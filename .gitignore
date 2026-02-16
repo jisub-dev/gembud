@@ -1,0 +1,94 @@
+# ===========================
+# Gembud Project .gitignore
+# ===========================
+
+# ===== Backend (Spring Boot) =====
+backend/build/
+backend/.gradle/
+backend/out/
+backend/bin/
+backend/target/
+
+# Spring Boot
+backend/.DS_Store
+backend/*.iml
+backend/*.ipr
+backend/*.iws
+backend/.idea/
+backend/.vscode/
+backend/.settings/
+backend/.classpath
+backend/.project
+backend/.factorypath
+
+# Log files
+backend/logs/
+backend/*.log
+
+# ===== Frontend (React) =====
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.turbo/
+
+# Frontend IDE
+frontend/.DS_Store
+frontend/*.iml
+frontend/.idea/
+frontend/.vscode/
+frontend/.eslintcache
+
+# Frontend environment
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# ===== Database =====
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== Docker =====
+docker-compose.override.yml
+
+# ===== Environment Variables =====
+.env
+.env.local
+.env.*.local
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Temporary Files =====
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# ===== Claude Code =====
+.claude/
+!.claude/settings.json
+
+# ===== Documentation (generated) =====
+docs/api/generated/
