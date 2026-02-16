@@ -17,6 +17,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
 
+app:
+  oauth2:
+    redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/auth/callback}
+
 logging:
   level:
     root: INFO

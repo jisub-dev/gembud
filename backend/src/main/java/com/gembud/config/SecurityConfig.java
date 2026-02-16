@@ -1,6 +1,7 @@
 package com.gembud.config;
 
 import com.gembud.security.JwtAuthenticationFilter;
+import com.gembud.security.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Spring Security configuration for JWT-based authentication.
+ * Spring Security configuration for JWT-based and OAuth2 authentication.
  *
  * @author Gembud Team
  * @since 2026-02-16
@@ -27,6 +28,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     /**
      * Configures HTTP security with JWT authentication.
@@ -51,6 +53,9 @@ public class SecurityConfig {
                     "/login/oauth2/**"
                 ).permitAll()
                 .anyRequest().authenticated()
+            )
+            .oauth2Login(oauth2 -> oauth2
+                .successHandler(oAuth2SuccessHandler)
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
