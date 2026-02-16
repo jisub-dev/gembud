@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/gembud
-    username: gembud
-    password: gembud123
+    username: ${DATABASE_USERNAME:gembud}
+    password: ${DATABASE_PASSWORD:gembud_dev_password}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
