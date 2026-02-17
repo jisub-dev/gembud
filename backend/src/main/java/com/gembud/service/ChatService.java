@@ -231,4 +231,71 @@ public class ChatService {
                 "Chat room not found for game room: " + roomId
             ));
     }
+
+    /**
+     * Create a direct chat room between two users.
+     *
+     * @param userId1 first user ID
+     * @param userId2 second user ID
+     * @return created chat room ID
+     */
+    @Transactional
+    public Long createDirectChatRoom(Long userId1, Long userId2) {
+        // Verify users exist
+        User user1 = userRepository.findById(userId1)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId1));
+        User user2 = userRepository.findById(userId2)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId2));
+
+        // Create DIRECT_CHAT
+        ChatRoom chatRoom = ChatRoom.builder()
+            .type(ChatRoom.ChatRoomType.DIRECT_CHAT)
+            .build();
+        chatRoom = chatRoomRepository.save(chatRoom);
+
+        // Add both users as members
+        ChatRoomMember member1 = ChatRoomMember.builder()
+            .chatRoom(chatRoom)
+            .user(user1)
+            .build();
+        chatRoomMemberRepository.save(member1);
+
+        ChatRoomMember member2 = ChatRoomMember.builder()
+            .chatRoom(chatRoom)
+            .user(user2)
+            .build();
+        chatRoomMemberRepository.save(member2);
+
+        return chatRoom.getId();
+    }
+
+    /**
+     * Create a group chat room.
+     *
+     * @param name group chat name
+     * @param creatorId creator user ID
+     * @return created chat room ID
+     */
+    @Transactional
+    public Long createGroupChatRoom(String name, Long creatorId) {
+        // Verify creator exists
+        User creator = userRepository.findById(creatorId)
+            .orElseThrow(() -> new IllegalArgumentException("Creator not found: " + creatorId));
+
+        // Create GROUP_CHAT
+        ChatRoom chatRoom = ChatRoom.builder()
+            .type(ChatRoom.ChatRoomType.GROUP_CHAT)
+            .name(name)
+            .build();
+        chatRoom = chatRoomRepository.save(chatRoom);
+
+        // Add creator as member
+        ChatRoomMember member = ChatRoomMember.builder()
+            .chatRoom(chatRoom)
+            .user(creator)
+            .build();
+        chatRoomMemberRepository.save(member);
+
+        return chatRoom.getId();
+    }
 }
