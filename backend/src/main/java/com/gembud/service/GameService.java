@@ -9,6 +9,7 @@ import com.gembud.repository.GameRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class GameService {
      *
      * @return list of game responses
      */
+    @Cacheable(value = "games", key = "'all'")
     @Transactional(readOnly = true)
     public List<GameResponse> getAllGames() {
         return gameRepository.findAll().stream()
@@ -43,6 +45,7 @@ public class GameService {
      * @param gameId game ID
      * @return game response with options
      */
+    @Cacheable(value = "games", key = "#gameId")
     @Transactional(readOnly = true)
     public GameResponse getGameById(Long gameId) {
         Game game = gameRepository.findById(gameId)

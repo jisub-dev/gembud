@@ -12,6 +12,7 @@ import com.gembud.repository.ChatRoomMemberRepository;
 import com.gembud.repository.ChatRoomRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
+import com.gembud.util.HtmlSanitizer;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,6 +40,7 @@ public class ChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
+    private final HtmlSanitizer htmlSanitizer;
 
     /**
      * Send a chat message.
@@ -67,6 +69,9 @@ public class ChatService {
             );
         }
 
+        // Sanitize message to prevent XSS attacks
+        String sanitizedMessage = htmlSanitizer.sanitizeAndLimit(request.getMessage(), 1000);
+
         // Handle message based on chat room type
         switch (chatRoom.getType()) {
             case ROOM_CHAT:
@@ -75,7 +80,7 @@ public class ChatService {
                     .chatRoomId(chatRoom.getId())
                     .userId(user.getId())
                     .username(user.getNickname())
-                    .message(request.getMessage())
+                    .message(sanitizedMessage)
                     .build();
 
             case GROUP_CHAT:
@@ -83,7 +88,7 @@ public class ChatService {
                 ChatMessage groupMessage = ChatMessage.builder()
                     .chatRoom(chatRoom)
                     .user(user)
-                    .message(request.getMessage())
+                    .message(sanitizedMessage)
                     .build();
                 groupMessage = chatMessageRepository.save(groupMessage);
 
@@ -102,7 +107,7 @@ public class ChatService {
                 ChatMessage directMessage = ChatMessage.builder()
                     .chatRoom(chatRoom)
                     .user(user)
-                    .message(request.getMessage())
+                    .message(sanitizedMessage)
                     .build();
                 directMessage = chatMessageRepository.save(directMessage);
 
