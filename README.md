@@ -144,17 +144,37 @@ npm run dev
   - EvaluationRepository 확장 (과거 평가 조회)
   - 6개 테스트 케이스
 
+- ✅ **Phase 9**: 신고 시스템
+  - Report 엔티티 및 ReportStatus 열거형 (PENDING, REVIEWED, RESOLVED)
+  - ReportRepository: 8개 복잡한 쿼리 메서드
+    - 신고자/피신고자/상태/방별 조회
+    - 중복 신고 체크 (동일 방 내)
+    - 대기 중인 신고 개수 조회
+  - ReportService: 9개 비즈니스 로직
+    - 신고 생성 (자기 자신 신고 방지, 중복 체크)
+    - 신고 상태 관리 (검토/처리 완료)
+    - 관리자 코멘트 추가
+  - ReportController: 8개 REST API
+    - POST /reports - 신고 생성
+    - GET /reports/my - 내 신고 목록
+    - GET /reports/status/{status} - 상태별 조회 (관리자)
+    - GET /reports/user/{userId} - 사용자별 신고 조회 (관리자)
+    - PUT /reports/{id}/review - 검토 시작 (관리자)
+    - PUT /reports/{id}/resolve - 처리 완료 (관리자)
+    - DELETE /reports/{id} - 신고 삭제 (관리자)
+  - Flyway V11 마이그레이션 (reports 테이블)
+  - 20개 포괄적인 테스트 케이스
+
 ### 📊 통계
-- **100개 파일, 9,977줄** 추가
-- **Backend**: 75개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
+- **107개 파일, 11,628줄** 추가
+- **Backend**: 82개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
 - **Frontend**: 8개 파일 (인증 UI, API 서비스, 상태 관리)
-- **Database**: 10개 Flyway 마이그레이션
-- **Tests**: 총 101개 테스트 케이스
-- **API Documentation**: 완전한 REST API 문서 (매칭 추천 포함)
+- **Database**: 11개 Flyway 마이그레이션
+- **Tests**: 총 121개 테스트 케이스
+- **API Documentation**: 완전한 REST API 문서 (신고 시스템 포함)
 
 ### 🚀 다음 단계
 
-- ⏳ Phase 9: 신고 시스템
 - ⏳ Phase 10: 실시간 알림
 - ⏳ Phase 11: 스팀 게임 확장
 - ⏳ Phase 12: 게임사 API 연동
