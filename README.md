@@ -165,17 +165,52 @@ npm run dev
   - Flyway V11 마이그레이션 (reports 테이블)
   - 20개 포괄적인 테스트 케이스
 
+- ✅ **Phase 10**: 실시간 알림 시스템
+  - Notification 엔티티 및 NotificationType 열거형
+    - FRIEND_REQUEST, FRIEND_ACCEPTED, ROOM_INVITE
+    - ROOM_JOIN, EVALUATION_RECEIVED, REPORT_RESOLVED
+  - NotificationRepository: 6개 쿼리 메서드
+    - 사용자별/읽지 않은 알림 조회
+    - 읽지 않은 알림 개수 카운트
+    - 일괄 읽음 처리 (UPDATE 쿼리)
+    - 30일 이상 된 읽은 알림 자동 삭제
+  - NotificationService: 9개 비즈니스 로직
+    - createNotification(): 알림 생성 및 WebSocket 전송
+    - getMyNotifications(): 내 알림 목록
+    - getUnreadNotifications(): 읽지 않은 알림
+    - getUnreadCount(): 읽지 않은 개수
+    - markAsRead(): 개별 읽음 처리
+    - markAllAsRead(): 일괄 읽음 처리
+    - deleteNotification(): 알림 삭제
+    - cleanupOldNotifications(): 오래된 알림 정리
+  - NotificationController: 6개 REST API
+    - GET /notifications - 내 알림 목록
+    - GET /notifications/unread - 읽지 않은 알림
+    - GET /notifications/unread/count - 읽지 않은 개수
+    - PUT /notifications/{id}/read - 읽음 처리
+    - PUT /notifications/read-all - 모두 읽음
+    - DELETE /notifications/{id} - 알림 삭제
+  - WebSocket 실시간 알림 전송
+    - SimpMessagingTemplate 활용
+    - /user/queue/notifications 구독
+    - 전송 실패 시 graceful 처리
+  - Flyway V12 마이그레이션 (notifications 테이블)
+  - 15개 포괄적인 테스트 케이스
+    - 알림 생성 및 전송 검증
+    - WebSocket 실패 처리 테스트
+    - 권한 검증 (다른 사용자 알림 접근 방지)
+    - 일괄 처리 및 자동 정리 테스트
+
 ### 📊 통계
-- **107개 파일, 11,628줄** 추가
-- **Backend**: 82개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
+- **114개 파일, 13,491줄** 추가
+- **Backend**: 89개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
 - **Frontend**: 8개 파일 (인증 UI, API 서비스, 상태 관리)
-- **Database**: 11개 Flyway 마이그레이션
-- **Tests**: 총 121개 테스트 케이스
-- **API Documentation**: 완전한 REST API 문서 (신고 시스템 포함)
+- **Database**: 12개 Flyway 마이그레이션
+- **Tests**: 총 136개 테스트 케이스
+- **API Documentation**: 완전한 REST API 문서 (실시간 알림 포함)
 
 ### 🚀 다음 단계
 
-- ⏳ Phase 10: 실시간 알림
 - ⏳ Phase 11: 스팀 게임 확장
 - ⏳ Phase 12: 게임사 API 연동
 
