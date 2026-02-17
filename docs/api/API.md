@@ -383,6 +383,143 @@ Authorization: Bearer <your_jwt_token>
 
 ---
 
+## Report APIs
+
+### 1. Create Report
+신고 생성
+
+**Endpoint:** `POST /reports`
+
+**Request Body:**
+```json
+{
+  "reportedId": 2,
+  "roomId": 1,
+  "reason": "욕설 사용",
+  "description": "심한 욕설을 사용했습니다."
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "id": 1,
+  "reporter": {
+    "id": 1,
+    "nickname": "Reporter",
+    "email": "reporter@example.com"
+  },
+  "reported": {
+    "id": 2,
+    "nickname": "Reported",
+    "email": "reported@example.com"
+  },
+  "roomId": 1,
+  "roomTitle": "Test Room",
+  "reason": "욕설 사용",
+  "description": "심한 욕설을 사용했습니다.",
+  "status": "PENDING",
+  "createdAt": "2026-02-17T12:00:00",
+  "reviewedAt": null,
+  "resolvedAt": null,
+  "adminComment": null
+}
+```
+
+**Notes:**
+- `roomId` is optional (for non-room related reports)
+- Cannot report yourself
+- Cannot report the same user twice in the same room
+
+### 2. Get My Reports
+내가 작성한 신고 목록
+
+**Endpoint:** `GET /reports/my`
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 1,
+    "reporter": {
+      "id": 1,
+      "nickname": "Reporter",
+      "email": "reporter@example.com"
+    },
+    "reported": {
+      "id": 2,
+      "nickname": "Reported",
+      "email": "reported@example.com"
+    },
+    "roomId": 1,
+    "roomTitle": "Test Room",
+    "reason": "욕설 사용",
+    "description": "심한 욕설을 사용했습니다.",
+    "status": "RESOLVED",
+    "createdAt": "2026-02-17T12:00:00",
+    "reviewedAt": "2026-02-17T13:00:00",
+    "resolvedAt": "2026-02-17T14:00:00",
+    "adminComment": "처리 완료"
+  }
+]
+```
+
+### 3. Get Reports by Status (Admin Only)
+상태별 신고 조회
+
+**Endpoint:** `GET /reports/status/{status}`
+
+**Path Parameters:**
+- `status` - Report status (PENDING, REVIEWED, RESOLVED)
+
+**Response:** `200 OK`
+
+### 4. Get Reports Against User (Admin Only)
+특정 사용자에 대한 신고 조회
+
+**Endpoint:** `GET /reports/user/{userId}`
+
+**Path Parameters:**
+- `userId` - User ID
+
+**Response:** `200 OK`
+
+### 5. Get Pending Report Count (Admin Only)
+대기 중인 신고 개수 조회
+
+**Endpoint:** `GET /reports/user/{userId}/count`
+
+**Response:** `200 OK`
+```json
+3
+```
+
+### 6. Mark Report as Reviewed (Admin Only)
+신고를 검토 중으로 변경
+
+**Endpoint:** `PUT /reports/{reportId}/review`
+
+**Response:** `200 OK`
+
+### 7. Resolve Report (Admin Only)
+신고 처리 완료
+
+**Endpoint:** `PUT /reports/{reportId}/resolve`
+
+**Query Parameters:**
+- `adminComment` - Admin comment (required)
+
+**Response:** `200 OK`
+
+### 8. Delete Report (Admin Only)
+신고 삭제
+
+**Endpoint:** `DELETE /reports/{reportId}`
+
+**Response:** `204 No Content`
+
+---
+
 ## Friend APIs
 
 ### 1. Send Friend Request
