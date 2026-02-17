@@ -37,6 +37,7 @@ public class RoomService {
     private final GameRepository gameRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TemperatureService temperatureService;
 
     /**
      * Create a new room.
@@ -49,6 +50,14 @@ public class RoomService {
     public RoomResponse createRoom(CreateRoomRequest request, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Check temperature restriction (< 30°C cannot create rooms)
+        if (!temperatureService.canCreateRoom(user.getId())) {
+            throw new IllegalStateException(
+                "Cannot create room: temperature is below 30°C. " +
+                "Improve your rating by participating in games and receiving positive evaluations."
+            );
+        }
 
         Game game = gameRepository.findById(request.getGameId())
             .orElseThrow(() -> new IllegalArgumentException("Game not found"));
