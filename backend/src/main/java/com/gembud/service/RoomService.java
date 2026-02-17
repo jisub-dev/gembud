@@ -38,6 +38,7 @@ public class RoomService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TemperatureService temperatureService;
+    private final ChatService chatService;
 
     /**
      * Create a new room.
@@ -101,6 +102,11 @@ public class RoomService {
                 .collect(Collectors.toList());
             filterRepository.saveAll(filters);
         }
+
+        // Create chat room for this game room
+        Long chatRoomId = chatService.createChatRoomForGameRoom(room.getId());
+        // Add creator as chat room member
+        chatService.addMemberToChatRoom(chatRoomId, user.getId());
 
         return buildRoomResponse(room);
     }
@@ -186,6 +192,10 @@ public class RoomService {
         room.incrementParticipants();
         roomRepository.save(room);
 
+        // Add user to chat room
+        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        chatService.addMemberToChatRoom(chatRoomId, user.getId());
+
         return buildRoomResponse(room);
     }
 
@@ -208,9 +218,13 @@ public class RoomService {
 
         boolean wasHost = participant.getIsHost();
 
-        // Remove participant
+        // Remove participant from game room
         participantRepository.delete(participant);
         room.decrementParticipants();
+
+        // Remove user from chat room
+        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        chatService.removeMemberFromChatRoom(chatRoomId, user.getId());
 
         // If no participants left, close room
         if (room.getCurrentParticipants() == 0) {
