@@ -2,6 +2,24 @@
 
 게임 파티원을 모집하고 매칭할 수 있는 웹 플랫폼입니다. 롤(LoL), 배그(PUBG), 발로란트 등 다양한 게임을 지원합니다.
 
+## 🚀 빠른 시작
+
+```bash
+# 1. Docker로 PostgreSQL, Redis 실행
+docker-compose up -d
+
+# 2. 백엔드 실행
+cd backend
+./gradlew bootRun
+
+# 3. API 테스트
+curl http://localhost:8080/api/games
+```
+
+**자세한 실행 가이드는 [SETUP.md](SETUP.md)를 참고하세요.**
+
+---
+
 ## 주요 기능
 
 - 🎮 **게임별 파티 모집**: 롤, 배그, 발로란트 등 게임별 파티 생성
