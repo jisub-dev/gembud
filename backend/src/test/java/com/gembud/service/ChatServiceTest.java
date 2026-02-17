@@ -482,4 +482,96 @@ class ChatServiceTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Chat room not found for game room: 100");
     }
+
+    @Test
+    @DisplayName("createDirectChatRoom - should create direct chat room successfully")
+    void createDirectChatRoom_ValidUsers_ShouldCreateDirectChat() {
+        // Given
+        User user2 = User.builder()
+            .id(2L)
+            .email("user2@example.com")
+            .nickname("User2")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+
+        ChatRoom directChat = ChatRoom.builder()
+            .id(10L)
+            .type(ChatRoom.ChatRoomType.DIRECT_CHAT)
+            .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user2));
+        when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(directChat);
+        when(chatRoomMemberRepository.save(any(ChatRoomMember.class)))
+            .thenReturn(new ChatRoomMember());
+
+        // When
+        Long chatRoomId = chatService.createDirectChatRoom(1L, 2L);
+
+        // Then
+        assertThat(chatRoomId).isEqualTo(10L);
+        verify(chatRoomRepository, times(1)).save(any(ChatRoom.class));
+        verify(chatRoomMemberRepository, times(2)).save(any(ChatRoomMember.class));
+    }
+
+    @Test
+    @DisplayName("createDirectChatRoom - should throw exception when user1 not found")
+    void createDirectChatRoom_User1NotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> chatService.createDirectChatRoom(1L, 2L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("User not found: 1");
+    }
+
+    @Test
+    @DisplayName("createDirectChatRoom - should throw exception when user2 not found")
+    void createDirectChatRoom_User2NotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(userRepository.findById(2L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> chatService.createDirectChatRoom(1L, 2L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("User not found: 2");
+    }
+
+    @Test
+    @DisplayName("createGroupChatRoom - should create group chat room successfully")
+    void createGroupChatRoom_ValidRequest_ShouldCreateGroupChat() {
+        // Given
+        ChatRoom groupChat = ChatRoom.builder()
+            .id(20L)
+            .type(ChatRoom.ChatRoomType.GROUP_CHAT)
+            .name("Test Group")
+            .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(groupChat);
+        when(chatRoomMemberRepository.save(any(ChatRoomMember.class)))
+            .thenReturn(new ChatRoomMember());
+
+        // When
+        Long chatRoomId = chatService.createGroupChatRoom("Test Group", 1L);
+
+        // Then
+        assertThat(chatRoomId).isEqualTo(20L);
+        verify(chatRoomRepository, times(1)).save(any(ChatRoom.class));
+        verify(chatRoomMemberRepository, times(1)).save(any(ChatRoomMember.class));
+    }
+
+    @Test
+    @DisplayName("createGroupChatRoom - should throw exception when creator not found")
+    void createGroupChatRoom_CreatorNotFound_ShouldThrowException() {
+        // Given
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> chatService.createGroupChatRoom("Test Group", 1L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Creator not found: 1");
+    }
 }

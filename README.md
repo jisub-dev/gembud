@@ -79,7 +79,7 @@ npm run dev
 ## 문서
 
 - [Architecture Decision Records](docs/adr/README.md)
-- [API 문서](docs/api/) (개발 중)
+- [API 문서](docs/api/API.md)
 - [개발 가이드](docs/guides/) (개발 중)
 
 ## 개발 단계
@@ -115,22 +115,39 @@ npm run dev
   - Redis 캐싱 (게임 목록, 옵션)
   - 46개의 서비스 테스트 케이스
 
+- ✅ **Phase 6**: 친구 시스템
+  - 양방향 친구 관계 관리
+  - 친구 요청/수락/거절/삭제
+  - 친구 목록 조회 (받은/보낸 요청 포함)
+  - FriendService: 8개 비즈니스 로직
+  - FriendController: 7개 REST API
+  - 23개 테스트 케이스
+
+- ✅ **Phase 7**: 그룹 및 1:1 채팅
+  - CustomUserDetails 개선 (userId 포함)
+  - 1:1 직접 채팅 생성
+  - 그룹 채팅 생성 및 멤버 관리
+  - ChatController: 5개 REST API
+  - WebSocket과 REST API 통합
+  - 5개 추가 테스트 케이스
+
 ### 📊 통계
-- **83개 파일, 7,559줄** 추가
-- **Backend**: 58개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
+- **95개 파일, 9,246줄** 추가
+- **Backend**: 70개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
 - **Frontend**: 8개 파일 (인증 UI, API 서비스, 상태 관리)
-- **Database**: 9개 Flyway 마이그레이션
-- **Tests**: 총 67개 테스트 케이스 (UserRepository, JWT, Chat, Game, Temperature, Evaluation)
+- **Database**: 10개 Flyway 마이그레이션
+- **Tests**: 총 95개 테스트 케이스
+- **API Documentation**: 완전한 REST API 문서
 
 ### 🚀 다음 단계
 
-- ⏳ Phase 6: 친구 시스템
-- ⏳ Phase 7: 그룹/1:1 채팅
 - ⏳ Phase 8: 매칭 추천 시스템
 - ⏳ Phase 9: 신고 시스템
 - ⏳ Phase 10: 실시간 알림
+- ⏳ Phase 11: 스팀 게임 확장
+- ⏳ Phase 12: 게임사 API 연동
 
-자세한 내용은 [프로젝트 계획서](.claude/plans/)를 참고하세요.
+자세한 내용은 [프로젝트 계획서](.claude/plans/)와 [API 문서](docs/api/API.md)를 참고하세요.
 
 ## 라이선스
 
