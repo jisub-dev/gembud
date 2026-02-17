@@ -86,12 +86,49 @@ npm run dev
 
 현재 진행 상황:
 
-- ✅ Phase 0: 프로젝트 셋업 및 문서화 기반 구축 (진행 중)
-- ⏳ Phase 1: 코어 인증 시스템
-- ⏳ Phase 2: 게임 및 방 시스템
-- ⏳ Phase 3: 온도 및 평가 시스템
-- ⏳ Phase 4: 실시간 채팅 시스템
-- ⏳ Phase 5: 폴리싱 및 배포
+### ✅ 완료된 Phase (MVP 백엔드)
+
+- ✅ **Phase 0**: 프로젝트 셋업 및 문서화 기반 구축
+- ✅ **Phase 1**: 코어 인증 시스템 (JWT + OAuth2)
+  - JWT 토큰 기반 인증 (Access Token 1h, Refresh Token 7d)
+  - Google, Discord OAuth2 연동
+  - 자체 회원가입/로그인 (BCrypt 암호화)
+- ✅ **Phase 2**: 게임 및 방 시스템
+  - 게임 도메인 (롤, 배그, 발로란트)
+  - 하이브리드 매칭 옵션 (공통 + 게임별 옵션)
+  - 방 생성/참가/나가기
+  - 방장 자동 이양 시스템
+- ✅ **Phase 3**: 온도 및 평가 시스템
+  - 온도 시스템 (0~100°C, 기본 36.5°C)
+  - 평가 기반 온도 증감 (-0.5°C ~ +0.5°C)
+  - 온도 30°C 미만 시 방 생성 제한
+  - 다차원 평가 (매너, 실력, 소통)
+- ✅ **Phase 4**: 실시간 채팅 시스템
+  - WebSocket (STOMP) 기반 실시간 채팅
+  - 차등 메시지 저장 전략
+    - ROOM_CHAT: 저장 안 함 (실시간만)
+    - GROUP_CHAT: 최근 100개만 저장
+    - DIRECT_CHAT: 전부 저장
+- ✅ **Phase 5**: 폴리싱 및 배포 준비
+  - GlobalExceptionHandler (통합 예외 처리)
+  - CORS 설정 및 XSS 방지 (HtmlSanitizer)
+  - Redis 캐싱 (게임 목록, 옵션)
+  - 46개의 서비스 테스트 케이스
+
+### 📊 통계
+- **83개 파일, 7,559줄** 추가
+- **Backend**: 58개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
+- **Frontend**: 8개 파일 (인증 UI, API 서비스, 상태 관리)
+- **Database**: 9개 Flyway 마이그레이션
+- **Tests**: 총 67개 테스트 케이스 (UserRepository, JWT, Chat, Game, Temperature, Evaluation)
+
+### 🚀 다음 단계
+
+- ⏳ Phase 6: 친구 시스템
+- ⏳ Phase 7: 그룹/1:1 채팅
+- ⏳ Phase 8: 매칭 추천 시스템
+- ⏳ Phase 9: 신고 시스템
+- ⏳ Phase 10: 실시간 알림
 
 자세한 내용은 [프로젝트 계획서](.claude/plans/)를 참고하세요.
 
