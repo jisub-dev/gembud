@@ -1,0 +1,201 @@
+package com.gembud.service;
+
+import com.gembud.dto.request.FriendRequest;
+import com.gembud.dto.response.FriendResponse;
+import com.gembud.entity.Friend;
+import com.gembud.entity.Friend.FriendStatus;
+import com.gembud.entity.User;
+import com.gembud.repository.FriendRepository;
+import com.gembud.repository.UserRepository;
+import java.util.List;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Service for friend operations.
+ *
+ * @author Gembud Team
+ * @since 2026-02-17
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class FriendService {
+
+    private final FriendRepository friendRepository;
+    private final UserRepository userRepository;
+
+    /**
+     * Send friend request.
+     *
+     * @param userEmail current user email
+     * @param request friend request
+     * @return created friend relationship
+     */
+    @Transactional
+    public FriendResponse sendFriendRequest(String userEmail, FriendRequest request) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        User friend = userRepository.findById(request.getFriendId())
+            .orElseThrow(() -> new IllegalArgumentException("Friend user not found"));
+
+        // Cannot send request to self
+        if (user.getId().equals(friend.getId())) {
+            throw new IllegalArgumentException("Cannot send friend request to yourself");
+        }
+
+        // Check if request already exists (bidirectional)
+        if (friendRepository.requestExists(user.getId(), friend.getId())) {
+            throw new IllegalStateException("Friend request already exists");
+        }
+
+        // Create friend request
+        Friend friendRelation = Friend.builder()
+            .user(user)
+            .friend(friend)
+            .status(FriendStatus.PENDING)
+            .build();
+
+        friendRepository.save(friendRelation);
+
+        return FriendResponse.from(friendRelation);
+    }
+
+    /**
+     * Accept friend request.
+     *
+     * @param userEmail current user email
+     * @param requestId friend request ID
+     * @return updated friend relationship
+     */
+    @Transactional
+    public FriendResponse acceptFriendRequest(String userEmail, Long requestId) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Friend friendRequest = friendRepository.findById(requestId)
+            .orElseThrow(() -> new IllegalArgumentException("Friend request not found"));
+
+        // Only the receiver can accept the request
+        if (!friendRequest.getFriend().getId().equals(user.getId())) {
+            throw new IllegalStateException("Only the receiver can accept this request");
+        }
+
+        // Check if already accepted
+        if (friendRequest.getStatus() == FriendStatus.ACCEPTED) {
+            throw new IllegalStateException("Friend request already accepted");
+        }
+
+        // Accept request
+        friendRequest.accept();
+        friendRepository.save(friendRequest);
+
+        return FriendResponse.from(friendRequest);
+    }
+
+    /**
+     * Reject friend request.
+     *
+     * @param userEmail current user email
+     * @param requestId friend request ID
+     * @return updated friend relationship
+     */
+    @Transactional
+    public FriendResponse rejectFriendRequest(String userEmail, Long requestId) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Friend friendRequest = friendRepository.findById(requestId)
+            .orElseThrow(() -> new IllegalArgumentException("Friend request not found"));
+
+        // Only the receiver can reject the request
+        if (!friendRequest.getFriend().getId().equals(user.getId())) {
+            throw new IllegalStateException("Only the receiver can reject this request");
+        }
+
+        // Reject request
+        friendRequest.reject();
+        friendRepository.save(friendRequest);
+
+        return FriendResponse.from(friendRequest);
+    }
+
+    /**
+     * Unfriend (remove friend).
+     *
+     * @param userEmail current user email
+     * @param friendId friend user ID
+     */
+    @Transactional
+    public void unfriend(String userEmail, Long friendId) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Check if they are friends
+        if (!friendRepository.areFriends(user.getId(), friendId)) {
+            throw new IllegalStateException("Not friends with this user");
+        }
+
+        // Delete friendship (bidirectional)
+        friendRepository.deleteByUserIdAndFriendId(user.getId(), friendId);
+    }
+
+    /**
+     * Get my friends list.
+     *
+     * @param userEmail current user email
+     * @return list of friends
+     */
+    public List<FriendResponse> getMyFriends(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return friendRepository.findAcceptedFriends(user.getId()).stream()
+            .map(FriendResponse::from)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Get pending friend requests (received).
+     *
+     * @param userEmail current user email
+     * @return list of pending requests
+     */
+    public List<FriendResponse> getPendingRequests(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return friendRepository.findByFriendIdAndStatus(user.getId(), FriendStatus.PENDING).stream()
+            .map(FriendResponse::from)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Get sent friend requests.
+     *
+     * @param userEmail current user email
+     * @return list of sent requests
+     */
+    public List<FriendResponse> getSentRequests(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return friendRepository.findByUserIdAndStatus(user.getId(), FriendStatus.PENDING).stream()
+            .map(FriendResponse::from)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Check if two users are friends.
+     *
+     * @param userId user ID
+     * @param friendId friend ID
+     * @return true if they are friends
+     */
+    public boolean areFriends(Long userId, Long friendId) {
+        return friendRepository.areFriends(userId, friendId);
+    }
+}
