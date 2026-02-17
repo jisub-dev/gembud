@@ -131,17 +131,29 @@ npm run dev
   - WebSocket과 REST API 통합
   - 5개 추가 테스트 케이스
 
+- ✅ **Phase 8**: 매칭 추천 시스템
+  - 다차원 점수 계산 알고리즘 (총 100점)
+    - 필터 매칭: 40점
+    - 온도 호환성: 30점
+    - 과거 평가: 20점
+    - 방장 온도 보너스: 10점
+  - 사용자 맞춤 방 추천 API
+  - 점수 기반 한글 추천 사유 생성
+  - MatchingService: 핵심 추천 로직
+  - MatchingController: GET /matching/recommendations/game/{gameId}
+  - EvaluationRepository 확장 (과거 평가 조회)
+  - 6개 테스트 케이스
+
 ### 📊 통계
-- **95개 파일, 9,246줄** 추가
-- **Backend**: 70개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
+- **100개 파일, 9,977줄** 추가
+- **Backend**: 75개 파일 (엔티티, 서비스, 컨트롤러, 테스트)
 - **Frontend**: 8개 파일 (인증 UI, API 서비스, 상태 관리)
 - **Database**: 10개 Flyway 마이그레이션
-- **Tests**: 총 95개 테스트 케이스
-- **API Documentation**: 완전한 REST API 문서
+- **Tests**: 총 101개 테스트 케이스
+- **API Documentation**: 완전한 REST API 문서 (매칭 추천 포함)
 
 ### 🚀 다음 단계
 
-- ⏳ Phase 8: 매칭 추천 시스템
 - ⏳ Phase 9: 신고 시스템
 - ⏳ Phase 10: 실시간 알림
 - ⏳ Phase 11: 스팀 게임 확장

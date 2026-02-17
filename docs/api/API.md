@@ -300,6 +300,89 @@ Authorization: Bearer <your_jwt_token>
 
 ---
 
+## Matching Recommendation APIs
+
+### 1. Get Recommended Rooms
+게임별 추천 매칭방 조회
+
+**Endpoint:** `GET /matching/recommendations/game/{gameId}`
+
+**Path Parameters:**
+- `gameId` - 게임 ID
+
+**Query Parameters:**
+- `limit` - 최대 추천 개수 (기본값: 10)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "room": {
+      "id": 1,
+      "title": "롤 같이 하실 분",
+      "description": "골드 이상 구해요",
+      "gameId": 1,
+      "gameName": "리그 오브 레전드",
+      "maxParticipants": 5,
+      "currentParticipants": 3,
+      "isPrivate": false,
+      "status": "OPEN",
+      "createdBy": {
+        "id": 2,
+        "nickname": "방장닉네임",
+        "temperature": 45.0
+      },
+      "createdAt": "2026-02-17T10:00:00"
+    },
+    "matchingScore": 87.5,
+    "hostTemperature": 45.0,
+    "reason": "매우 높은 매칭도! 조건이 잘 맞습니다."
+  },
+  {
+    "room": {
+      "id": 3,
+      "title": "배그 스쿼드",
+      "description": "편하게 즐겨요",
+      "gameId": 2,
+      "gameName": "배틀그라운드",
+      "maxParticipants": 4,
+      "currentParticipants": 2,
+      "isPrivate": false,
+      "status": "OPEN",
+      "createdBy": {
+        "id": 4,
+        "nickname": "일반유저",
+        "temperature": 36.5
+      },
+      "createdAt": "2026-02-17T11:30:00"
+    },
+    "matchingScore": 62.0,
+    "hostTemperature": 36.5,
+    "reason": "좋은 매칭도! 조건이 맞습니다."
+  }
+]
+```
+
+**매칭 점수 계산 방식:**
+- 필터 매칭: 40점 (방의 조건과 사용자 정보 일치도)
+- 온도 호환성: 30점 (참가자들의 평균 온도와 사용자 온도 차이)
+- 과거 평가: 20점 (참가자들과의 과거 평가 이력)
+- 방장 온도 보너스: 10점 (방장의 온도가 높을수록 가산점)
+
+**추천 사유:**
+- 80점 이상: "매우 높은 매칭도! 조건이 잘 맞습니다."
+- 60-79점: "좋은 매칭도! 조건이 맞습니다." (방장 온도 40°C 초과 시: "좋은 매칭도! 방장의 온도가 높습니다.")
+- 40-59점: "괜찮은 매칭도입니다."
+- 40점 미만: "새로운 사람들과 플레이해보세요!"
+
+**특징:**
+- 이미 참가 중인 방은 제외
+- 매칭 점수 내림차순 정렬
+- 사용자의 게임 티어, 나이대, 플레이 스타일을 고려
+- 과거 함께 플레이한 사용자들과의 평가 이력 반영
+
+---
+
 ## Friend APIs
 
 ### 1. Send Friend Request
