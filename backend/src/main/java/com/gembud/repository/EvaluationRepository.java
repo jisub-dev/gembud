@@ -66,4 +66,17 @@ public interface EvaluationRepository extends JpaRepository<Evaluation, Long> {
      */
     @Query("SELECT COUNT(e) FROM Evaluation e WHERE e.evaluated.id = :userId")
     long countByEvaluatedId(@Param("userId") Long userId);
+
+    /**
+     * Find evaluations given by evaluator to evaluated user.
+     *
+     * @param evaluatorId evaluator ID
+     * @param evaluatedId evaluated ID
+     * @return list of evaluations
+     */
+    @Query("SELECT e FROM Evaluation e WHERE e.evaluator.id = :evaluatorId AND e.evaluated.id = :evaluatedId")
+    List<Evaluation> findByEvaluatorIdAndEvaluatedId(
+        @Param("evaluatorId") Long evaluatorId,
+        @Param("evaluatedId") Long evaluatedId
+    );
 }
