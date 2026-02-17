@@ -520,6 +520,134 @@ Authorization: Bearer <your_jwt_token>
 
 ---
 
+## Notification APIs
+
+### 1. Get My Notifications
+내 알림 목록 조회
+
+**Endpoint:** `GET /notifications`
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 1,
+    "type": "FRIEND_REQUEST",
+    "content": "새로운 친구 요청이 있습니다.",
+    "relatedId": 2,
+    "isRead": false,
+    "createdAt": "2026-02-17T12:00:00"
+  },
+  {
+    "id": 2,
+    "type": "EVALUATION_RECEIVED",
+    "content": "매칭에서 평가를 받았습니다.",
+    "relatedId": 10,
+    "isRead": true,
+    "createdAt": "2026-02-17T11:30:00"
+  }
+]
+```
+
+**Notification Types:**
+- `FRIEND_REQUEST` - 친구 요청
+- `FRIEND_ACCEPTED` - 친구 요청 수락됨
+- `ROOM_INVITE` - 방 초대
+- `ROOM_JOIN` - 방 참가 알림
+- `EVALUATION_RECEIVED` - 평가 받음
+- `REPORT_RESOLVED` - 신고 처리 완료
+
+### 2. Get Unread Notifications
+읽지 않은 알림 조회
+
+**Endpoint:** `GET /notifications/unread`
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 1,
+    "type": "FRIEND_REQUEST",
+    "content": "새로운 친구 요청이 있습니다.",
+    "relatedId": 2,
+    "isRead": false,
+    "createdAt": "2026-02-17T12:00:00"
+  }
+]
+```
+
+### 3. Get Unread Count
+읽지 않은 알림 개수
+
+**Endpoint:** `GET /notifications/unread/count`
+
+**Response:** `200 OK`
+```json
+5
+```
+
+### 4. Mark Notification as Read
+알림을 읽음으로 표시
+
+**Endpoint:** `PUT /notifications/{notificationId}/read`
+
+**Response:** `200 OK`
+```json
+{
+  "id": 1,
+  "type": "FRIEND_REQUEST",
+  "content": "새로운 친구 요청이 있습니다.",
+  "relatedId": 2,
+  "isRead": true,
+  "createdAt": "2026-02-17T12:00:00"
+}
+```
+
+### 5. Mark All as Read
+모든 알림을 읽음으로 표시
+
+**Endpoint:** `PUT /notifications/read-all`
+
+**Response:** `200 OK`
+```json
+5
+```
+
+**Note:** Returns the number of notifications marked as read.
+
+### 6. Delete Notification
+알림 삭제
+
+**Endpoint:** `DELETE /notifications/{notificationId}`
+
+**Response:** `204 No Content`
+
+---
+
+## WebSocket Notifications
+
+**Connection:**
+```javascript
+const socket = new SockJS('/ws');
+const stompClient = Stomp.over(socket);
+
+stompClient.connect({}, (frame) => {
+  // Subscribe to user's notification queue
+  stompClient.subscribe('/user/queue/notifications', (message) => {
+    const notification = JSON.parse(message.body);
+    console.log('New notification:', notification);
+  });
+});
+```
+
+**Notes:**
+- Notifications are sent in real-time via WebSocket
+- Each user subscribes to `/user/queue/notifications`
+- Notifications are also persisted in the database
+- Old read notifications are automatically cleaned up after 30 days
+
+---
+
 ## Friend APIs
 
 ### 1. Send Friend Request
