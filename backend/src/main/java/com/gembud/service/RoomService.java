@@ -52,6 +52,14 @@ public class RoomService {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // Phase 11: Check if user is suspended
+        if (user.isSuspended()) {
+            throw new IllegalStateException(
+                String.format("Cannot create room: You are suspended until %s due to multiple reports. " +
+                    "Please contact support for more information.", user.getSuspendedUntil())
+            );
+        }
+
         // Check temperature restriction (< 30°C cannot create rooms)
         if (!temperatureService.canCreateRoom(user.getId())) {
             throw new IllegalStateException(
@@ -149,6 +157,14 @@ public class RoomService {
     public RoomResponse joinRoom(Long roomId, JoinRoomRequest request, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Phase 11: Check if user is suspended
+        if (user.isSuspended()) {
+            throw new IllegalStateException(
+                String.format("Cannot join room: You are suspended until %s due to multiple reports. " +
+                    "Please contact support for more information.", user.getSuspendedUntil())
+            );
+        }
 
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new IllegalArgumentException("Room not found"));

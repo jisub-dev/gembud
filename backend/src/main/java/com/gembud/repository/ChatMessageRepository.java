@@ -45,4 +45,19 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
      * @return message count
      */
     long countByChatRoomId(Long chatRoomId);
+
+    /**
+     * Delete old ROOM_CHAT messages (Phase 11: Evidence retention).
+     * Deletes ROOM_CHAT messages older than the specified date.
+     *
+     * @param cutoffDate cutoff date (e.g., 7 days ago)
+     * @return number of deleted messages
+     */
+    @Query(value = "DELETE FROM chat_messages m USING chat_rooms r " +
+           "WHERE m.chat_room_id = r.id " +
+           "AND r.type = 'ROOM_CHAT' " +
+           "AND m.created_at < :cutoffDate",
+           nativeQuery = true)
+    @org.springframework.data.jpa.repository.Modifying
+    int deleteOldRoomChatMessages(@Param("cutoffDate") java.time.LocalDateTime cutoffDate);
 }

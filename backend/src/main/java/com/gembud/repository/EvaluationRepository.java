@@ -79,4 +79,20 @@ public interface EvaluationRepository extends JpaRepository<Evaluation, Long> {
         @Param("evaluatorId") Long evaluatorId,
         @Param("evaluatedId") Long evaluatedId
     );
+
+    /**
+     * Count evaluations by evaluator to evaluated user in current month.
+     * Used for preventing evaluation manipulation (monthly limit).
+     *
+     * @param evaluatorId evaluator ID
+     * @param evaluatedId evaluated ID
+     * @param startOfMonth start of current month
+     * @return count of evaluations in current month
+     */
+    @Query("SELECT COUNT(e) FROM Evaluation e WHERE e.evaluator.id = :evaluatorId AND e.evaluated.id = :evaluatedId AND e.createdAt >= :startOfMonth")
+    long countByEvaluatorAndEvaluatedInCurrentMonth(
+        @Param("evaluatorId") Long evaluatorId,
+        @Param("evaluatedId") Long evaluatedId,
+        @Param("startOfMonth") java.time.LocalDateTime startOfMonth
+    );
 }

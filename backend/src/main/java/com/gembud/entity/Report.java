@@ -40,6 +40,37 @@ public class Report {
         RESOLVED    // 처리 완료
     }
 
+    /**
+     * Report category enum (Phase 11).
+     */
+    public enum ReportCategory {
+        VERBAL_ABUSE("욕설/비방"),
+        GAME_DISRUPTION("게임 방해"),
+        HARASSMENT("성희롱"),
+        FRAUD("사기/계정거래"),
+        FALSE_INFO("허위 정보");
+
+        private final String displayName;
+
+        ReportCategory(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
+
+    /**
+     * Report priority enum (Phase 11).
+     */
+    public enum ReportPriority {
+        LOW,        // 낮음
+        MEDIUM,     // 중간
+        HIGH,       // 높음
+        CRITICAL    // 최고 (성희롱, 사기 등)
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -66,6 +97,16 @@ public class Report {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private ReportStatus status = ReportStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
+    private ReportCategory category = ReportCategory.VERBAL_ABUSE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ReportPriority priority = ReportPriority.MEDIUM;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)

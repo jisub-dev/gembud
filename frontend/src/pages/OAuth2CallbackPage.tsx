@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 
-export function OAuth2CallbackPage() {
+function OAuth2CallbackPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { handleOAuth2Callback } = useAuthStore();
@@ -21,3 +21,5 @@ export function OAuth2CallbackPage() {
     </div>
   );
 }
+
+export default OAuth2CallbackPage;

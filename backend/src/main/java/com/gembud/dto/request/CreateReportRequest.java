@@ -1,5 +1,6 @@
 package com.gembud.dto.request;
 
+import com.gembud.entity.Report.ReportCategory;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -27,6 +28,12 @@ public class CreateReportRequest {
      * Room ID (nullable).
      */
     private Long roomId;
+
+    /**
+     * Report category (Phase 11).
+     */
+    @NotNull(message = "Category is required")
+    private ReportCategory category;
 
     /**
      * Report reason.

@@ -68,6 +68,13 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /**
+     * User suspension expiration time (Phase 11: Auto-sanction).
+     * Null if not suspended.
+     */
+    @Column(name = "suspended_until")
+    private LocalDateTime suspendedUntil;
+
     @Builder
     public User(String email, String password, String nickname, String profileImageUrl,
                 String ageRange, BigDecimal temperature, OAuthProvider oauthProvider,
@@ -134,6 +141,31 @@ public class User {
      */
     public boolean isEmailUser() {
         return email != null && password != null;
+    }
+
+    /**
+     * Check if user is currently suspended (Phase 11).
+     *
+     * @return true if suspended
+     */
+    public boolean isSuspended() {
+        return suspendedUntil != null && suspendedUntil.isAfter(LocalDateTime.now());
+    }
+
+    /**
+     * Suspend user until specified date (Phase 11).
+     *
+     * @param until suspension expiration time
+     */
+    public void suspend(LocalDateTime until) {
+        this.suspendedUntil = until;
+    }
+
+    /**
+     * Lift suspension (Phase 11).
+     */
+    public void liftSuspension() {
+        this.suspendedUntil = null;
     }
 
     public enum OAuthProvider {

@@ -25,6 +25,31 @@ public class TemperatureService {
     private final EvaluationRepository evaluationRepository;
 
     /**
+     * Calculate evaluator credibility weight based on their temperature.
+     * Higher temperature = more trustworthy evaluation.
+     * - Temperature >= 40°C: 1.2x weight
+     * - Temperature 30-40°C: 1.0x weight
+     * - Temperature < 30°C: 0.5x weight
+     *
+     * @param evaluatorId evaluator user ID
+     * @return weight multiplier
+     */
+    public double calculateEvaluatorWeight(Long evaluatorId) {
+        User evaluator = userRepository.findById(evaluatorId)
+            .orElseThrow(() -> new IllegalArgumentException("Evaluator not found"));
+
+        double temperature = evaluator.getTemperature().doubleValue();
+
+        if (temperature >= 40.0) {
+            return 1.2;
+        } else if (temperature < 30.0) {
+            return 0.5;
+        } else {
+            return 1.0;
+        }
+    }
+
+    /**
      * Calculate temperature delta from evaluation score.
      * Score 1-2: -0.5°C
      * Score 3: 0°C
@@ -41,6 +66,21 @@ public class TemperatureService {
         } else {
             return BigDecimal.ZERO;
         }
+    }
+
+    /**
+     * Calculate temperature delta with evaluator credibility weight applied.
+     *
+     * @param averageScore average evaluation score (1-5)
+     * @param evaluatorId evaluator user ID
+     * @return weighted temperature delta
+     */
+    public BigDecimal calculateWeightedTemperatureDelta(double averageScore, Long evaluatorId) {
+        BigDecimal baseDelta = calculateTemperatureDelta(averageScore);
+        double weight = calculateEvaluatorWeight(evaluatorId);
+
+        return baseDelta.multiply(new BigDecimal(weight))
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     /**

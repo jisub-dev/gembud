@@ -82,6 +82,9 @@ public class EvaluationService {
             throw new IllegalArgumentException("Cannot evaluate yourself");
         }
 
+        // Check monthly evaluation limit (Phase 11: Anti-manipulation)
+        checkMonthlyEvaluationLimit(evaluator.getId(), evaluated.getId());
+
         // Create evaluation
         Evaluation evaluation = Evaluation.builder()
             .room(room)
@@ -95,8 +98,8 @@ public class EvaluationService {
 
         evaluationRepository.save(evaluation);
 
-        // Update temperature
-        temperatureService.updateTemperatureFromEvaluation(evaluated.getId(), evaluation);
+        // Update temperature with evaluator credibility weight (Phase 11: Anti-manipulation)
+        updateTemperatureWithWeight(evaluated.getId(), evaluation, evaluator.getId());
 
         return EvaluationResponse.from(evaluation);
     }
@@ -153,5 +156,53 @@ public class EvaluationService {
             .map(p -> p.getUser().getId())
             .filter(id -> !id.equals(user.getId()))
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Check monthly evaluation limit to prevent manipulation.
+     * Same evaluator can evaluate same user maximum 3 times per month.
+     *
+     * @param evaluatorId evaluator ID
+     * @param evaluatedId evaluated ID
+     * @throws IllegalStateException if monthly limit exceeded
+     */
+    private void checkMonthlyEvaluationLimit(Long evaluatorId, Long evaluatedId) {
+        java.time.LocalDateTime startOfMonth = java.time.LocalDateTime.now()
+            .withDayOfMonth(1)
+            .withHour(0)
+            .withMinute(0)
+            .withSecond(0)
+            .withNano(0);
+
+        long count = evaluationRepository.countByEvaluatorAndEvaluatedInCurrentMonth(
+            evaluatorId, evaluatedId, startOfMonth
+        );
+
+        if (count >= 3) {
+            throw new IllegalStateException(
+                "이번 달에 이미 이 사용자를 3회 평가했습니다. 다음 달에 다시 평가할 수 있습니다."
+            );
+        }
+    }
+
+    /**
+     * Update temperature with evaluator credibility weight.
+     * Higher temperature evaluators have more influence.
+     *
+     * @param evaluatedId evaluated user ID
+     * @param evaluation evaluation
+     * @param evaluatorId evaluator ID
+     */
+    private void updateTemperatureWithWeight(Long evaluatedId, Evaluation evaluation, Long evaluatorId) {
+        User user = userRepository.findById(evaluatedId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        double averageScore = evaluation.getAverageScore();
+        java.math.BigDecimal weightedDelta = temperatureService.calculateWeightedTemperatureDelta(
+            averageScore, evaluatorId
+        );
+
+        user.updateTemperature(weightedDelta);
+        userRepository.save(user);
     }
 }

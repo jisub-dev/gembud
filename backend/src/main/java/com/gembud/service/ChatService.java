@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ChatService {
 
+    private static final int ROOM_CHAT_MESSAGE_LIMIT = 50;  // Phase 11: Keep last 50 for evidence
     private static final int GROUP_CHAT_MESSAGE_LIMIT = 100;
 
     private final ChatRoomRepository chatRoomRepository;
@@ -75,13 +76,23 @@ public class ChatService {
         // Handle message based on chat room type
         switch (chatRoom.getType()) {
             case ROOM_CHAT:
-                // Don't save ROOM_CHAT messages (real-time only)
-                return ChatMessageResponse.builder()
-                    .chatRoomId(chatRoom.getId())
-                    .userId(user.getId())
-                    .username(user.getNickname())
+                // Phase 11: Save last 50 ROOM_CHAT messages for evidence (신고 증거)
+                ChatMessage roomMessage = ChatMessage.builder()
+                    .chatRoom(chatRoom)
+                    .user(user)
                     .message(sanitizedMessage)
                     .build();
+                roomMessage = chatMessageRepository.save(roomMessage);
+
+                // Delete old messages (keep only last 50)
+                long roomMessageCount = chatMessageRepository.countByChatRoomId(chatRoom.getId());
+                if (roomMessageCount > ROOM_CHAT_MESSAGE_LIMIT) {
+                    chatMessageRepository.deleteOldMessages(
+                        chatRoom.getId(), ROOM_CHAT_MESSAGE_LIMIT
+                    );
+                }
+
+                return ChatMessageResponse.from(roomMessage);
 
             case GROUP_CHAT:
                 // Save GROUP_CHAT message
@@ -138,12 +149,7 @@ public class ChatService {
             throw new IllegalStateException("User is not a member of this chat room");
         }
 
-        // ROOM_CHAT messages are not saved
-        if (chatRoom.getType() == ChatRoom.ChatRoomType.ROOM_CHAT) {
-            return Collections.emptyList();
-        }
-
-        // Get recent messages for GROUP_CHAT and DIRECT_CHAT
+        // Get recent messages (Phase 11: ROOM_CHAT now saves last 50)
         Pageable pageable = PageRequest.of(0, limit);
         List<ChatMessage> messages = chatMessageRepository.findRecentMessages(
             chatRoomId, pageable
@@ -152,6 +158,24 @@ public class ChatService {
         return messages.stream()
             .map(ChatMessageResponse::from)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Cleanup expired chat messages (Phase 11: Evidence retention).
+     * ROOM_CHAT messages older than 7 days are deleted.
+     * Runs daily at 3 AM.
+     */
+    @Transactional
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 3 * * *")
+    public void cleanupExpiredMessages() {
+        java.time.LocalDateTime sevenDaysAgo = java.time.LocalDateTime.now().minusDays(7);
+
+        // Delete ROOM_CHAT messages older than 7 days
+        int deletedCount = chatMessageRepository.deleteOldRoomChatMessages(sevenDaysAgo);
+
+        if (deletedCount > 0) {
+            System.out.println("[ChatService] Cleaned up " + deletedCount + " expired ROOM_CHAT messages");
+        }
     }
 
     /**

@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @since 2026-02-16
  */
 @SpringBootApplication
+@org.springframework.scheduling.annotation.EnableScheduling  // Phase 11: Enable scheduled tasks
 public class GembudApplication {
 
     public static void main(String[] args) {

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { OAuth2Buttons } from '../components/auth/OAuth2Buttons';
 
-export function SignupPage() {
+function SignupPage() {
   const navigate = useNavigate();
   const { signup, isLoading, error, clearError } = useAuthStore();
   const [formData, setFormData] = useState({
@@ -191,3 +191,5 @@ export function SignupPage() {
     </div>
   );
 }
+
+export default SignupPage;

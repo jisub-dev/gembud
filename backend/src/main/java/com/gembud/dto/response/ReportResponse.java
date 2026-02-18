@@ -60,6 +60,16 @@ public class ReportResponse {
     private String status;
 
     /**
+     * Report category (Phase 11).
+     */
+    private String category;
+
+    /**
+     * Report priority (Phase 11).
+     */
+    private String priority;
+
+    /**
      * Created at.
      */
     private LocalDateTime createdAt;
@@ -116,6 +126,8 @@ public class ReportResponse {
             .reason(report.getReason())
             .description(report.getDescription())
             .status(report.getStatus().name())
+            .category(report.getCategory().name())
+            .priority(report.getPriority().name())
             .createdAt(report.getCreatedAt())
             .reviewedAt(report.getReviewedAt())
             .resolvedAt(report.getResolvedAt())

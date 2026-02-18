@@ -52,6 +52,7 @@ public class ReportController {
             userDetails.getUsername(),
             request.getReportedId(),
             request.getRoomId(),
+            request.getCategory(),
             request.getReason(),
             request.getDescription()
         );

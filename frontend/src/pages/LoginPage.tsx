@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { OAuth2Buttons } from '../components/auth/OAuth2Buttons';
 
-export function LoginPage() {
+function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading, error, clearError } = useAuthStore();
   const [formData, setFormData] = useState({
@@ -118,3 +118,5 @@ export function LoginPage() {
     </div>
   );
 }
+
+export default LoginPage;

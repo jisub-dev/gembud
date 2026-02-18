@@ -1,6 +1,8 @@
 package com.gembud.service;
 
 import com.gembud.entity.Report;
+import com.gembud.entity.Report.ReportCategory;
+import com.gembud.entity.Report.ReportPriority;
 import com.gembud.entity.Report.ReportStatus;
 import com.gembud.entity.Room;
 import com.gembud.entity.User;
@@ -30,11 +32,12 @@ public class ReportService {
     private final RoomRepository roomRepository;
 
     /**
-     * Create a new report.
+     * Create a new report with category (Phase 11).
      *
      * @param reporterEmail reporter email
      * @param reportedId reported user ID
      * @param roomId room ID (nullable)
+     * @param category report category
      * @param reason report reason
      * @param description detailed description
      * @return created report
@@ -44,6 +47,7 @@ public class ReportService {
         String reporterEmail,
         Long reportedId,
         Long roomId,
+        ReportCategory category,
         String reason,
         String description
     ) {
@@ -70,20 +74,76 @@ public class ReportService {
             }
         }
 
+        // Phase 11: Determine priority based on category
+        ReportPriority priority = determinePriority(category);
+
         Report report = Report.builder()
             .reporter(reporter)
             .reported(reported)
             .room(room)
+            .category(category)
+            .priority(priority)
             .reason(reason)
             .description(description)
             .status(ReportStatus.PENDING)
             .build();
 
         Report savedReport = reportRepository.save(report);
-        log.info("Report created: {} reported {} (reason: {})",
-            reporter.getNickname(), reported.getNickname(), reason);
+        log.info("Report created: {} reported {} (category: {}, priority: {})",
+            reporter.getNickname(), reported.getNickname(), category, priority);
+
+        // Phase 11: Check for auto-sanction (3+ pending reports)
+        checkAutoSanction(reportedId);
 
         return savedReport;
+    }
+
+    /**
+     * Determine report priority based on category (Phase 11).
+     *
+     * @param category report category
+     * @return priority
+     */
+    private ReportPriority determinePriority(ReportCategory category) {
+        return switch (category) {
+            case HARASSMENT, FRAUD -> ReportPriority.CRITICAL;
+            case VERBAL_ABUSE -> ReportPriority.HIGH;
+            case GAME_DISRUPTION -> ReportPriority.MEDIUM;
+            case FALSE_INFO -> ReportPriority.LOW;
+        };
+    }
+
+    /**
+     * Check and apply auto-sanction if user has 3+ pending reports (Phase 11).
+     *
+     * @param reportedId reported user ID
+     */
+    private void checkAutoSanction(Long reportedId) {
+        long pendingCount = reportRepository.countPendingByReportedId(reportedId);
+
+        if (pendingCount >= 3) {
+            User reported = userRepository.findById(reportedId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+            // Skip if already suspended
+            if (reported.isSuspended()) {
+                log.info("[AUTO-SANCTION] User {} already suspended until {}",
+                    reported.getNickname(), reported.getSuspendedUntil());
+                return;
+            }
+
+            // Suspend for 7 days
+            java.time.LocalDateTime suspendUntil = java.time.LocalDateTime.now().plusDays(7);
+            reported.suspend(suspendUntil);
+            userRepository.save(reported);
+
+            log.warn("[AUTO-SANCTION] User {} suspended until {} ({} pending reports)",
+                reported.getNickname(), suspendUntil, pendingCount);
+
+            // TODO: Send notification to admins and user
+            // notificationService.notifyAdminsAutoSanction(reported, pendingCount);
+            // notificationService.notifyUserSuspended(reported, suspendUntil);
+        }
     }
 
     /**
