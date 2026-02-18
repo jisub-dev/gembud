@@ -18,6 +18,7 @@ export default {
     },
     extend: {
       colors: {
+        // Shadcn/ui colors (기존 유지)
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -51,13 +52,54 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+
+        // Gaming Dark Mode Colors
+        'dark-primary': '#0e0e10',
+        'dark-secondary': '#18181b',
+        'dark-tertiary': '#1f1f23',
+
+        // Neon Accents
+        'neon-purple': '#a855f7',
+        'neon-cyan': '#06b6d4',
+        'neon-pink': '#ec4899',
+        'neon-green': '#10b981',
+
+        // Text
+        'text-primary': '#ffffff',
+        'text-secondary': '#a1a1aa',
+        'text-muted': '#71717a',
+      },
+      fontFamily: {
+        'display': ['Bebas Neue', 'Impact', 'sans-serif'],
+        'gaming': ['Orbitron', 'Rajdhani', 'sans-serif'],
+        'body': ['Inter', 'system-ui', 'sans-serif'],
+      },
+      fontSize: {
+        'hero': '4rem',      // 64px
+        'h1': '3rem',        // 48px
+        'h2': '2rem',        // 32px
+        'h3': '1.5rem',      // 24px
+      },
+      spacing: {
+        'card-padding': '1.5rem',
+        'section-gap': '3rem',
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        'card': '12px',
+        'button': '8px',
+        'input': '6px',
+      },
+      boxShadow: {
+        'glow-purple': '0 0 20px rgba(168, 85, 247, 0.5)',
+        'glow-purple-lg': '0 0 30px rgba(168, 85, 247, 0.6)',
+        'glow-cyan': '0 0 20px rgba(6, 182, 212, 0.5)',
+        'glow-pink': '0 0 20px rgba(236, 72, 153, 0.5)',
       },
       keyframes: {
+        // Shadcn/ui animations (기존 유지)
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -66,10 +108,30 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+
+        // Gaming animations
+        "glow-pulse": {
+          '0%, 100%': { boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)' },
+          '50%': { boxShadow: '0 0 30px rgba(168, 85, 247, 0.8)' },
+        },
+        "fade-in": {
+          from: { opacity: '0', transform: 'translateY(20px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        "slide-in-right": {
+          from: { transform: 'translateX(100%)' },
+          to: { transform: 'translateX(0)' },
+        },
       },
       animation: {
+        // Shadcn/ui animations (기존 유지)
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+
+        // Gaming animations
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        "fade-in": "fade-in 0.5s ease-out",
+        "slide-in-right": "slide-in-right 0.3s ease-out",
       },
     },
   },
