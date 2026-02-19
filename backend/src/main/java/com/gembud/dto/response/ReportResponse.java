@@ -91,6 +91,8 @@ public class ReportResponse {
 
     /**
      * User summary DTO.
+     *
+     * Phase 12: email 제거 (타인 개인정보 노출 차단)
      */
     @Getter
     @Builder
@@ -99,7 +101,7 @@ public class ReportResponse {
     public static class UserSummary {
         private Long id;
         private String nickname;
-        private String email;
+        // email 제거: Phase 12 개인정보 보호
     }
 
     /**
@@ -114,12 +116,12 @@ public class ReportResponse {
             .reporter(UserSummary.builder()
                 .id(report.getReporter().getId())
                 .nickname(report.getReporter().getNickname())
-                .email(report.getReporter().getEmail())
+                // Phase 12: email 제거 (타인 개인정보 노출 차단)
                 .build())
             .reported(UserSummary.builder()
                 .id(report.getReported().getId())
                 .nickname(report.getReported().getNickname())
-                .email(report.getReported().getEmail())
+                // Phase 12: email 제거 (타인 개인정보 노출 차단)
                 .build())
             .roomId(report.getRoom() != null ? report.getRoom().getId() : null)
             .roomTitle(report.getRoom() != null ? report.getRoom().getTitle() : null)
