@@ -109,6 +109,15 @@ public class User {
     }
 
     /**
+     * Set user role (Phase 12: ADMIN promotion).
+     *
+     * @param role new role
+     */
+    public void setRole(UserRole role) {
+        this.role = role;
+    }
+
+    /**
      * Update user profile
      */
     public void updateProfile(String nickname, String profileImageUrl, String ageRange) {
