@@ -8,20 +8,38 @@
 
 ## Executive Summary
 
-리서치 팀 보고서(1차, 2차)에서 지적한 **5가지 긴급 이슈 + 법적 컴플라이언스 요구사항**에 대한 의사결정을 완료하고, 구현 우선순위와 상세 스펙을 확정했습니다.
+리서치 팀 보고서(1차, 2차, 3차)에서 지적한 **5가지 긴급 이슈 + 법적 컴플라이언스 + 운영 실무 보완**에 대한 의사결정을 완료하고, 구현 우선순위와 상세 스펙을 확정했습니다.
 
 ### 핵심 결정사항 요약
 
 | 이슈 | 심각도 | 결정 | 구현 기간 |
 |------|--------|------|-----------|
-| 1. ADMIN 권한 분리 부재 | 🔴 최우선 | ENUM 역할 + @PreAuthorize + JWT role | 2주 |
-| 2. 자동 제재 오남용 | 🟠 높음 | 유니크 6명 + 7일 쿨다운 + effective_for_sanction 플래그 | 2주 (단순) → 6주 (점수형) |
+| 1. ADMIN 권한 분리 부재 | 🔴 최우선 | ENUM 역할 + @EnableMethodSecurity + JWT role | 2주 |
+| 2. 자동 제재 오남용 | 🟠 높음 | CRITICAL 4명 / 일반 6명 + 7일 쿨다운 | 2주 (단순) → 6주 (점수형) |
 | 3. 개인정보 노출 | 🟡 중간 | 타인 이메일 전면 제거 | 즉시 |
-| 4. 동시성/멱등성 | 🟡 중간 | DB 유니크 제약 (Generated Column) | 2주 |
-| 5. OAuth 토큰 URL 노출 | 🟠 높음 | HTTP-only Cookie + CSRF 재활성화 | 2주 |
-| 6. 연령 인증 (신규) | 🟡 중간 | 생년월일 입력 → PASS 인증 (단계적) | 6주 → 12주 |
-| 7. 접근 로그 보관 (PIPA) | 🟢 낮음 | 2년 보관, AOP 자동 로깅 | 12주 |
-| 8. Policy Engine | 🟡 중간 | DB 기반 정책 버전 관리 | 6주 |
+| 4. 동시성/멱등성 | 🟡 중간 | DB 유니크 제약 + 예외 핸들러 | 2주 |
+| 5. OAuth 토큰 + PII URL 노출 | 🔴 최우선 | HTTP-only Cookie + URL 파라미터 전부 제거 | 2주 |
+| 6. 연령 인증 (신규) | 🟡 중간 | 생년월일 입력 → PASS 인증 (데이터 최소화) | 6주 → 12주 |
+| 7. 접근 로그 보관 (PIPA) | 🟢 낮음 | 법령 기준 정확화 (1년/2년), AOP 로깅 | 12주 |
+| 8. Policy Engine | 🟡 중간 | JSON 스키마 검증 + 활성 정책 단일성 | 6주 |
+| 9. 계정 삭제 (Google Play) | 🟡 중간 | 인앱 + 웹 경로, 데이터 보관 고지 | 12주 |
+
+### 3차 검증 반영 사항 (운영 실무 보완) ✨
+
+**긴급 보안 이슈**:
+- 🔴 **OAuth URL에 토큰 + 이메일 + 닉네임 노출** → Cookie 전환 + URL 파라미터 전부 제거
+- 🔴 `@EnableGlobalMethodSecurity` → `@EnableMethodSecurity` (Spring Boot 3 권장)
+- 🔴 `DataIntegrityViolationException` 핸들러 누락 → 친화적 메시지 추가
+
+**운영 정책 조정**:
+- 🟠 자동 제재 6명 임계치가 초기 DAU에서 너무 보수적 → CRITICAL(FRAUD/HARASSMENT) 4명으로 완화
+- 🟠 Policy Engine에 JSON 스키마 검증, 활성 정책 단일성, 변경 감사 로그 추가
+- 🟠 PASS 연동 시 데이터 최소화 (CI만 저장, 성명/생년월일 불저장)
+
+**법적 컴플라이언스**:
+- 🟡 **Google Play 계정 삭제 요구사항** 추가 (인앱 `DELETE /api/users/me` + 웹 페이지)
+- 🟡 접근 로그 법령 기준 정확화 (기본 1년, 조건부 2년 → 우리는 2년 채택)
+- 🟢 Generated Column immutable 제약 명시
 
 ### 2차 검증 반영 사항
 
@@ -960,6 +978,557 @@ auto_suspend:
 
 ---
 
+## 부록 A: 3차 운영 실무 검증 및 대응 계획
+
+**검증일**: 2026-02-19
+**검증 범위**: Phase 12 v2.0 문서 + 현재 코드베이스 (커밋 9ee8b4a)
+**검증 초점**: 운영 시나리오, 공격 벡터, 법적 컴플라이언스 정확성
+
+### 검증 결과 요약
+
+문서 방향성은 **매우 우수**하나, 다음 항목들이 "운영 가능한 수준"으로 정밀화 필요:
+
+| 분류 | 이슈 | 긴급도 | 대응 일정 |
+|------|------|--------|-----------|
+| 🔴 즉시 수정 | OAuth URL에 토큰 + PII 노출 | 최우선 | 2주 (Day 4-5) |
+| 🔴 즉시 수정 | @EnableGlobalMethodSecurity → @EnableMethodSecurity | 최우선 | 2주 (Day 1-2) |
+| 🔴 즉시 수정 | DataIntegrityViolationException 핸들러 누락 | 최우선 | 2주 (Day 6-7) |
+| 🟠 운영 조정 | 자동 제재 6명 임계치 초기 DAU 현실화 | 높음 | 6주 |
+| 🟠 운영 조정 | Policy Engine 운영 안전장치 (스키마 검증) | 높음 | 6주 |
+| 🟡 컴플라이언스 | Google Play 계정 삭제 요구사항 | 중간 | 12주 |
+| 🟡 컴플라이언스 | 접근 로그 법령 기준 정확성 (1년/2년) | 중간 | 12주 |
+| 🟢 개선 | Generated Column immutable 제약 명시 | 낮음 | 2주 (문서화) |
+
+---
+
+### A.1 긴급 보완 사항 (2주 Sprint에 즉시 반영)
+
+#### A.1.1 OAuth URL에 토큰 + 개인정보 노출 (🔴 최우선)
+
+**문제**:
+현재 `OAuth2SuccessHandler`가 다음과 같이 동작:
+```java
+String redirectUrl = String.format(
+    "%s/oauth/callback?accessToken=%s&refreshToken=%s&email=%s&nickname=%s",
+    frontendUrl, accessToken, refreshToken, user.getEmail(), user.getNickname()
+);
+```
+
+**영향**:
+- **OWASP 가이드 정면 위반**: "민감 데이터를 URL에 두지 말 것"
+- **보안 토큰 노출**: 브라우저 히스토리, 서버 로그, Referrer 헤더에 토큰 기록
+- **PII 노출**: 이메일까지 URL에 포함 → 개인정보보호법 위반 가능성
+- **세션 하이재킹 위험**: URL 복사/공유 시 계정 탈취 가능
+
+**대응 방안**:
+1. **Cookie 전환** (문서 5번 결정과 일치):
+   ```java
+   // OAuth2SuccessHandler.java 수정
+   Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
+   accessTokenCookie.setHttpOnly(true);
+   accessTokenCookie.setSecure(true);
+   accessTokenCookie.setSameSite("Strict");
+   accessTokenCookie.setPath("/");
+   accessTokenCookie.setMaxAge(3600);
+   response.addCookie(accessTokenCookie);
+
+   // 토큰/PII 없이 리다이렉트
+   response.sendRedirect(frontendUrl + "/oauth/callback?success=true");
+   ```
+
+2. **프론트엔드 수정**:
+   ```typescript
+   // OAuth2CallbackPage.tsx
+   const params = new URLSearchParams(window.location.search);
+   if (params.get('success') === 'true') {
+       // 토큰은 이미 쿠키에 저장됨
+       // /me API 호출로 프로필 로딩
+       const profile = await api.get('/api/users/me');
+       navigate('/');
+   }
+   ```
+
+**구현 일정**: **Day 4-5 (Week 1)**
+
+**체크리스트**:
+- [ ] OAuth2SuccessHandler: URL query 파라미터 전부 제거
+- [ ] Cookie 설정: HttpOnly, Secure, SameSite=Strict
+- [ ] 프론트: URL에서 토큰 추출 로직 삭제
+- [ ] 프론트: `/me` API로 프로필 로딩
+- [ ] 테스트: 브라우저 히스토리에 토큰/이메일 없음 확인
+
+---
+
+#### A.1.2 Spring Security 6 호환성 (@EnableMethodSecurity) (🔴 최우선)
+
+**문제**:
+문서 체크리스트에 `@EnableGlobalMethodSecurity(prePostEnabled = true)`로 명시되어 있으나, Spring Boot 3 / Spring Security 6에서는 **deprecated**.
+
+**영향**:
+- 향후 Spring 버전 업그레이드 시 제거될 API
+- 최신 보안 패치 미적용 가능성
+
+**대응 방안**:
+```java
+// SecurityConfig.java
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity  // ← @EnableGlobalMethodSecurity 대신
+public class SecurityConfig {
+    // ...
+}
+```
+
+**문서 수정**:
+```markdown
+- [ ] SecurityConfig: @EnableMethodSecurity 추가 (Spring Boot 3 권장)
+```
+
+**구현 일정**: **Day 1-2 (Week 1)** - ADMIN 권한 분리와 동시 적용
+
+**체크리스트**:
+- [ ] SecurityConfig: `@EnableMethodSecurity` 적용
+- [ ] ReportController: `@PreAuthorize("hasRole('ADMIN')")` 테스트
+- [ ] 일반 유저 403 응답 확인
+
+---
+
+#### A.1.3 DB 제약 위반 예외 처리 누락 (🔴 최우선)
+
+**문제**:
+V18 마이그레이션으로 `evaluations`, `ad_views`에 UNIQUE 제약을 추가하지만, 현재 `GlobalExceptionHandler`에 `DataIntegrityViolationException` 처리 로직 없음.
+
+**영향**:
+- 중복 평가/광고 시도 시 500 Internal Server Error 응답
+- 사용자에게 "이미 처리됨" 안내 불가능
+- 운영 로그에 불필요한 에러 스택 누적
+
+**대응 방안**:
+```java
+// GlobalExceptionHandler.java
+@ExceptionHandler(DataIntegrityViolationException.class)
+public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+    DataIntegrityViolationException ex
+) {
+    String message = "요청을 처리할 수 없습니다.";
+
+    // 제약 조건별 메시지 커스터마이징
+    if (ex.getMessage().contains("uk_evaluation_per_room")) {
+        message = "이미 이 방에서 해당 사용자를 평가하셨습니다.";
+    } else if (ex.getMessage().contains("uk_ad_view_daily")) {
+        message = "오늘 이 광고를 이미 보셨습니다.";
+    }
+
+    return ResponseEntity
+        .status(HttpStatus.CONFLICT)
+        .body(new ErrorResponse("DUPLICATE_ACTION", message));
+}
+```
+
+**구현 일정**: **Day 6-7 (Week 2)** - V18 마이그레이션과 동시
+
+**체크리스트**:
+- [ ] GlobalExceptionHandler: DataIntegrityViolationException 핸들러 추가
+- [ ] 평가 중복 시: "이미 평가하셨습니다" (409 Conflict)
+- [ ] 광고 중복 시: "오늘 이 광고를 이미 보셨습니다" (409)
+- [ ] 프론트: 409 응답에 대한 친화적 토스트 표시
+
+---
+
+### A.2 운영 정책 조정 (6주 내 반영)
+
+#### A.2.1 자동 제재 임계치의 초기 DAU 현실화 (🟠 높음)
+
+**문제**:
+문서 결정: "유니크 신고자 6명"은 악용 방지에는 효과적이나, **초기 서비스 (유저 풀 작음)**에서는 다음 리스크 존재:
+
+- 실제 악성 유저가 6명 신고에 도달하지 못해 오래 남음
+- 피해자가 누적되어도 자동 제재 발동 안 됨
+- 관리자 수동 개입 부담 증가
+
+**영향**:
+- 초기 커뮤니티 신뢰도 하락
+- 악성 유저 유입으로 평판 시스템 왜곡
+
+**대응 방안**:
+
+**Option A - 카테고리별 차등 임계치** ✅ **권장**:
+```yaml
+auto_sanction_v1_refined:
+  default:
+    unique_reporters: 6
+    within_days: 7
+
+  critical_categories:  # FRAUD, HARASSMENT만
+    unique_reporters: 4  # 낮춤
+    within_days: 7
+    action: auto_suspend_7d
+
+  high_categories:  # VERBAL_ABUSE 등
+    unique_reporters: 6
+    action: admin_review_priority  # 자동 정지 대신 우선 검토
+```
+
+**Option B - 자동 검토 큐 우선순위**:
+```yaml
+auto_triage_system:
+  condition: unique_reporters >= 3 AND category IN ['FRAUD', 'HARASSMENT']
+  action: move_to_admin_queue_top  # 정지 대신 관리자 검토 상단 이동
+  notification: admin_slack_alert
+```
+
+**권장 전략**: **Option A + B 혼합**
+- CRITICAL(FRAUD, HARASSMENT): 4명 → 즉시 7일 정지
+- 나머지: 6명 → 정지 OR 3명 → 관리자 우선 검토
+
+**구현 일정**: **Week 3-4 (Phase 12-B)**
+
+**체크리스트**:
+- [ ] ReportCategory enum에 `severity` 필드 추가
+- [ ] AutoSanctionPolicy: 카테고리별 임계치 설정
+- [ ] 관리자 검토 큐 우선순위 정렬
+- [ ] Slack/Discord 웹훅 알림 (optional)
+
+---
+
+#### A.2.2 Policy Engine 운영 안전장치 (🟠 높음)
+
+**문제**:
+문서의 Policy Engine은 "DB JSON으로 정책 관리"라는 강력한 아이디어이나, **운영 리스크**가 큼:
+
+- 잘못된 JSON으로 서비스 장애 가능
+- 정책 변경 승인 프로세스 없음
+- 변경 이력 추적 불가능
+
+**영향**:
+- 관리자 실수로 자동 제재 오작동
+- 감사 시 "누가 언제 왜 변경했는지" 증명 불가
+
+**대응 방안**:
+
+**1. JSON 스키마 검증**:
+```java
+@Service
+public class PolicyService {
+
+    private final ObjectMapper objectMapper;
+    private final JsonSchema autoSanctionSchema;
+
+    public void savePolicy(String policyType, String configJson) {
+        // 1. 스키마 검증
+        JsonNode config = objectMapper.readTree(configJson);
+        Set<ValidationMessage> errors = getSchema(policyType).validate(config);
+
+        if (!errors.isEmpty()) {
+            throw new InvalidPolicyException(
+                "정책 JSON이 유효하지 않습니다: " + errors
+            );
+        }
+
+        // 2. 활성 정책 단일성 보장
+        policyRepository.deactivateAllByType(policyType);
+
+        // 3. 새 버전 저장
+        PolicyVersion newVersion = PolicyVersion.builder()
+            .policyType(policyType)
+            .config(configJson)
+            .createdBy(getCurrentAdminId())
+            .isActive(true)
+            .build();
+
+        policyRepository.save(newVersion);
+
+        // 4. 변경 로그
+        auditLogger.log("POLICY_CHANGED", policyType, newVersion.getId());
+    }
+}
+```
+
+**2. 정책 변경 승인 워크플로우** (선택, 12주 이후):
+```sql
+CREATE TABLE policy_change_requests (
+  id BIGSERIAL PRIMARY KEY,
+  policy_type VARCHAR(50),
+  new_config JSONB,
+  requested_by BIGINT,
+  approved_by BIGINT,
+  status VARCHAR(20),  -- 'PENDING', 'APPROVED', 'REJECTED'
+  created_at TIMESTAMP,
+  approved_at TIMESTAMP
+);
+```
+
+**구현 일정**: **Week 5 (Phase 12-B)**
+
+**체크리스트**:
+- [ ] JSON Schema 정의 (auto_sanction, temperature, matching)
+- [ ] PolicyService: 스키마 검증 로직
+- [ ] 활성 정책 단일성 보장 (트랜잭션)
+- [ ] 정책 변경 감사 로그
+- [ ] 관리자 API: 정책 조회/변경 (ADMIN only)
+
+---
+
+#### A.2.3 연령 인증 데이터 최소화 (🟠 높음)
+
+**문제**:
+PASS 본인인증 연동 시 **성명, 생년월일, CI, DI, 성별, 통신사** 등 다양한 정보를 제공받을 수 있으나, "받을 수 있다"와 "저장해야 한다"는 별개.
+
+**영향**:
+- 개인정보보호법: "목적에 필요한 최소한의 정보만 수집"
+- 불필요한 정보 저장 시 법적 리스크 증가
+- 개인정보 유출 시 피해 범위 확대
+
+**대응 방안**:
+
+**저장 최소화 전략**:
+```yaml
+pass_authentication_minimal:
+  save_to_db:
+    - ci: VARCHAR(88)      # 중복 가입 방지용 (필수)
+    - age_verified: BOOLEAN  # 만 13세 이상 확인 (필수)
+    - birth_year: INT        # 연령대 분석용 (선택)
+
+  do_not_save:
+    - 성명 (실명)             # 서비스에 불필요
+    - 생년월일 전체           # birth_year만 저장
+    - 성별                   # 서비스에 불필요
+    - 통신사                 # 서비스에 불필요
+    - DI                     # CI만으로 충분
+```
+
+**접근 통제**:
+```java
+// User.java
+@Column(name = "ci", length = 88)
+@JsonIgnore  // API 응답에 절대 노출 금지
+private String ci;
+
+// UserRepository.java
+@Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END " +
+       "FROM User u WHERE u.ci = :ci")
+boolean existsByCi(@Param("ci") String ci);
+// → CI는 중복 체크에만 사용, 조회 금지
+```
+
+**구현 일정**: **Week 7-9 (Phase 12-C)**
+
+**체크리스트**:
+- [ ] PASS 인증 후 필요한 최소 정보만 추출
+- [ ] CI 컬럼: @JsonIgnore, 접근 제어
+- [ ] 성명/생년월일/성별 DB 저장 안 함
+- [ ] 개인정보 처리방침 업데이트
+
+---
+
+### A.3 법적 컴플라이언스 정밀화 (12주 내 반영)
+
+#### A.3.1 Google Play 계정 삭제 요구사항 (🟡 중간)
+
+**문제**:
+현재 문서에 **계정 삭제 기능이 누락**되어 있으나, Google Play User Data 정책은 다음을 명시:
+
+> "앱에서 계정을 만들 수 있으면, **앱 안과 앱 밖(웹)에서 계정 삭제 요청 경로**를 제공해야 함"
+
+**영향**:
+- Google Play 심사 거부 가능성
+- 개인정보보호법: 이용자의 개인정보 삭제 요구권 보장
+
+**대응 방안**:
+
+**1. 인앱 계정 삭제**:
+```java
+// UserController.java
+@DeleteMapping("/api/users/me")
+@PreAuthorize("isAuthenticated()")
+public ResponseEntity<Void> deleteAccount(
+    @AuthenticationPrincipal CustomUserDetails userDetails
+) {
+    userService.deleteAccount(userDetails.getUserId());
+    return ResponseEntity.noContent().build();
+}
+
+// UserService.java
+@Transactional
+public void deleteAccount(Long userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException("사용자를 찾을 수 없습니다"));
+
+    // 1. 연관 데이터 처리
+    chatMessageRepository.deleteByUserId(userId);
+    evaluationRepository.deleteByUserId(userId);
+
+    // 2. 보안/사기 방지용 데이터는 익명화 후 보관
+    reportRepository.anonymizeReporterOrReported(userId);
+
+    // 3. 계정 삭제 (soft delete)
+    user.markAsDeleted();
+    userRepository.save(user);
+
+    // 4. 삭제 로그
+    auditLogger.log("ACCOUNT_DELETED", userId);
+}
+```
+
+**2. 웹 계정 삭제 페이지** (인앱 없이도 접근 가능):
+```
+https://gembud.com/account-deletion
+- 로그인 필요
+- 삭제 확인 절차 (비밀번호 재입력)
+- 삭제 후 복구 불가 고지
+```
+
+**3. 데이터 보관 고지**:
+```
+"계정 삭제 후에도 다음 정보는 보안/법적 사유로 익명화하여 보관됩니다:
+- 신고 이력 (익명 처리)
+- 제재 이력 (익명 처리)
+- 접근 로그 (2년 보관 후 자동 삭제)
+
+이 정보는 사기/어뷰징 방지를 위해 필요하며,
+개인식별 정보는 모두 제거됩니다."
+```
+
+**구현 일정**: **Week 10-11 (Phase 12-C)**
+
+**체크리스트**:
+- [ ] `DELETE /api/users/me` API 구현
+- [ ] 연관 데이터 삭제/익명화 로직
+- [ ] Soft delete (deleted_at 컬럼)
+- [ ] 웹 계정 삭제 페이지 (Next.js 정적 페이지)
+- [ ] 개인정보 처리방침: 삭제 절차 및 보관 정책 명시
+- [ ] Google Play Console: Data Safety → Account deletion 경로 등록
+
+---
+
+#### A.3.2 접근 로그 법령 기준 정확성 (🟡 중간)
+
+**문제**:
+문서에 "PIPA 접근 로그 2년 보관"으로 명시되어 있으나, **법령 문구는 다름**:
+
+- **기본**: 개인정보 처리 시스템 접근 기록 **1년 이상** 보관
+- **2년**: 5만명 이상 처리, 민감정보/고유식별 처리, 기간통신사업자 등 **조건부**
+
+**영향**:
+- 법령 근거 오해 가능성
+- 불필요하게 긴 보관 기간 설정 시 저장 비용 증가
+
+**대응 방안**:
+
+**1. 법령 기준 정확화**:
+```markdown
+### 접근 로그 보관 기간 결정
+
+**개인정보보호법 시행령 제30조 (접근기록의 보관 및 점검)**:
+- 기본: 개인정보취급자의 접근 기록을 **1년 이상** 보관·관리
+- 2년 조건:
+  - 개인정보 5만명 이상 처리
+  - 민감정보 또는 고유식별정보 처리
+  - 정보통신서비스 제공자 등
+
+**우리 서비스 결정**: **2년 보관**
+**근거**:
+- 향후 5만명 이상 예상 (MVP 단계에서는 1년도 OK)
+- 소송 시효 대비 (민사 3년, 형사 5~7년)
+- 운영 안전 마진 확보
+
+**주의**: 초기 1년으로 시작 후, DAU 5만 도달 시 2년으로 전환 가능
+```
+
+**2. 보관 기간 자동 관리**:
+```java
+// AdminActionLogCleanupJob.java
+@Scheduled(cron = "0 0 3 * * *")  // 매일 새벽 3시
+public void deleteOldLogs() {
+    LocalDateTime cutoff = LocalDateTime.now()
+        .minusDays(policyService.getLogRetentionDays());  // 365 or 730
+
+    int deleted = adminActionLogRepository.deleteOlderThan(cutoff);
+    log.info("접근 로그 {} 건 삭제 (기준일: {})", deleted, cutoff);
+}
+```
+
+**구현 일정**: **Week 10-11 (Phase 12-C)**
+
+**체크리스트**:
+- [ ] 문서: 접근 로그 법령 근거 정확화
+- [ ] PolicyService: log_retention_days 설정 (기본 365)
+- [ ] Spring Batch: 보관 기간 지난 로그 자동 삭제
+- [ ] 관리자 대시보드: 로그 보관 정책 표시
+
+---
+
+#### A.3.3 Generated Column 제약 조건 명시 (🟢 낮음)
+
+**문제**:
+문서에 "Generated Column 방식 채택"이라고 명시되어 있으나, **PostgreSQL의 제약 사항**이 누락:
+
+- Generated Column은 **immutable 함수**만 사용 가능
+- `DATE(viewed_at)`는 immutable이므로 OK
+- 하지만 `CURRENT_TIMESTAMP`, `random()` 등은 불가
+
+**대응 방안**:
+
+**문서 V18 마이그레이션 섹션에 주석 추가**:
+```sql
+-- V18: 동시성 제약
+-- ⚠️ Generated Column 제약: immutable 함수만 사용 가능
+--    DATE()는 immutable이므로 OK
+--    CURRENT_TIMESTAMP, random() 등은 불가
+
+ALTER TABLE ad_views
+ADD COLUMN view_date DATE GENERATED ALWAYS AS (DATE(viewed_at)) STORED;
+```
+
+**구현 일정**: **즉시 (문서화만)**
+
+---
+
+### A.4 체크리스트 업데이트 (문서 반영)
+
+위 보완사항을 반영하여 기존 체크리스트를 다음과 같이 업데이트:
+
+#### 2주 Sprint (긴급)
+
+**Day 1-2**:
+- [x] User 엔티티 role 필드 추가
+- [ ] SecurityConfig: `@EnableMethodSecurity` 적용 ✅ **업데이트**
+- [ ] ReportController: `@PreAuthorize("hasRole('ADMIN')")` 적용
+- [ ] AdminInitializer: 환경변수 기반 admin 생성
+
+**Day 3**:
+- [ ] DTO email 제거 (ReportResponse, 기타 타인 DTO)
+
+**Day 4-5**:
+- [ ] **OAuth2SuccessHandler: URL query 파라미터 전부 제거** ✅ **신규**
+- [ ] OAuth Cookie 전환 (HttpOnly, Secure, SameSite)
+- [ ] CSRF 재활성화 (CookieCsrfTokenRepository)
+- [ ] 프론트: URL 토큰 추출 로직 삭제, `/me` API로 전환
+
+**Day 6-7**:
+- [ ] V18 마이그레이션 (evaluations, ad_views UNIQUE)
+- [ ] **GlobalExceptionHandler: DataIntegrityViolationException 핸들러** ✅ **신규**
+
+**Day 8-10**:
+- [ ] 자동 제재 v1 (6명, 7일 쿨다운, effective_for_sanction)
+
+#### 6주 차 (운영 안정화)
+
+- [ ] **자동 제재 임계치 조정 (CRITICAL 4명)** ✅ **신규**
+- [ ] Policy Engine: JSON 스키마 검증 ✅ **신규**
+- [ ] Policy Engine: 활성 정책 단일성 보장 ✅ **신규**
+- [ ] Policy Engine: 변경 감사 로그 ✅ **신규**
+
+#### 12주 차 (컴플라이언스)
+
+- [ ] **계정 삭제 API (`DELETE /api/users/me`)** ✅ **신규**
+- [ ] **웹 계정 삭제 페이지** ✅ **신규**
+- [ ] **개인정보 처리방침: 계정 삭제 절차** ✅ **신규**
+- [ ] PASS 인증: 데이터 최소화 (CI만 저장) ✅ **신규**
+- [ ] 접근 로그: 법령 기준 정확화 (1년/2년) ✅ **신규**
+
+---
+
 ## 추가 검토 사항
 
 ### Steam 게임 카탈로그 통합 (Phase 13 이후)
@@ -986,6 +1555,29 @@ public void syncSteamGames() {
 
 ## 버전 히스토리
 
+### v3.0 (2026-02-19) ✨ **운영 실무 검증 완료**
+**3차 리서치 보고서 반영 - 운영 시나리오 & 공격 벡터 정밀화**:
+
+**긴급 보완 사항 (2주 내)**:
+- ✅ **OAuth URL PII 노출 심각성** 명시 (토큰 + 이메일 + 닉네임 query 제거)
+- ✅ `@EnableGlobalMethodSecurity` → `@EnableMethodSecurity` (Spring Boot 3)
+- ✅ `DataIntegrityViolationException` 핸들러 추가 (DB 제약 위반 시 친화적 메시지)
+
+**운영 정책 조정 (6주 내)**:
+- ✅ 자동 제재 임계치 초기 DAU 현실화 (CRITICAL 카테고리 4명으로 완화)
+- ✅ Policy Engine 운영 안전장치 (JSON 스키마 검증, 활성 정책 단일성, 변경 감사 로그)
+- ✅ 연령 인증 데이터 최소화 (PASS 연동 시 CI만 저장, 성명/생년월일 불저장)
+
+**법적 컴플라이언스 정밀화 (12주 내)**:
+- ✅ **Google Play 계정 삭제 요구사항** 추가 (인앱 + 웹 경로, 데이터 보관 고지)
+- ✅ 접근 로그 법령 기준 정확화 (기본 1년, 조건부 2년 → 우리는 2년 채택)
+- ✅ Generated Column immutable 제약 명시
+
+**체크리스트 업데이트**:
+- 2주 Sprint: OAuth URL 제거, DataIntegrity 핸들러 추가
+- 6주: 자동 제재 임계치 조정, Policy Engine 검증 로직
+- 12주: 계정 삭제 API/웹 페이지, PASS 최소 데이터
+
 ### v2.0 (2026-02-19)
 **2차 리서치 보고서 반영**:
 - PostgreSQL UNIQUE 제약 한계 → Generated Column 방식
@@ -1005,7 +1597,7 @@ public void syncSteamGames() {
 
 ---
 
-**문서 버전**: 2.0
+**문서 버전**: 3.0
 **최종 수정**: 2026-02-19
 **작성자**: Gembud 개발팀 + Claude Code
-**리뷰**: 리서치 팀 1차, 2차 보고서 반영 완료
+**리뷰**: 리서치 팀 1차, 2차, 3차 보고서 반영 완료 ✅
