@@ -135,8 +135,8 @@ public ResponseEntity<ReportResponse> markAsReviewed(@PathVariable Long reportId
 - `GET /api/reports/status/{status}` (상태별 조회)
 - `GET /api/reports/user/{userId}` (유저별 신고 조회)
 
-#### Q4. JWT에 role 포함 여부
-**결정**: **포함 O**
+#### Q4. JWT에 role 포함 여부 ✨ **3차 검증 반영**
+**결정**: **포함 O (단, 트레이드오프 인지)**
 
 ```java
 // JwtTokenProvider.java
@@ -155,6 +155,70 @@ public String generateAccessToken(String email, String role) {
 - 토큰만으로 권한 체크 가능 (성능 향상)
 - 매 요청마다 DB 조회 불필요
 - 역할 변경은 드물어 즉시 반영 불필요
+
+**⚠️ 트레이드오프 (3차 검증 지적사항)**:
+
+**문제**: 역할 변경(USER → ADMIN 또는 ADMIN → USER) 시 **기존 토큰에는 즉시 반영되지 않음**
+
+| 시나리오 | 영향 | 대응 방안 |
+|---------|------|----------|
+| ADMIN → USER 강등 | 토큰 만료 전까지 ADMIN 권한 유지 | Access token 만료 짧게 (15분~1시간) |
+| USER → ADMIN 승격 | 토큰 만료 전까지 ADMIN 권한 없음 | 승격 후 즉시 로그아웃 강제 |
+| 보안 사고 시 긴급 조치 | 역할 변경으로 차단 불가능 | 심층 방어: ADMIN API는 DB role 재확인 |
+
+**채택 전략**: **Option A - Access Token 만료 짧게 + Refresh 시 role 재확인** ✅
+
+```java
+// JwtConfig.java
+private Long accessTokenExpiration = 3600000L;  // 1시간 (기존 유지)
+// 또는 15분 (900000L)으로 단축 고려
+
+// AuthController.java - Refresh 시 DB role 재확인
+@PostMapping("/api/auth/refresh")
+public ResponseEntity<Void> refresh(
+    @CookieValue("refreshToken") String refreshToken,
+    HttpServletResponse response
+) {
+    String email = jwtTokenProvider.getEmailFromToken(refreshToken);
+
+    // DB에서 최신 role 조회
+    User user = userRepository.findByEmail(email)
+        .orElseThrow(() -> new UnauthorizedException("사용자를 찾을 수 없습니다"));
+
+    // 새 access token에 최신 role 반영
+    String newAccessToken = jwtTokenProvider.generateAccessToken(
+        user.getEmail(),
+        user.getRole().name()
+    );
+
+    // 쿠키 설정...
+}
+```
+
+**대안 전략** (선택 사항, 보안 최우선 시):
+
+**Option B - ADMIN API는 DB role 재확인 (심층 방어)**:
+```java
+// ReportController.java
+@PutMapping("/{reportId}/review")
+@PreAuthorize("hasRole('ADMIN')")  // 1차: 토큰 기반
+public ResponseEntity<ReportResponse> markAsReviewed(
+    @PathVariable Long reportId,
+    @AuthenticationPrincipal CustomUserDetails userDetails
+) {
+    // 2차: DB 기반 재확인 (심층 방어)
+    User user = userRepository.findById(userDetails.getUserId())
+        .orElseThrow(() -> new UnauthorizedException("사용자를 찾을 수 없습니다"));
+
+    if (user.getRole() != UserRole.ADMIN) {
+        throw new ForbiddenException("관리자 권한이 없습니다");
+    }
+
+    // 실제 로직...
+}
+```
+
+**권장**: **Option A (Refresh 시 재확인)** - 성능과 보안 균형
 
 ### 구현 체크리스트
 
@@ -208,6 +272,7 @@ auto_sanction_v1:
     unique_reporters: 6        # ✨ 5인 파티 담합 방지
     within_days: 7
     exclude_low_temp: 25       # 온도 25°C 미만 신고자 무시
+    exclude_new_account: 7     # ✨ 계정 생성 7일 미만 신고자 무시 (Sybil 방어)
 
   duplicate_prevention:
     same_target_cooldown_days: 7
@@ -216,6 +281,11 @@ auto_sanction_v1:
   action:
     suspend_days: 7
 ```
+
+**⚠️ Sybil 공격 방어** (3차 검증 지적사항):
+- 온도 필터만으로는 부족: 신규 계정은 기본 온도 36.5°C로 시작
+- **계정 연령 조건 추가**: 가입 7일 미만 계정의 신고는 `effective_for_sanction=false`
+- 온도 + 계정 연령 조합으로 다계정 공격 차단
 
 **6명 선택 이유**:
 - 5인 파티 게임에서 전원이 담합해도 정지 안 됨
@@ -461,28 +531,42 @@ UNIQUE (user_id, ad_id, DATE(viewed_at));
 
 ```java
 // OAuth2SuccessHandler.java
-Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
-accessTokenCookie.setHttpOnly(true);  // JS 접근 불가
-accessTokenCookie.setSecure(true);    // HTTPS only
-accessTokenCookie.setPath("/");
-accessTokenCookie.setMaxAge(3600);    // 1시간
-response.addCookie(accessTokenCookie);
+import org.springframework.boot.web.server.Cookie.SameSite;
+import org.springframework.http.ResponseCookie;
 
-Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
-refreshTokenCookie.setHttpOnly(true);
-refreshTokenCookie.setSecure(true);
-refreshTokenCookie.setPath("/api/auth/refresh");
-refreshTokenCookie.setMaxAge(604800);  // 7일
-response.addCookie(refreshTokenCookie);
+// Access Token 쿠키
+ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", accessToken)
+    .httpOnly(true)       // XSS 방어: JS 접근 불가
+    .secure(true)         // HTTPS only
+    .path("/")            // 전체 경로
+    .maxAge(3600)         // 1시간
+    .sameSite("Strict")   // CSRF 방어: cross-site 요청 차단
+    .build();
+response.addHeader("Set-Cookie", accessTokenCookie.toString());
 
-// 프론트로 리다이렉트 (토큰 없이)
+// Refresh Token 쿠키
+ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
+    .httpOnly(true)
+    .secure(true)
+    .path("/api/auth/refresh")  // refresh 경로로만 전송 (공격 표면 축소)
+    .maxAge(604800)              // 7일
+    .sameSite("Strict")
+    .build();
+response.addHeader("Set-Cookie", refreshTokenCookie.toString());
+
+// ⚠️ 프론트로 리다이렉트 (URL에 토큰/이메일/닉네임 전부 제거)
 response.sendRedirect(frontendUrl + "/oauth/callback?success=true");
 ```
 
 **선택 이유**:
-- XSS 공격 방지 (httpOnly)
-- 로그/히스토리 안전
-- 웹 표준 방식
+- **XSS 방어**: `httpOnly=true` (JS 접근 불가)
+- **CSRF 방어**: `sameSite=Strict` (cross-site 요청 차단)
+- **중간자 공격 방어**: `secure=true` (HTTPS only)
+- **로그/히스토리 안전**: URL에 민감 정보 없음
+- **공격 표면 축소**: refresh token은 `/api/auth/refresh` 경로로만 전송
+
+**⚠️ CSRF 필수 요구사항**:
+Cookie 기반 인증 전환 시 CSRF 토큰 시스템 **반드시 활성화** 필요 (Q5 참고)
 
 #### Q2. 프론트엔드 수정
 **결정**: **OK - 프론트 미구현 상태라 지금 적용 최적**
@@ -549,6 +633,91 @@ public ResponseEntity<Void> logout(HttpServletResponse response) {
     return ResponseEntity.ok().build();
 }
 ```
+
+---
+
+#### Q5. CSRF 재활성화 (Cookie 인증 필수) ✨ **3차 검증 반영**
+
+**배경**:
+Cookie 기반 인증으로 전환 시 **CSRF(Cross-Site Request Forgery) 공격에 취약**해집니다.
+- Spring Security 문서: "커스텀 쿠키로 인증 상태를 담는 stateless 앱도 CSRF 취약"
+- 현재 SecurityConfig는 `csrf().disable()` 상태 → 즉시 재활성화 필요
+
+**결정**: **CookieCsrfTokenRepository + SPA 헤더 전송 방식** ✅
+
+**백엔드 설정**:
+```java
+// SecurityConfig.java
+@Bean
+public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http
+        .csrf(csrf -> csrf
+            .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+            // ↑ XSRF-TOKEN 쿠키 생성 (HttpOnly=false: JS가 읽을 수 있어야 함)
+            .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+        )
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        // ... 기존 설정
+        ;
+    return http.build();
+}
+
+// CSRF 토큰 핸들러 (SPA용)
+final class SpaCsrfTokenRequestHandler extends CsrfTokenRequestAttributeHandler {
+    private final CsrfTokenRequestHandler delegate = new XorCsrfTokenRequestAttributeHandler();
+
+    @Override
+    public void handle(HttpServletRequest request, HttpServletResponse response,
+                       Supplier<CsrfToken> csrfToken) {
+        this.delegate.handle(request, response, csrfToken);
+    }
+
+    @Override
+    public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+        if (StringUtils.hasText(request.getHeader(csrfToken.getHeaderName()))) {
+            return super.resolveCsrfTokenValue(request, csrfToken);
+        }
+        return this.delegate.resolveCsrfTokenValue(request, csrfToken);
+    }
+}
+```
+
+**프론트엔드 설정**:
+```typescript
+// axios 인터셉터 설정
+import Cookies from 'js-cookie';
+
+// 요청 시 CSRF 토큰 자동 포함
+axios.interceptors.request.use((config) => {
+    const csrfToken = Cookies.get('XSRF-TOKEN');
+    if (csrfToken) {
+        config.headers['X-XSRF-TOKEN'] = csrfToken;
+    }
+    return config;
+});
+
+// 쿠키 전송 활성화
+axios.defaults.withCredentials = true;
+```
+
+**동작 방식**:
+1. 서버가 `XSRF-TOKEN` 쿠키 생성 (HttpOnly=false)
+2. 프론트가 쿠키에서 토큰 읽음
+3. 프론트가 `X-XSRF-TOKEN` 헤더로 토큰 전송
+4. 서버가 쿠키 토큰과 헤더 토큰 비교 검증
+5. 일치하지 않으면 403 Forbidden
+
+**선택 이유**:
+- **SPA 친화적**: React 등 프론트엔드 프레임워크와 호환
+- **Spring 표준**: `CookieCsrfTokenRepository`는 Spring 권장 방식
+- **XSS 완화**: SameSite 쿠키와 함께 사용 시 강력한 방어
+
+**⚠️ 주의사항**:
+- CSRF 토큰은 **HttpOnly=false**여야 함 (JS가 읽을 수 있어야 헤더로 전송 가능)
+- Access/Refresh Token은 **HttpOnly=true** (XSS 방어)
+- CORS 설정: `allowCredentials(true)` 필수
+
+---
 
 ### 구현 체크리스트
 
@@ -828,16 +997,31 @@ Phase 1 (MVP): 생년월일 입력
 Phase 2 (스토어 론칭): PASS 인증 추가
 ```
 
-**결정**: **Option C - 하이브리드 전략 ✅**
+**Option D - 조건부 PASS (비용 최소화 전략)** ✨ **권장**:
+```
+기본: 생년월일 입력 + Adult action (만 13세 미만 차단)
+PASS는 전 유저 강제가 아닌 조건부 적용:
+  - 기능 게이팅: DM/방 생성/프리미엄 기능
+  - 리스크 기반: 제재 누적, 다계정 의심, 이의제기
+  - 결제 연동: 구독/프리미엄 결제 시점
+```
+
+**결정**: **Option D - 조건부 PASS 전략 ✅**
 
 **근거**:
-- MVP 단계에서는 생년월일 입력으로 빠른 테스트
-- Google Play 제출 전 PASS 인증 통합
-- 외국인 사용자는 생년월일 입력 허용 (선택적 PASS)
+- **비용 절감**: PASS 호출을 전체 유저가 아닌 일부 구간에만 적용
+- **Google Play 정책 준수**: Adult action + 안전 기능 + 타겟 오디언스 설정으로 리스크 최소화
+- **확장성**: 외국인/무통신사 유저도 기본 기능 사용 가능
+- **점진적 강화**: 스토어 피드백 및 유저 증가에 따라 PASS 범위 조정 가능
+
+**핵심 원칙**:
+1. **PASS는 전면 도입이 아니라 조건부/부분 적용**
+2. **스토어 출시 초기: 생년월일 기반 게이팅 + 안전 기능으로 시작**
+3. **PASS 연동 시 데이터 최소화: CI만 저장, 성명/생년월일 불저장**
 
 **구현 일정**:
-- **6주 차**: 생년월일 입력 + 만 13세 미만 차단
-- **12주 차 (스토어 론칭 전)**: PASS 인증 옵션 추가
+- **6주 차**: 생년월일 입력 + 만 13세 미만 차단 + 기능 게이팅 설계
+- **12주 차**: PASS 인증 조건부 적용 (Feature Flag 방식)
 
 #### Q2. 접근 로그 보관
 
@@ -1529,6 +1713,320 @@ ADD COLUMN view_date DATE GENERATED ALWAYS AS (DATE(viewed_at)) STORED;
 
 ---
 
+## 부록 B: PASS 최소화 운영 전략
+
+**작성일**: 2026-02-19
+**기반**: 3차 리서치 보고서 - PASS 비용 최소화 전략
+**목표**: PASS 호출을 최소화하면서 Google Play 정책 리스크 절감
+
+### 핵심 원칙
+
+> **"PASS는 전면 도입이 아니라 조건부/부분 적용"**
+
+1. **한국 법적 공신력**: PASS(통신3사 기반)는 피할 수 없지만, **전 유저 강제는 불필요**
+2. **Google Play 요구사항**: PASS 필수가 아닌 **"Adult action + 안전 기능 + 타겟 오디언스 설정"** 충족이 핵심
+3. **비용 절감 전략**: PASS를 **기능 게이팅** 또는 **리스크 기반**으로만 적용
+
+---
+
+### 대안 1: PASS 없는 "최소 리스크" 패키지 (MVP/클로즈드 베타용)
+
+**목표**: 비용 0원, Play 정책 리스크 최대한 절감 (완전 공신력은 포기)
+
+**구성 요소**:
+
+1. **가입 시 생년월일 입력 + 만 13세 미만 차단**
+   ```java
+   // SignupRequest.java
+   @NotNull
+   private LocalDate birthDate;
+
+   // UserService.java
+   public void signup(SignupRequest request) {
+       LocalDate minAge = LocalDate.now().minusYears(13);
+       if (request.getBirthDate().isAfter(minAge)) {
+           throw new ForbiddenException("만 13세 이상만 가입 가능합니다");
+       }
+       // ...
+   }
+   ```
+
+2. **타겟 오디언스 설정**
+   - Google Play Console: "Children" 타겟 **OFF**
+   - 연령 등급: 만 13세 이상
+
+3. **Adult Action (추가 안전 조치)**
+   - 최초 채팅/DM 기능 사용 시:
+     - "커뮤니티 가이드 확인"
+     - "신고/차단 방법 안내"
+     - "개인정보 공유 자제 경고"
+
+4. **안전 기능 (Phase 12 핵심)**
+   - 신고/차단 시스템
+   - 자동 모더레이션 (자동 제재, 온도 시스템)
+   - 관리자 검토 큐
+
+5. **명시적 고지**
+   ```
+   "본 서비스는 아동을 대상으로 하지 않습니다.
+    만 13세 미만 사용자는 가입할 수 없습니다."
+   ```
+
+**장점**:
+- ✅ 비용 0원
+- ✅ 빠른 MVP 출시
+- ✅ 외국인/무통신사 유저 가능
+
+**단점**:
+- ❌ 법적 공신력 없음 (생년월일 거짓 입력 가능)
+- ❌ Google Play 심사에서 절대 안전 보장 불가
+
+**적용 시점**: 클로즈드 베타, 웹 PWA, 초기 MVP
+
+---
+
+### 대안 2: PASS "부분 적용" (권장, 비용 최소 + 리스크 절감) ✅
+
+**목표**: 전체 유저가 아닌 **일부 구간에서만 PASS 요구**
+
+#### 2-1. 기능 게이팅 전략
+
+| 기능 | 기본 (PASS 불필요) | PASS 인증 후 |
+|------|-------------------|-------------|
+| 방 탐색 | ✅ 가능 | - |
+| 방 참가 (요청형) | ✅ 가능 (제한적) | 무제한 |
+| ROOM_CHAT | ✅ 가능 | - |
+| **DM (1:1 채팅)** | ❌ 불가능 | ✅ 가능 |
+| **방 생성** | △ 1일 1회 | ✅ 무제한 |
+| **프리미엄 기능** | ❌ 불가능 | ✅ 가능 |
+| 광고 | 표시 | 제거 |
+
+**구현**:
+```java
+// User.java
+@Column(name = "pass_verified")
+private Boolean passVerified = false;
+
+// RoomService.java
+public void createRoom(Long userId, CreateRoomRequest request) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException("사용자를 찾을 수 없습니다"));
+
+    if (!user.getPassVerified()) {
+        // 미인증 유저는 1일 1회 제한
+        LocalDate today = LocalDate.now();
+        long todayRooms = roomRepository.countByCreatedByIdAndCreatedAtAfter(
+            userId, today.atStartOfDay()
+        );
+
+        if (todayRooms >= 1) {
+            throw new ForbiddenException(
+                "PASS 본인인증을 완료하면 방 생성 제한이 해제됩니다"
+            );
+        }
+    }
+
+    // 방 생성...
+}
+```
+
+**효과**:
+- PASS 호출은 **"프리미엄 기능 원하는 유저"**에만 발생
+- 기본 기능으로 서비스 체험 후 선택적 인증 유도
+- 비용 = **프리미엄 유저 수 × 인증 단가**
+
+---
+
+#### 2-2. 리스크 기반 게이팅 전략
+
+| 트리거 조건 | PASS 요구 시점 | 목적 |
+|-----------|---------------|------|
+| 신고 누적 3건 이상 | 이의제기 시 | 악성 유저 복귀 차단 |
+| 제재 이력 2회 이상 | 제재 해제 후 복귀 시 | 재범 방지 |
+| 다계정 의심 | 동일 IP/디바이스 2개 이상 | Sybil 공격 차단 |
+| 온도 < 20°C | 방 생성/DM 시도 시 | 저품질 유저 필터링 |
+| 허위 신고 확정 | 재신고 기능 사용 시 | 어뷰징 방지 |
+
+**구현**:
+```java
+// RiskAssessmentService.java
+public boolean requiresPassVerification(User user) {
+    // 신고 누적
+    long reportCount = reportRepository.countByReportedId(user.getId());
+    if (reportCount >= 3 && !user.getPassVerified()) {
+        return true;
+    }
+
+    // 제재 이력
+    long violationCount = userViolationRepository.countByUserId(user.getId());
+    if (violationCount >= 2 && !user.getPassVerified()) {
+        return true;
+    }
+
+    // 온도 낮음
+    if (user.getTemperature() < 20.0 && !user.getPassVerified()) {
+        return true;
+    }
+
+    return false;
+}
+```
+
+**효과**:
+- PASS 비용은 **"문제 계정"**에만 발생
+- 일반 유저는 평생 PASS 불필요
+- 악성 유저에게는 강력한 진입 장벽
+
+---
+
+#### 2-3. 결제 연동 시점 인증
+
+**시나리오**: 프리미엄 구독, 유료 아이템 구매 시
+
+**효과**:
+- 결제 수단 자체가 "부분적 실명성" 역할
+- PASS와 결제를 함께 요구하면 중복 가입 완벽 차단
+- Google Play 정책상 안전 (결제 연령 제한과 정렬)
+
+**⚠️ 주의**:
+- 청소년 결제/환불 이슈 (부모 동의 필요)
+- 법적 검토 필요
+
+---
+
+### 대안 3: PASS 대신 "저비용 신호" 조합
+
+**목표**: PASS 완전 대체는 아니지만, 오남용/다계정 유입 차단
+
+| 신호 | 비용 | 효과 | 구현 |
+|------|------|------|------|
+| 이메일 검증 | 무료 | 기본 중복 방지 | 인증 메일 발송 |
+| 전화번호 OTP | 건당 10-50원 | PASS보다 저렴, 중복 방지 | SMS API (Twilio, Aligo) |
+| 계정 연령 필터 | 무료 | Sybil 방어 | 가입 7일 미만 신고 무시 |
+| 온도 시스템 | 무료 | 신뢰도 기반 필터 | effective_for_sanction |
+| 디바이스 핑거프린트 | 무료-유료 | 다계정 탐지 | FingerprintJS |
+| 레이트 리밋 | 무료 | API 어뷰징 차단 | Spring RateLimiter |
+
+**조합 전략**:
+```yaml
+tier_1_basic:  # 무료
+  - 이메일 검증
+  - 생년월일 입력
+  - 계정 연령 필터 (7일)
+
+tier_2_standard:  # 전화번호 OTP (저비용)
+  - Tier 1 +
+  - 전화번호 인증
+  - 디바이스 핑거프린트
+
+tier_3_premium:  # PASS (고비용, 고신뢰)
+  - Tier 2 +
+  - PASS 본인인증
+  - 프리미엄 기능
+```
+
+**효과**:
+- 대부분 유저는 Tier 1-2로 충분
+- PASS는 **"프리미엄 또는 리스크 계정"**에만
+
+---
+
+### Feature Flag 기반 점진적 적용
+
+**목표**: PASS 범위를 운영 중 조정 가능하도록 설계
+
+```yaml
+# application.yml
+features:
+  pass-verification:
+    enabled: true
+    mode: CONDITIONAL  # OFF, OPTIONAL, CONDITIONAL, REQUIRED
+    triggers:
+      - PREMIUM_FEATURE
+      - RISK_BASED
+      - PAYMENT
+    bypass-for-test-accounts: true
+```
+
+```java
+@Service
+public class PassVerificationService {
+
+    @Value("${features.pass-verification.mode}")
+    private String passMode;
+
+    public boolean isPassRequired(User user, String context) {
+        if ("OFF".equals(passMode)) {
+            return false;
+        }
+
+        if ("REQUIRED".equals(passMode)) {
+            return !user.getPassVerified();
+        }
+
+        if ("CONDITIONAL".equals(passMode)) {
+            // 트리거 조건 확인
+            return triggers.stream()
+                .anyMatch(trigger -> trigger.shouldRequirePass(user, context));
+        }
+
+        return false;  // OPTIONAL
+    }
+}
+```
+
+**효과**:
+- 스토어 심사 결과에 따라 즉시 조정
+- A/B 테스트 가능
+- 긴급 상황 시 전면 활성화/비활성화
+
+---
+
+### 구현 로드맵 (PASS 최소화 반영)
+
+#### 6주 차 (Phase 12-B)
+
+- [ ] 생년월일 기반 age gate (만 13세 미만 차단)
+- [ ] Feature Flag 시스템 구현
+- [ ] 기능 게이팅 로직 (DM, 방 생성 제한)
+- [ ] 리스크 평가 서비스 (RiskAssessmentService)
+- [ ] 전화번호 OTP 연동 (선택, Tier 2용)
+
+#### 12주 차 (Phase 12-C)
+
+- [ ] PASS 인증 API 연동 (NICE 또는 KCB)
+- [ ] PASS 트리거 조건 구현 (기능/리스크/결제)
+- [ ] Feature Flag로 PASS 활성화 범위 조정
+- [ ] Google Play Console: 타겟 오디언스 설정
+- [ ] 개인정보 처리방침: PASS 수집 항목 명시 (CI만)
+
+---
+
+### Google Play 제출 시 체크리스트
+
+- [ ] 타겟 오디언스: "Children" OFF
+- [ ] 연령 등급: 만 13세 이상
+- [ ] Data Safety: 수집 데이터 명시 (생년월일, CI)
+- [ ] Adult action: "안전 안내 + 커뮤니티 가이드 확인" 구현
+- [ ] 안전 기능: 신고/차단/모더레이션 명시
+- [ ] PASS 정책: "조건부 적용" 설명 준비
+- [ ] 앱 내 고지: "아동 대상 아님" 명시
+
+---
+
+### 비용 추정 (예시)
+
+| 전략 | 월간 활성 유저 | PASS 호출 비율 | 비용 (건당 400원) |
+|------|---------------|---------------|-----------------|
+| 전면 도입 | 10,000명 | 100% | 400만원 |
+| 기능 게이팅 (프리미엄 10%) | 10,000명 | 10% | 40만원 ✅ |
+| 리스크 기반 (문제 계정 2%) | 10,000명 | 2% | 8만원 ✅ |
+| 전화번호 OTP (건당 30원) | 10,000명 | 80% | 24만원 |
+
+**결론**: 조건부 PASS로 **90% 이상 비용 절감** 가능
+
+---
+
 ## 추가 검토 사항
 
 ### Steam 게임 카탈로그 통합 (Phase 13 이후)
@@ -1554,6 +2052,29 @@ public void syncSteamGames() {
 ---
 
 ## 버전 히스토리
+
+### v4.0 (2026-02-19) 🎯 **PASS 최소화 전략 확정**
+**3차 리서치 보고서 반영 - PASS 비용 절감 + 스펙 정밀화**:
+
+**PASS 조건부 적용 전략**:
+- ✅ 연령 인증 방식: Option D - 조건부 PASS 채택
+- ✅ 기능 게이팅: DM/방 생성/프리미엄 기능에만 PASS 요구
+- ✅ 리스크 기반: 신고 누적, 제재 이력, 다계정 의심 시 PASS 요구
+- ✅ 비용 절감: 전면 도입 대비 90% 이상 비용 절감 가능
+- ✅ Feature Flag: 운영 중 PASS 범위 조정 가능
+
+**스펙 정밀화**:
+- ✅ CSRF 재활성화 상세 스펙 (CookieCsrfTokenRepository + SPA 헤더)
+- ✅ JWT role claim 트레이드오프 명시 (역할 변경 반영 문제)
+- ✅ Sybil 공격 방어: 계정 연령 조건 추가 (7일 미만 신고자 무시)
+- ✅ OAuth Cookie 설정: SameSite=Strict 추가
+
+**부록 B 추가: PASS 최소화 운영 전략**:
+- 대안 1: PASS 없는 최소 리스크 패키지 (MVP용)
+- 대안 2: PASS 부분 적용 (기능/리스크 기반) ✅ 권장
+- 대안 3: 저비용 신호 조합 (전화번호 OTP, 계정 연령)
+- Feature Flag 기반 점진적 적용
+- 비용 추정 예시
 
 ### v3.0 (2026-02-19) ✨ **운영 실무 검증 완료**
 **3차 리서치 보고서 반영 - 운영 시나리오 & 공격 벡터 정밀화**:
@@ -1597,7 +2118,8 @@ public void syncSteamGames() {
 
 ---
 
-**문서 버전**: 3.0
+**문서 버전**: 4.0
 **최종 수정**: 2026-02-19
 **작성자**: Gembud 개발팀 + Claude Code
 **리뷰**: 리서치 팀 1차, 2차, 3차 보고서 반영 완료 ✅
+**특이사항**: PASS 비용 최소화 전략 확정 (조건부 적용, 90% 비용 절감)
