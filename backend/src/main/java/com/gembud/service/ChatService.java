@@ -193,7 +193,7 @@ public class ChatService {
         // Create ROOM_CHAT
         ChatRoom chatRoom = ChatRoom.builder()
             .type(ChatRoom.ChatRoomType.ROOM_CHAT)
-            .relatedRoomId(roomId)
+            .relatedRoom(room)
             .build();
         chatRoom = chatRoomRepository.save(chatRoom);
 
