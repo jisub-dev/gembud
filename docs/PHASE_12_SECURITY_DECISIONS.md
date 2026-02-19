@@ -8,17 +8,32 @@
 
 ## Executive Summary
 
-리서치 팀 보고서에서 지적한 5가지 긴급 이슈에 대한 의사결정을 완료하고, 구현 우선순위와 상세 스펙을 확정했습니다.
+리서치 팀 보고서(1차, 2차)에서 지적한 **5가지 긴급 이슈 + 법적 컴플라이언스 요구사항**에 대한 의사결정을 완료하고, 구현 우선순위와 상세 스펙을 확정했습니다.
 
 ### 핵심 결정사항 요약
 
 | 이슈 | 심각도 | 결정 | 구현 기간 |
 |------|--------|------|-----------|
 | 1. ADMIN 권한 분리 부재 | 🔴 최우선 | ENUM 역할 + @PreAuthorize + JWT role | 2주 |
-| 2. 자동 제재 오남용 | 🟠 높음 | 유니크 6명 + 7일 쿨다운 + 4단계 패널티 | 2주 (단순) → 6주 (점수형) |
+| 2. 자동 제재 오남용 | 🟠 높음 | 유니크 6명 + 7일 쿨다운 + effective_for_sanction 플래그 | 2주 (단순) → 6주 (점수형) |
 | 3. 개인정보 노출 | 🟡 중간 | 타인 이메일 전면 제거 | 즉시 |
-| 4. 동시성/멱등성 | 🟡 중간 | DB 유니크 제약 중심 | 2주 |
-| 5. OAuth 토큰 URL 노출 | 🟠 높음 | HTTP-only Cookie + CORS | 2주 |
+| 4. 동시성/멱등성 | 🟡 중간 | DB 유니크 제약 (Generated Column) | 2주 |
+| 5. OAuth 토큰 URL 노출 | 🟠 높음 | HTTP-only Cookie + CSRF 재활성화 | 2주 |
+| 6. 연령 인증 (신규) | 🟡 중간 | 생년월일 입력 → PASS 인증 (단계적) | 6주 → 12주 |
+| 7. 접근 로그 보관 (PIPA) | 🟢 낮음 | 2년 보관, AOP 자동 로깅 | 12주 |
+| 8. Policy Engine | 🟡 중간 | DB 기반 정책 버전 관리 | 6주 |
+
+### 2차 검증 반영 사항
+
+**기술적 보완** (2차 리서치 보고서):
+- ✅ PostgreSQL UNIQUE 제약 한계 → Generated Column 방식 채택
+- ✅ CSRF 재활성화 필수 (Cookie 인증 시)
+- ✅ `effective_for_sanction` 플래그 도입 (저온도 신고자 필터링)
+
+**법적 컴플라이언스**:
+- ✅ PIPA 접근 로그 2년 보관
+- ✅ Google Play 연령 인증 (만 13세 이상)
+- ✅ PASS 본인인증 단계적 도입
 
 ---
 
@@ -265,15 +280,24 @@ false_report_penalty:
 - [ ] ReportService: 7일 쿨다운 체크 로직 추가
 - [ ] ReportService: 유니크 신고자 6명 조건으로 변경
 - [ ] ReportService: 온도 25°C 미만 신고자 필터링
+- [ ] **`reports.effective_for_sanction` 플래그 추가** ✅
 - [ ] V19 마이그레이션: `user_violations` 테이블 생성
 - [ ] `reports` 테이블: `is_false_report`, `retaliation_flag` 컬럼 추가
 - [ ] 테스트: 6명 미만 신고 시 자동 정지 안 됨
 - [ ] 테스트: 동일 신고자 7일 쿨다운
+- [ ] 테스트: 온도 < 25°C 신고자의 신고는 effective_for_sanction=false
 
 **Phase 2 (6주, 데이터 기반)**:
 - [ ] 점수형 자동 제재 알고리즘 구현
 - [ ] 신고자 신뢰도 계산 로직
 - [ ] 정책 엔진(Policy Engine) 도입
+
+**⚠️ 운영 개선 사항 (2차 검증)**:
+- **`effective_for_sanction` 플래그 도입 권장**:
+  - 온도 < 25°C 신고자의 신고는 기록은 되지만 자동 제재 카운트에서 제외
+  - 관리자가 수동 검토 시 참고 가능 (완전 삭제 X)
+  - 향후 신고자 신뢰도 점수 계산 시 활용 가능
+  - DB 컬럼: `effective_for_sanction BOOLEAN DEFAULT TRUE`
 
 ---
 
@@ -514,17 +538,30 @@ public ResponseEntity<Void> logout(HttpServletResponse response) {
 - [ ] AuthController: `/api/auth/refresh` 구현
 - [ ] AuthController: `/api/auth/logout` 구현
 - [ ] CorsConfig: `allowCredentials(true)` 설정
+- [ ] **CSRF 재활성화** (Cookie 인증 필수)
+- [ ] SecurityConfig: `.csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))`
+- [ ] SecurityConfig: SameSite 쿠키 설정
 - [ ] 프론트 OAuth2CallbackPage: 토큰 추출 로직 제거
 - [ ] 프론트 axios: `withCredentials: true` 설정
 - [ ] 프론트 인터셉터: 401 자동 갱신
+- [ ] 프론트: CSRF 토큰 헤더 자동 포함
 - [ ] 테스트: 쿠키로 인증 동작
 - [ ] 테스트: 401 시 자동 갱신 후 재시도
+- [ ] 테스트: CSRF 토큰 누락 시 403
+
+**⚠️ 보안 주의사항 (2차 검증)**:
+- 현재 `SecurityConfig`에 `csrf().disable()` 설정되어 있음
+- Cookie 기반 인증으로 전환 시 CSRF 공격에 취약해짐
+- **즉시 CSRF 재활성화 필수** ✅
+- `CookieCsrfTokenRepository` + `SameSite=Strict` 권장
 
 ---
 
-## 구현 우선순위 (2주 Sprint)
+## 전체 구현 로드맵
 
-### Week 1 (긴급)
+### 📅 Phase 12-A: 긴급 보안 패치 (2주)
+
+**Week 1 (긴급)**:
 
 **Day 1-2**:
 - ✅ 1-1. ADMIN 권한 분리 (User entity, migration, JWT)
@@ -536,27 +573,76 @@ public ResponseEntity<Void> logout(HttpServletResponse response) {
 
 **Day 4-5**:
 - 5. OAuth Cookie 방식 (보안 이슈)
+- **CSRF 재활성화** (Cookie 인증 필수)
 - CORS 설정
 
-### Week 2 (안정화)
+**Week 2 (안정화)**:
 
 **Day 6-7**:
-- 4. DB 유니크 제약 (V18 migration)
-- 예외 처리
+- 4. DB 유니크 제약 (V18 migration, Generated Column)
+- 예외 처리 (DataIntegrityViolationException)
 
 **Day 8-10**:
 - 2-1. 자동 제재 개선 (Phase 1 - 단순 차단)
-- 유니크 6명, 7일 쿨다운
+- 유니크 6명, 7일 쿨다운, effective_for_sanction 플래그
 
 **Day 11-12**:
-- 테스트 작성
-- 통합 테스트
-- 문서화
+- 테스트 작성 (단위, 통합)
+- 문서화 업데이트
 
 **Day 13-14**:
 - 버그 수정
 - QA
 - 배포 준비
+
+---
+
+### 📅 Phase 12-B: 운영 안정화 (6주)
+
+**Week 3-4: 점수형 자동 제재 + Policy Engine**
+- [ ] 점수형 자동 제재 알고리즘 구현
+- [ ] 신고자 신뢰도 계산 로직
+- [ ] `policy_versions` 테이블 생성
+- [ ] PolicyService 구현
+- [ ] 자동 제재, 온도 계산에 Policy Engine 적용
+
+**Week 5: 연령 인증 (MVP)**
+- [ ] `users.birth_date`, `age_verified` 컬럼 추가
+- [ ] 회원가입 시 생년월일 입력 필수
+- [ ] 만 13세 미만 가입 차단
+- [ ] 프론트엔드: 생년월일 입력 폼
+
+**Week 6: 허위 신고 대응**
+- [ ] 허위 신고 자동 탐지 로직
+- [ ] 4단계 패널티 시스템 구현
+- [ ] 관리자 허위 신고 확정 기능
+- [ ] 신고 제한 기능 (30일, 영구)
+
+---
+
+### 📅 Phase 12-C: 법적 컴플라이언스 (12주)
+
+**Week 7-9: PASS 본인인증 통합**
+- [ ] NICE 평가정보 또는 KCB API 연동
+- [ ] `users.ci`, `di` 컬럼 추가
+- [ ] PASS 인증 OAuth 플로우 구현
+- [ ] CI/DI 중복 가입 체크
+- [ ] 외국인 예외 처리 (생년월일 입력 허용)
+- [ ] 프론트엔드: PASS 인증 버튼
+
+**Week 10-11: 접근 로그 보관 시스템 (PIPA)**
+- [ ] `admin_action_logs` 테이블 생성
+- [ ] Spring AOP: 자동 로깅 애스펙트
+- [ ] 관리자 액션 로깅 (신고 처리, 제재)
+- [ ] Spring Batch: 2년 지난 로그 자동 삭제
+- [ ] 로그 조회 API (관리자 전용)
+
+**Week 12: 최종 검증 & 배포**
+- [ ] 전체 시스템 통합 테스트
+- [ ] 보안 감사 (OWASP 체크리스트)
+- [ ] 법적 컴플라이언스 체크
+- [ ] Google Play 정책 준수 확인
+- [ ] 프로덕션 배포 준비
 
 ---
 
@@ -575,18 +661,43 @@ ALTER TABLE evaluations
 ADD CONSTRAINT uk_evaluation_per_room
 UNIQUE (room_id, evaluator_id, evaluated_id);
 
--- 광고 하루 1회
+-- 광고 하루 1회 (PostgreSQL 제약: DATE() 표현식 직접 사용 불가)
+-- Option A: Generated Column 방식 (권장) ✅
+ALTER TABLE ad_views
+ADD COLUMN view_date DATE GENERATED ALWAYS AS (DATE(viewed_at)) STORED;
+
 ALTER TABLE ad_views
 ADD CONSTRAINT uk_ad_view_daily
-UNIQUE (user_id, ad_id, DATE(viewed_at));
+UNIQUE (user_id, ad_id, view_date);
+
+CREATE INDEX idx_ad_views_date ON ad_views(view_date);
+
+-- Option B (대안): Expression-based Unique Index
+-- CREATE UNIQUE INDEX uk_ad_view_daily
+-- ON ad_views (user_id, ad_id, DATE(viewed_at));
 ```
+
+**⚠️ 기술적 보완 사항 (2차 검증)**:
+- PostgreSQL은 UNIQUE 제약에 함수 표현식 직접 사용 불가
+- Generated Column 방식 채택 이유:
+  - 쿼리 성능 향상 (인덱스 활용)
+  - 명시적 컬럼으로 디버깅 용이
+  - 향후 날짜 기반 쿼리 최적화
 
 ### V19: 허위 신고 & 자동 제재
 ```sql
 -- reports 테이블 확장
 ALTER TABLE reports
 ADD COLUMN is_false_report BOOLEAN DEFAULT FALSE,
-ADD COLUMN retaliation_flag BOOLEAN DEFAULT FALSE;
+ADD COLUMN retaliation_flag BOOLEAN DEFAULT FALSE,
+ADD COLUMN effective_for_sanction BOOLEAN DEFAULT TRUE;  -- ✨ 2차 검증 반영
+
+-- effective_for_sanction 컬럼 설명
+COMMENT ON COLUMN reports.effective_for_sanction IS
+  '자동 제재 카운트 포함 여부 (온도 < 25°C 신고자는 false)';
+
+CREATE INDEX idx_reports_effective ON reports(effective_for_sanction)
+  WHERE effective_for_sanction = TRUE;
 
 -- 사용자 위반 이력
 CREATE TABLE user_violations (
@@ -635,6 +746,176 @@ ALTER TABLE users ADD COLUMN false_report_count INT DEFAULT 0;
 
 ---
 
+## 6. 연령 인증 & 법적 컴플라이언스 (신규 요구사항)
+
+### 배경
+
+**Google Play Families 정책** 및 **개인정보보호법(PIPA)** 준수를 위해 추가 고려 필요:
+
+1. **연령 제한 (Age Gating)**:
+   - Google Play: 채팅 기능이 있는 앱은 만 13세 이상 연령 인증 필요
+   - 한국: 온라인 게임은 만 18세 미만 심야 접속 제한 (셧다운제 폐지, 자율 규제)
+
+2. **접근 로그 보관**:
+   - PIPA 제75조: 개인정보 처리 시스템 접근 기록 1년 이상 보관
+   - 실무 권장: 2년 보관 (소송 시효 대비)
+
+3. **정책 유연성**:
+   - 자동 제재 점수, 온도 계산 로직 등 하드코딩 시 변경 어려움
+   - Policy Engine 도입으로 운영 유연성 확보
+
+### 의사결정
+
+#### Q1. 연령 인증 방식
+
+**검토 옵션**:
+
+**Option A - PASS 인증 (본인인증) 🇰🇷**:
+```
+장점:
+- 법적 공신력 (실명, 생년월일 확인)
+- 구글 플레이 정책 완벽 준수
+- 중복 가입 방지 (CI/DI 활용)
+- 미성년자 보호 강력
+
+단점:
+- 비용 발생 (건당 300-500원)
+- 외국인 사용 불가
+- PASS 앱 설치 필요
+- 통신사 연동 필요
+
+구현:
+- NICE 평가정보, KCB 등 본인인증 API
+- OAuth2 처럼 리다이렉트 플로우
+- CI/DI 저장 (중복 가입 체크)
+```
+
+**Option B - 생년월일 입력 + 이메일 인증**:
+```
+장점:
+- 무료
+- 간단한 구현
+- 외국인 가능
+- MVP에 충분
+
+단점:
+- 법적 강제력 없음
+- 거짓 입력 가능
+- 구글 플레이 거부 가능성
+```
+
+**Option C - 하이브리드 (단계적 도입)**:
+```
+Phase 1 (MVP): 생년월일 입력
+Phase 2 (스토어 론칭): PASS 인증 추가
+```
+
+**결정**: **Option C - 하이브리드 전략 ✅**
+
+**근거**:
+- MVP 단계에서는 생년월일 입력으로 빠른 테스트
+- Google Play 제출 전 PASS 인증 통합
+- 외국인 사용자는 생년월일 입력 허용 (선택적 PASS)
+
+**구현 일정**:
+- **6주 차**: 생년월일 입력 + 만 13세 미만 차단
+- **12주 차 (스토어 론칭 전)**: PASS 인증 옵션 추가
+
+#### Q2. 접근 로그 보관
+
+**결정**: **12주 차에 구현 (PIPA 준수)**
+
+**요구사항**:
+```yaml
+access_log_retention:
+  scope:
+    - 관리자 신고 처리 액션
+    - 사용자 정지/해제 이력
+    - 개인정보 조회 (이메일, 프로필)
+
+  retention_period: 730 days  # 2년
+
+  fields:
+    - timestamp
+    - user_id (행위자)
+    - action_type (예: 'REPORT_REVIEWED', 'USER_SUSPENDED')
+    - target_user_id
+    - ip_address
+    - request_path
+```
+
+**구현 방식**:
+- `admin_action_logs` 테이블 생성
+- Spring AOP로 자동 로깅
+- 2년 후 자동 삭제 (Spring Batch)
+
+#### Q3. Policy Engine 도입
+
+**결정**: **6주 차에 MVP 버전 구현**
+
+**배경**:
+- 자동 제재 점수, 온도 계산 로직이 코드에 하드코딩됨
+- 정책 변경 시 재배포 필요 → 운영 부담
+- A/B 테스트 불가능
+
+**Policy Engine 아키텍처**:
+```sql
+-- 정책 버전 관리
+CREATE TABLE policy_versions (
+  id BIGSERIAL PRIMARY KEY,
+  policy_type VARCHAR(50),  -- 'AUTO_SANCTION', 'TEMPERATURE', 'MATCHING'
+  version INT,
+  config JSONB,
+  effective_from TIMESTAMP,
+  created_by BIGINT,
+  is_active BOOLEAN DEFAULT TRUE
+);
+
+-- 예시: 자동 제재 정책
+INSERT INTO policy_versions (policy_type, version, config, effective_from)
+VALUES ('AUTO_SANCTION', 2, '{
+  "unique_reporters": 6,
+  "within_days": 7,
+  "exclude_low_temp": 25,
+  "category_points": {
+    "FRAUD": 100,
+    "HARASSMENT": 100,
+    "VERBAL_ABUSE": 35
+  }
+}', NOW());
+```
+
+**장점**:
+- 재배포 없이 정책 변경
+- 정책 변경 이력 추적
+- A/B 테스트 가능 (세그먼트별 다른 정책)
+- 감사 로그 자동 생성
+
+**구현 범위 (6주 차)**:
+- `policy_versions` 테이블
+- PolicyService (DB에서 정책 로드)
+- 자동 제재, 온도 계산에 적용
+
+### 구현 체크리스트
+
+**6주 차**:
+- [ ] `users` 테이블: `birth_date DATE`, `age_verified BOOLEAN` 추가
+- [ ] 회원가입 API: 생년월일 입력 필수
+- [ ] 만 13세 미만 가입 차단
+- [ ] Policy Engine 테이블 생성
+- [ ] PolicyService 구현
+- [ ] 자동 제재, 온도 계산에 Policy Engine 적용
+
+**12주 차**:
+- [ ] PASS 인증 API 연동 (NICE 또는 KCB)
+- [ ] `users` 테이블: `ci VARCHAR(88)`, `di VARCHAR(64)` 추가
+- [ ] PASS 인증 후 CI/DI 중복 가입 체크
+- [ ] `admin_action_logs` 테이블 생성
+- [ ] AOP 기반 접근 로그 자동 수집
+- [ ] Spring Batch: 2년 지난 로그 삭제
+
+---
+
 ## 다음 단계 (6주 후 - Phase 2)
 
 ### 자동 제재 점수형 전환
@@ -679,6 +960,52 @@ auto_suspend:
 
 ---
 
-**문서 버전**: 1.0
+## 추가 검토 사항
+
+### Steam 게임 카탈로그 통합 (Phase 13 이후)
+
+**요구사항**:
+- Steam Web API `IStoreService/GetAppList`를 통한 게임 목록 동기화
+- 주기적 업데이트 (Spring @Scheduled, 매일 1회)
+- 인기도 기반 정렬 (플레이어 수, 리뷰 점수)
+- 게임 검색 기능 (PostgreSQL Full-Text Search 또는 Elasticsearch)
+
+**구현 계획**:
+```java
+@Scheduled(cron = "0 0 2 * * *")  // 매일 새벽 2시
+public void syncSteamGames() {
+    // 1. Steam API 호출
+    // 2. 신규 게임 DB 저장
+    // 3. 인기도 메타데이터 업데이트
+}
+```
+
+**우선순위**: Phase 13 (보안 패치 완료 후)
+
+---
+
+## 버전 히스토리
+
+### v2.0 (2026-02-19)
+**2차 리서치 보고서 반영**:
+- PostgreSQL UNIQUE 제약 한계 → Generated Column 방식
+- CSRF 재활성화 필수 추가
+- `effective_for_sanction` 플래그 도입
+- PASS 본인인증 및 연령 인증 계획 추가
+- PIPA 접근 로그 보관 요구사항 추가
+- Policy Engine 아키텍처 상세화
+- 12주 로드맵 확정
+
+### v1.0 (2026-02-19)
+**초기 의사결정 문서**:
+- 5가지 긴급 보안 이슈 결정
+- ADMIN 권한 분리, 자동 제재, 개인정보 보호
+- 동시성 해결, OAuth Cookie 전환
+- 2주 Sprint 계획
+
+---
+
+**문서 버전**: 2.0
 **최종 수정**: 2026-02-19
 **작성자**: Gembud 개발팀 + Claude Code
+**리뷰**: 리서치 팀 1차, 2차 보고서 반영 완료
