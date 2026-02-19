@@ -11,8 +11,23 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Phase 12: Cookie-based authentication
-// No Authorization header needed - cookies are sent automatically
+// Phase 12: Cookie-based authentication + CSRF protection
+api.interceptors.request.use(
+  (config) => {
+    // Add CSRF token from cookie to header
+    const csrfToken = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('XSRF-TOKEN='))
+      ?.split('=')[1];
+
+    if (csrfToken && config.method !== 'get') {
+      config.headers['X-XSRF-TOKEN'] = decodeURIComponent(csrfToken);
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Response interceptor to handle token refresh
 api.interceptors.response.use(
