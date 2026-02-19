@@ -75,10 +75,17 @@ public class User {
     @Column(name = "suspended_until")
     private LocalDateTime suspendedUntil;
 
+    /**
+     * User role (Phase 12: ADMIN separation).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role = UserRole.USER;
+
     @Builder
     public User(String email, String password, String nickname, String profileImageUrl,
                 String ageRange, BigDecimal temperature, OAuthProvider oauthProvider,
-                String oauthId) {
+                String oauthId, UserRole role) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
@@ -87,6 +94,7 @@ public class User {
         this.temperature = temperature != null ? temperature : new BigDecimal("36.5");
         this.oauthProvider = oauthProvider;
         this.oauthId = oauthId;
+        this.role = role != null ? role : UserRole.USER;
     }
 
     @PrePersist
@@ -166,6 +174,14 @@ public class User {
      */
     public void liftSuspension() {
         this.suspendedUntil = null;
+    }
+
+    /**
+     * User role enum (Phase 12).
+     */
+    public enum UserRole {
+        USER,   // 일반 사용자
+        ADMIN   // 관리자
     }
 
     public enum OAuthProvider {

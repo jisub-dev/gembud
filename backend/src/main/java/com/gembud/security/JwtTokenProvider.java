@@ -36,23 +36,25 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Generates an access token for the given email.
+     * Generates an access token for the given email and role (Phase 12).
      *
      * @param email user email to store as subject
+     * @param role user role to store in claims
      * @return signed access token
      */
-    public String generateAccessToken(String email) {
-        return generateToken(email, jwtConfig.getAccessTokenExpiration());
+    public String generateAccessToken(String email, String role) {
+        return generateToken(email, role, jwtConfig.getAccessTokenExpiration());
     }
 
     /**
-     * Generates a refresh token for the given email.
+     * Generates a refresh token for the given email and role (Phase 12).
      *
      * @param email user email to store as subject
+     * @param role user role to store in claims
      * @return signed refresh token
      */
-    public String generateRefreshToken(String email) {
-        return generateToken(email, jwtConfig.getRefreshTokenExpiration());
+    public String generateRefreshToken(String email, String role) {
+        return generateToken(email, role, jwtConfig.getRefreshTokenExpiration());
     }
 
     /**
@@ -89,6 +91,20 @@ public class JwtTokenProvider {
     }
 
     /**
+     * Extracts the role from the token (Phase 12).
+     *
+     * @param token JWT to parse
+     * @return role stored in the token claims
+     */
+    public String getRoleFromToken(String token) {
+        try {
+            return parseClaims(token).get("role", String.class);
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid JWT token", ex);
+        }
+    }
+
+    /**
      * Checks whether the token has expired.
      *
      * @param token JWT to check
@@ -103,11 +119,12 @@ public class JwtTokenProvider {
         }
     }
 
-    private String generateToken(String email, Long expirationMillis) {
+    private String generateToken(String email, String role, Long expirationMillis) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expirationMillis);
         return Jwts.builder()
             .subject(email)
+            .claim("role", role)
             .issuedAt(now)
             .expiration(expiration)
             .signWith(getSigningKey(), SignatureAlgorithm.HS256)
