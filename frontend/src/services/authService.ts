@@ -23,6 +23,7 @@ export interface AuthResponse {
 export const authService = {
   /**
    * Sign up a new user
+   * Phase 12: Tokens delivered via HTTP-only cookies
    */
   async signup(data: SignupRequest): Promise<AuthResponse> {
     const response = await api.post<AuthResponse>('/auth/signup', data);
@@ -31,6 +32,7 @@ export const authService = {
 
   /**
    * Log in with email and password
+   * Phase 12: Tokens delivered via HTTP-only cookies
    */
   async login(data: LoginRequest): Promise<AuthResponse> {
     const response = await api.post<AuthResponse>('/auth/login', data);
@@ -38,13 +40,19 @@ export const authService = {
   },
 
   /**
-   * Refresh access token
+   * Get current user info
+   * Phase 12: New endpoint to get user info after OAuth callback
    */
-  async refreshToken(refreshToken: string): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/refresh', {
-      refreshToken,
-    });
+  async getCurrentUser(): Promise<{ email: string; nickname: string }> {
+    const response = await api.get<{ email: string; nickname: string }>('/users/me');
     return response.data;
+  },
+
+  /**
+   * Log out (clears HTTP-only cookies on backend)
+   */
+  async logout(): Promise<void> {
+    await api.post('/auth/logout');
   },
 
   /**
@@ -56,25 +64,16 @@ export const authService = {
   },
 
   /**
-   * Store auth tokens in localStorage
+   * Phase 12: Cookie-based authentication
+   * Tokens are stored in HTTP-only cookies (not accessible from JavaScript)
+   * Authentication state is checked by calling /users/me endpoint
    */
-  storeTokens(accessToken: string, refreshToken: string): void {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-  },
-
-  /**
-   * Remove auth tokens from localStorage
-   */
-  clearTokens(): void {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-  },
-
-  /**
-   * Check if user is authenticated
-   */
-  isAuthenticated(): boolean {
-    return !!localStorage.getItem('accessToken');
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      await this.getCurrentUser();
+      return true;
+    } catch {
+      return false;
+    }
   },
 };

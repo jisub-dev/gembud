@@ -2,9 +2,11 @@ package com.gembud.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -70,16 +72,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Extracts JWT token from Authorization header.
+     * Extracts JWT token from Cookie (Phase 12) or Authorization header (fallback).
+     *
+     * Phase 12 Security: Tokens are stored in HTTP-only cookies
+     * Fallback to Authorization header for backward compatibility
      *
      * @param request HTTP request
      * @return JWT token or null if not present
      */
     private String extractJwtFromRequest(HttpServletRequest request) {
+        // Phase 12: Try to get token from HTTP-only cookie first
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            String tokenFromCookie = Arrays.stream(cookies)
+                .filter(cookie -> "accessToken".equals(cookie.getName()))
+                .map(Cookie::getValue)
+                .findFirst()
+                .orElse(null);
+
+            if (StringUtils.hasText(tokenFromCookie)) {
+                return tokenFromCookie;
+            }
+        }
+
+        // Fallback: Try Authorization header (for backward compatibility)
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
         }
+
         return null;
     }
 }

@@ -1,15 +1,15 @@
 package com.gembud.security;
 
+import com.gembud.config.JwtConfig;
 import com.gembud.entity.User;
 import com.gembud.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
  * OAuth2 authentication success handler.
  * Creates or updates user and generates JWT tokens.
  *
+ * Phase 12 Security: Tokens delivered via HTTP-only cookies (not URL query).
+ *
  * @author Gembud Team
  * @since 2026-02-16
  */
@@ -29,12 +31,18 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final JwtConfig jwtConfig;
 
     @Value("${app.oauth2.redirect-uri:http://localhost:5173/auth/callback}")
     private String redirectUri;
 
     /**
      * Handles successful OAuth2 authentication.
+     *
+     * Phase 12 Security Fix:
+     * - Tokens delivered via HTTP-only cookies (SameSite=Strict)
+     * - URL contains only success=true (no PII/tokens)
+     * - JWT includes user role for RBAC
      *
      * @param request HTTP request
      * @param response HTTP response
@@ -53,18 +61,39 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         String registrationId = extractRegistrationId(request);
         User user = processOAuth2User(registrationId, oAuth2User);
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail());
-
-        String targetUrl = String.format(
-            "%s?accessToken=%s&refreshToken=%s&email=%s&nickname=%s",
-            redirectUri,
-            URLEncoder.encode(accessToken, StandardCharsets.UTF_8),
-            URLEncoder.encode(refreshToken, StandardCharsets.UTF_8),
-            URLEncoder.encode(user.getEmail() != null ? user.getEmail() : "", StandardCharsets.UTF_8),
-            URLEncoder.encode(user.getNickname(), StandardCharsets.UTF_8)
+        // Generate JWT tokens with user role (Phase 12: RBAC)
+        String accessToken = jwtTokenProvider.generateAccessToken(
+            user.getEmail(),
+            user.getRole().name()
+        );
+        String refreshToken = jwtTokenProvider.generateRefreshToken(
+            user.getEmail(),
+            user.getRole().name()
         );
 
+        // Set access token cookie (HTTP-only, Secure, SameSite=Strict)
+        ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
+            .httpOnly(true)
+            .secure(true)  // HTTPS only
+            .path("/")
+            .maxAge(jwtConfig.getAccessTokenExpiration() / 1000)  // seconds
+            .sameSite("Strict")
+            .build();
+
+        // Set refresh token cookie (HTTP-only, Secure, SameSite=Strict)
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
+            .httpOnly(true)
+            .secure(true)  // HTTPS only
+            .path("/")
+            .maxAge(jwtConfig.getRefreshTokenExpiration() / 1000)  // seconds
+            .sameSite("Strict")
+            .build();
+
+        response.addHeader("Set-Cookie", accessCookie.toString());
+        response.addHeader("Set-Cookie", refreshCookie.toString());
+
+        // Redirect to frontend (URL contains only success flag, no PII/tokens)
+        String targetUrl = redirectUri + "?success=true";
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 

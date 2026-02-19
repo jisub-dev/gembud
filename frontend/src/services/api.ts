@@ -7,19 +7,12 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Phase 12: Cookie-based authentication (HTTP-only cookies)
+  withCredentials: true,
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+// Phase 12: Cookie-based authentication
+// No Authorization header needed - cookies are sent automatically
 
 // Response interceptor to handle token refresh
 api.interceptors.response.use(
@@ -31,23 +24,17 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token');
-        }
+        // Call refresh endpoint (cookies are sent automatically)
+        await axios.post(
+          `${API_BASE_URL}/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
 
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refreshToken,
-        });
-
-        const { accessToken } = response.data;
-        localStorage.setItem('accessToken', accessToken);
-
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        // Retry original request (new access token cookie will be used)
         return api(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        // Refresh failed - redirect to login
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
