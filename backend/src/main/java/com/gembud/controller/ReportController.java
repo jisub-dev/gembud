@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -83,9 +84,12 @@ public class ReportController {
     /**
      * Get reports by status (admin only).
      *
+     * Phase 12: ADMIN 권한 필요
+     *
      * @param status report status
      * @return list of reports
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/status/{status}")
     public ResponseEntity<List<ReportResponse>> getReportsByStatus(
         @PathVariable ReportStatus status
@@ -102,9 +106,12 @@ public class ReportController {
     /**
      * Get reports against a user (admin only).
      *
+     * Phase 12: ADMIN 권한 필요
+     *
      * @param userId user ID
      * @return list of reports
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<ReportResponse>> getReportsAgainstUser(
         @PathVariable Long userId
@@ -121,9 +128,12 @@ public class ReportController {
     /**
      * Get pending report count for a user (admin only).
      *
+     * Phase 12: ADMIN 권한 필요
+     *
      * @param userId user ID
      * @return count
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/user/{userId}/count")
     public ResponseEntity<Long> getPendingReportCount(@PathVariable Long userId) {
         long count = reportService.getPendingReportCount(userId);
@@ -133,9 +143,12 @@ public class ReportController {
     /**
      * Mark report as reviewed (admin only).
      *
+     * Phase 12: ADMIN 권한 필요
+     *
      * @param reportId report ID
      * @return updated report
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{reportId}/review")
     public ResponseEntity<ReportResponse> markAsReviewed(@PathVariable Long reportId) {
         Report report = reportService.markAsReviewed(reportId);
@@ -145,10 +158,13 @@ public class ReportController {
     /**
      * Resolve report (admin only).
      *
+     * Phase 12: ADMIN 권한 필요
+     *
      * @param reportId report ID
      * @param adminComment admin comment
      * @return updated report
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{reportId}/resolve")
     public ResponseEntity<ReportResponse> resolveReport(
         @PathVariable Long reportId,
@@ -161,9 +177,12 @@ public class ReportController {
     /**
      * Delete report (admin only).
      *
+     * Phase 12: ADMIN 권한 필요
+     *
      * @param reportId report ID
      * @return no content
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{reportId}")
     public ResponseEntity<Void> deleteReport(@PathVariable Long reportId) {
         reportService.deleteReport(reportId);
