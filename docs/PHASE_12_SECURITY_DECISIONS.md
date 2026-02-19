@@ -1,8 +1,9 @@
-# Gembud Phase 12: 보안·정책 긴급 패치 의사결정 문서
+# Gembud Phase 12: 보안·정책 긴급 패치 의사결정 문서 v5.0
 
 **작성일**: 2026-02-19
-**기반 자료**: 리서치 팀 Phase 11 심층 검증 보고서
-**목표**: 운영 전 필수 보안 취약점 및 정책 개선
+**최종 업데이트**: 2026-02-19 (v5.0 - 출시 준비 완료)
+**기반 자료**: 리서치 팀 Phase 11 심층 검증 보고서 (1차~4차)
+**목표**: 운영 전 필수 보안 취약점 및 정책 개선 + 출시 체크리스트 확정
 
 ---
 
@@ -2027,6 +2028,690 @@ public class PassVerificationService {
 
 ---
 
+## 부록 C: 출시용 고지/약관 최소 세트
+
+**작성일**: 2026-02-19
+**목적**: Google Play 정책 준수 + 법적 리스크 최소화
+**범위**: 유저가 직접 보는 고지 문구 및 동의 흐름
+
+### C.1 필수 고지 문구
+
+#### 연령 제한 고지
+
+**위치**: 회원가입 페이지, 앱 설명
+
+```
+본 서비스는 만 13세 이상만 이용 가능합니다.
+
+만 13세 미만 사용자는 가입할 수 없으며,
+아동을 대상으로 하지 않습니다.
+```
+
+**Google Play 제출 시**:
+- Target Audience: "Children" OFF
+- Age Rating: Teen (13+)
+
+---
+
+#### 채팅/신고 증거 보관 고지
+
+**위치**: 최초 채팅/신고 기능 사용 전
+
+```markdown
+### 안전한 커뮤니티를 위한 안내
+
+**채팅 기록 보관**
+- 방 채팅은 최근 50개 메시지가 증거용으로 7일간 보관됩니다
+- 신고 접수 시 관련 채팅이 관리자에게 제출됩니다
+
+**신고 시스템**
+- 허위 신고는 제재 대상입니다
+- 신고 내용은 익명으로 처리되지 않습니다
+- 악의적 신고 시 패널티가 부여될 수 있습니다
+
+**개인정보 보호**
+- 전화번호, 주소 등 개인정보를 채팅에 공유하지 마세요
+- 외부 서비스 유도는 사기 위험이 있습니다
+```
+
+**동의 버튼**: "확인했습니다"
+
+---
+
+#### 계정 삭제 후 데이터 보관 고지
+
+**위치**: 계정 삭제 확인 페이지
+
+```markdown
+### 계정 삭제 안내
+
+계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+
+**삭제되는 데이터**
+- 프로필 정보 (이메일, 닉네임, 프로필 사진)
+- 채팅 메시지
+- 친구 목록
+- 평가 이력
+
+**보관되는 데이터 (익명 처리)**
+- 신고 이력: 사기/어뷰징 방지 목적으로 익명화하여 보관
+- 제재 이력: 재가입 방지 및 커뮤니티 안전 유지
+- 접근 로그: 법령에 따라 2년간 보관 후 자동 삭제
+
+보관 데이터는 개인을 식별할 수 없는 형태로 처리되며,
+법적 분쟁 또는 수사 협조 시에만 활용됩니다.
+```
+
+**확인 체크박스**: "위 내용을 이해했으며 계정 삭제에 동의합니다"
+
+---
+
+#### 커뮤니티 가이드라인 (최소판)
+
+**위치**: 앱 내 도움말 페이지, Play 스토어 설명
+
+```markdown
+### Gembud 커뮤니티 가이드라인
+
+**금지 행위**
+1. 욕설, 성희롱, 차별적 발언
+2. 사기, 계정 거래, 실물 거래 유도
+3. 개인정보 요구 또는 공유
+4. 스팸, 광고, 외부 서비스 홍보
+5. 게임 플레이 방해 (트롤링, 일부러 패배 유도)
+6. 허위 신고, 보복 신고
+
+**위반 시 조치**
+- 1차: 경고 + 온도 하락
+- 2차: 3일 정지
+- 3차: 7일 정지
+- 4차: 30일 정지
+- 5차: 영구 정지
+
+**신고 방법**
+1. 해당 유저 프로필 → 신고 버튼
+2. 신고 사유 선택 + 증거 제출 (선택)
+3. 관리자 검토 (평균 24시간 이내)
+
+**온도 시스템**
+- 기본: 36.5°C
+- 좋은 평가: +0.5°C
+- 나쁜 평가: -1.0°C
+- 온도가 낮으면 방 참가 제한, 신고 가중치 감소
+```
+
+---
+
+### C.2 동의 흐름 설계
+
+#### 회원가입 시
+
+```
+Step 1: 생년월일 입력
+└─ 만 13세 미만 → 가입 차단
+
+Step 2: 이메일 인증
+
+Step 3: 약관 동의
+├─ [필수] 서비스 이용약관
+├─ [필수] 개인정보 처리방침
+├─ [필수] 만 13세 이상 확인
+└─ [선택] 마케팅 수신 동의
+
+Step 4: 가입 완료
+```
+
+---
+
+#### 최초 채팅 사용 시
+
+```
+Modal: "안전한 채팅을 위한 안내"
+├─ 채팅 기록 보관 안내 (7일)
+├─ 개인정보 공유 금지 안내
+└─ [버튼] 확인했습니다
+
+→ user.chat_safety_guide_read = true
+```
+
+---
+
+#### PASS 인증 요구 시 (조건부)
+
+```
+Modal: "추가 인증이 필요합니다"
+
+본 기능을 사용하려면 본인인증이 필요합니다.
+
+인증 이유:
+- DM 기능은 미성년자 보호를 위해 본인인증이 필요합니다
+- 중복 가입 방지 및 커뮤니티 안전 유지
+
+인증 혜택:
+- DM (1:1 채팅) 무제한
+- 방 생성 무제한
+- 프리미엄 기능 이용
+
+[PASS 인증하기] [나중에]
+```
+
+---
+
+### C.3 Play Console Data Safety 작성 예시
+
+**수집하는 데이터**:
+
+| 항목 | 수집 목적 | 공유 여부 |
+|------|----------|----------|
+| 이메일 주소 | 계정 식별, 로그인 | 공유 안 함 |
+| 닉네임 | 서비스 제공 | 다른 사용자에게 표시 |
+| 생년월일 (연도만) | 연령 확인 | 공유 안 함 |
+| 채팅 메시지 | 서비스 제공, 신고 증거 | 신고 시 관리자에게 제공 |
+| CI (본인인증 시) | 중복 가입 방지 | 공유 안 함 |
+
+**데이터 삭제 방법**:
+- 인앱: 설정 → 계정 관리 → 계정 삭제
+- 웹: https://gembud.com/account-deletion
+
+---
+
+### C.4 구현 체크리스트
+
+**2주 차 (출시 필수)**:
+- [ ] 회원가입: "만 13세 이상" 체크박스 필수
+- [ ] 앱 내: "아동 대상 아님" 고지 명시
+- [ ] 계정 삭제 페이지: 보관 데이터 고지 포함
+- [ ] Play Console: Data Safety 작성
+
+**4주 차**:
+- [ ] 최초 채팅 시: 안전 안내 모달
+- [ ] 커뮤니티 가이드라인 페이지 (간단)
+- [ ] PASS 인증 요구 시: 이유 설명 모달
+
+**6주 차**:
+- [ ] 개인정보 처리방침 업데이트 (PASS CI 수집)
+- [ ] 서비스 이용약관 업데이트 (온도, 제재)
+
+---
+
+## 부록 D: API 레이트리밋 전략
+
+**작성일**: 2026-02-19
+**목적**: OWASP API6 (Unrestricted Access to Sensitive Business Flows) 대응
+**배경**: 어뷰저는 "중복"이 아니라 "대량 호출"로 시스템 공격
+
+### D.1 출시용 최소 레이트리밋
+
+#### 우선순위 1: 인증 관련 (최우선)
+
+| API | 제한 | 이유 |
+|-----|------|------|
+| `POST /api/auth/refresh` | **유저당 분당 5회** | 토큰 갱신 폭격 방지 |
+| `POST /oauth2/*` | **IP당 분당 10회** | OAuth 콜백 어뷰징 |
+| `POST /api/auth/logout` | 유저당 분당 10회 | (우선순위 낮음) |
+
+**구현**:
+```java
+@RateLimiter(name = "auth-refresh", fallbackMethod = "refreshRateLimitFallback")
+@PostMapping("/api/auth/refresh")
+public ResponseEntity<Void> refresh(...) {
+    // ...
+}
+
+private ResponseEntity<Void> refreshRateLimitFallback(Exception e) {
+    return ResponseEntity
+        .status(HttpStatus.TOO_MANY_REQUESTS)
+        .body(new ErrorResponse("RATE_LIMIT_EXCEEDED", "너무 많은 요청입니다. 잠시 후 다시 시도해주세요."));
+}
+```
+
+**설정**:
+```yaml
+# application.yml
+resilience4j.ratelimiter:
+  instances:
+    auth-refresh:
+      limitForPeriod: 5
+      limitRefreshPeriod: 60s
+      timeoutDuration: 0s
+```
+
+---
+
+#### 우선순위 2: 신고/제재 (높음)
+
+| API | 제한 | 이유 |
+|-----|------|------|
+| `POST /api/reports` | **유저당 분당 3회, 시간당 10회** | 신고 폭격 방지 |
+| `POST /api/rooms/{id}/evaluations` | 유저당 분당 5회 | 평가 어뷰징 |
+
+**구현**:
+```java
+// 분당 + 시간당 이중 제한
+@RateLimiter(name = "report-minute")
+@RateLimiter(name = "report-hour")
+@PostMapping("/api/reports")
+public ResponseEntity<ReportResponse> createReport(...) {
+    // ...
+}
+```
+
+```yaml
+resilience4j.ratelimiter:
+  instances:
+    report-minute:
+      limitForPeriod: 3
+      limitRefreshPeriod: 60s
+    report-hour:
+      limitForPeriod: 10
+      limitRefreshPeriod: 3600s
+```
+
+---
+
+#### 우선순위 3: 광고 (중간)
+
+| API | 제한 | 이유 |
+|-----|------|------|
+| `POST /api/ads/{id}/view` | **유저당 분당 10회** | 광고 어뷰징 (수익 부정) |
+
+**추가 방어**:
+- DB 유니크 제약 (하루 동일 광고 1회)
+- 레이트리밋은 "폭격" 차단용
+
+---
+
+### D.2 구현 전략
+
+#### Option A: Resilience4j (권장, Spring Boot 친화적)
+
+**장점**:
+- Spring Boot Starter 존재
+- 인메모리 (Redis 불필요, 출시 MVP에 적합)
+- 어노테이션 기반 (간단)
+
+**단점**:
+- 단일 인스턴스만 지원 (스케일 아웃 시 Redis 필요)
+
+**의존성**:
+```xml
+<dependency>
+    <groupId>io.github.resilience4j</groupId>
+    <artifactId>resilience4j-spring-boot3</artifactId>
+</dependency>
+```
+
+---
+
+#### Option B: Bucket4j + Redis (확장성 우선)
+
+**장점**:
+- 멀티 인스턴스 지원 (Redis 기반)
+- Token Bucket 알고리즘 (유연)
+
+**단점**:
+- Redis 의존성 (인프라 복잡도 증가)
+- 출시 MVP에는 과함
+
+**권장**: Phase 13 이후 (DAU 증가 시)
+
+---
+
+### D.3 에러 응답 표준
+
+```json
+{
+  "code": "RATE_LIMIT_EXCEEDED",
+  "message": "너무 많은 요청입니다. 잠시 후 다시 시도해주세요.",
+  "retryAfter": 60
+}
+```
+
+**HTTP 상태**: `429 Too Many Requests`
+
+**프론트 처리**:
+```typescript
+if (error.response?.status === 429) {
+    const retryAfter = error.response.data.retryAfter || 60;
+    toast.error(`${retryAfter}초 후 다시 시도해주세요`);
+}
+```
+
+---
+
+### D.4 구현 체크리스트
+
+**2주 차 (출시 필수)**:
+- [ ] Resilience4j 의존성 추가
+- [ ] `POST /api/auth/refresh`: 유저당 분당 5회
+- [ ] `POST /api/reports`: 유저당 분당 3회, 시간당 10회
+- [ ] 429 에러 핸들러 + 친화적 메시지
+
+**4주 차**:
+- [ ] `POST /api/ads/{id}/view`: 유저당 분당 10회
+- [ ] `POST /api/rooms/{id}/evaluations`: 유저당 분당 5회
+- [ ] 프론트: 429 응답 시 토스트 표시
+
+**6주 차** (스케일 준비):
+- [ ] Redis 도입 검토 (DAU 증가 시)
+- [ ] Bucket4j 전환 고려
+
+---
+
+## 부록 E: 릴리즈 게이트 (자동 테스트)
+
+**작성일**: 2026-02-19
+**목적**: "이 테스트 통과하면 출시 가능" 기준 명확화
+**배경**: 체크리스트가 많으면 핵심 하나가 빠져서 터지는 경우 많음
+
+### E.1 Release 0.1 게이트 (2주 차)
+
+#### 보안 테스트 (필수 통과)
+
+**1. ADMIN 권한 분리**
+```java
+@Test
+@WithMockUser(roles = "USER")
+void 일반유저가_신고검토API_호출시_403() {
+    // Given
+    Long reportId = 1L;
+
+    // When & Then
+    mockMvc.perform(put("/api/reports/{reportId}/review", reportId))
+        .andExpect(status().isForbidden());
+}
+
+@Test
+@WithMockUser(roles = "ADMIN")
+void 관리자가_신고검토API_호출시_200() {
+    // Given
+    Long reportId = 1L;
+
+    // When & Then
+    mockMvc.perform(put("/api/reports/{reportId}/review", reportId))
+        .andExpect(status().isOk());
+}
+```
+
+---
+
+**2. OAuth URL에 토큰/PII 없음**
+```java
+@Test
+void OAuth성공시_URL에_토큰없음() {
+    // Given
+    String code = "mock-oauth-code";
+
+    // When
+    MvcResult result = mockMvc.perform(
+        get("/oauth2/callback/google")
+            .param("code", code)
+    ).andReturn();
+
+    // Then
+    String redirectUrl = result.getResponse().getRedirectedUrl();
+    assertThat(redirectUrl).doesNotContain("accessToken");
+    assertThat(redirectUrl).doesNotContain("refreshToken");
+    assertThat(redirectUrl).doesNotContain("email");
+    assertThat(redirectUrl).doesNotContain("nickname");
+    assertThat(redirectUrl).contains("success=true");
+}
+```
+
+---
+
+**3. CSRF 토큰 검증**
+```java
+@Test
+void CSRF토큰_없으면_403() {
+    mockMvc.perform(post("/api/reports")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{...}")
+            // CSRF 헤더 누락
+        )
+        .andExpect(status().isForbidden());
+}
+
+@Test
+void CSRF토큰_있으면_성공() {
+    String csrfToken = "mock-csrf-token";
+
+    mockMvc.perform(post("/api/reports")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{...}")
+            .header("X-XSRF-TOKEN", csrfToken)
+            .cookie(new Cookie("XSRF-TOKEN", csrfToken))
+        )
+        .andExpect(status().isCreated());
+}
+```
+
+---
+
+**4. DB 유니크 제약 + 친화적 에러**
+```java
+@Test
+void 광고_하루_중복뷰_409() {
+    // Given
+    Long userId = 1L;
+    Long adId = 1L;
+    adViewRepository.save(AdView.builder()
+        .userId(userId)
+        .adId(adId)
+        .viewedAt(LocalDateTime.now())
+        .build());
+
+    // When & Then
+    mockMvc.perform(post("/api/ads/{adId}/view", adId)
+            .with(user(userId))
+        )
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("DUPLICATE_ACTION"))
+        .andExpect(jsonPath("$.message").value("오늘 이 광고를 이미 보셨습니다"));
+}
+```
+
+---
+
+**5. 신고 쿨다운 (roomId=null 포함)**
+```java
+@Test
+void 동일대상_7일내_재신고_차단() {
+    // Given
+    Long reporterId = 1L;
+    Long reportedId = 2L;
+
+    reportRepository.save(Report.builder()
+        .reporterId(reporterId)
+        .reportedId(reportedId)
+        .roomId(null)  // roomId null
+        .category(ReportCategory.VERBAL_ABUSE)
+        .createdAt(LocalDateTime.now().minusDays(3))
+        .build());
+
+    // When & Then
+    CreateReportRequest request = new CreateReportRequest(reportedId, null, ReportCategory.FRAUD, "");
+
+    mockMvc.perform(post("/api/reports")
+            .with(user(reporterId))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request))
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(containsString("최근에 이미 신고")));
+}
+```
+
+---
+
+**6. 타인 이메일 노출 없음**
+```java
+@Test
+void 신고조회시_타인이메일_null() {
+    // Given
+    Long reportId = 1L;
+
+    // When & Then
+    mockMvc.perform(get("/api/reports/{reportId}", reportId)
+            .with(user(1L))
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reporter.email").doesNotExist())
+        .andExpect(jsonPath("$.reported.email").doesNotExist());
+}
+```
+
+---
+
+#### 기능 테스트
+
+**7. 로그아웃 시 쿠키 삭제**
+```java
+@Test
+void 로그아웃시_쿠키삭제() {
+    MvcResult result = mockMvc.perform(post("/api/auth/logout"))
+        .andExpect(status().isOk())
+        .andReturn();
+
+    Cookie[] cookies = result.getResponse().getCookies();
+    Cookie accessCookie = Arrays.stream(cookies)
+        .filter(c -> "accessToken".equals(c.getName()))
+        .findFirst()
+        .orElseThrow();
+
+    assertThat(accessCookie.getMaxAge()).isEqualTo(0);
+}
+```
+
+---
+
+**8. 레이트리밋 동작**
+```java
+@Test
+void Refresh_분당5회초과_429() {
+    Long userId = 1L;
+
+    // 5회 성공
+    for (int i = 0; i < 5; i++) {
+        mockMvc.perform(post("/api/auth/refresh")
+                .with(user(userId))
+            )
+            .andExpect(status().isOk());
+    }
+
+    // 6회째 실패
+    mockMvc.perform(post("/api/auth/refresh")
+            .with(user(userId))
+        )
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
+}
+```
+
+---
+
+### E.2 Release 0.2 게이트 (4주 차)
+
+**9. 계정 삭제 동작**
+```java
+@Test
+void 계정삭제후_로그인불가() {
+    // Given
+    Long userId = 1L;
+
+    // When
+    mockMvc.perform(delete("/api/users/me")
+            .with(user(userId))
+        )
+        .andExpect(status().isNoContent());
+
+    // Then
+    User user = userRepository.findById(userId).orElseThrow();
+    assertThat(user.getDeletedAt()).isNotNull();
+
+    // 로그인 시도 시 실패
+    mockMvc.perform(post("/api/auth/login")
+            .content("{\"email\":\"...\",\"password\":\"...\"}")
+        )
+        .andExpect(status().isUnauthorized());
+}
+```
+
+---
+
+**10. 생년월일 13세 미만 차단**
+```java
+@Test
+void 만13세미만_가입차단() {
+    SignupRequest request = new SignupRequest();
+    request.setBirthDate(LocalDate.now().minusYears(12));
+
+    mockMvc.perform(post("/api/auth/signup")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request))
+        )
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value(containsString("만 13세 이상")));
+}
+```
+
+---
+
+### E.3 CI/CD 통합
+
+**GitHub Actions 예시**:
+```yaml
+name: Release Gate Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+
+      - name: Run Release 0.1 Gate Tests
+        run: ./gradlew test --tests "*ReleaseGateTest"
+
+      - name: Fail if any test fails
+        if: failure()
+        run: |
+          echo "❌ Release Gate 실패. 출시 불가능."
+          exit 1
+
+      - name: Success
+        if: success()
+        run: echo "✅ Release Gate 통과. 출시 준비 완료."
+```
+
+---
+
+### E.4 체크리스트
+
+**2주 차 (Release 0.1)**:
+- [ ] 테스트 1-8 통과 (ADMIN 권한, OAuth, CSRF, DB 제약, 쿨다운, 이메일, 로그아웃, 레이트리밋)
+- [ ] CI/CD에 Release Gate 추가
+- [ ] 테스트 실패 시 배포 차단
+
+**4주 차 (Release 0.2)**:
+- [ ] 테스트 9-10 통과 (계정 삭제, 연령 제한)
+- [ ] 전체 게이트 통과 확인
+
+**6주 차 (Release 0.3)**:
+- [ ] Policy Engine 스키마 검증 테스트
+- [ ] 활성 정책 단일성 테스트
+
+---
+
 ## 추가 검토 사항
 
 ### Steam 게임 카탈로그 통합 (Phase 13 이후)
@@ -2052,6 +2737,40 @@ public void syncSteamGames() {
 ---
 
 ## 버전 히스토리
+
+### v5.0 (2026-02-19) 🚀 **출시 준비 완료 - 최종 체크리스트 확정**
+**4차 리서치 보고서 반영 - 출시용 필수 항목 추가**:
+
+**부록 C 추가: 출시용 고지/약관 최소 세트**:
+- ✅ 연령 제한 안내 (만 13세 미만 차단, Google Play 아동 타겟팅 회피)
+- ✅ 채팅 증거 보관 안내 (제재/소송 대비)
+- ✅ 계정 삭제 데이터 보관 정책 (삭제/익명화/보관 구분)
+- ✅ 커뮤니티 가이드라인 (간단 버전)
+- ✅ 동의 플로우 (회원가입/채팅 진입 시)
+- ✅ Google Play Data Safety 템플릿
+
+**부록 D 추가: API 레이트리밋 전략**:
+- ✅ OWASP API6 대응 (Unrestricted Access to Sensitive Business Flows)
+- ✅ 우선순위별 레이트리밋 설정 (인증 > 신고 > 광고)
+- ✅ Resilience4j 구현 (출시 MVP용, 인메모리)
+- ✅ 429 Too Many Requests 에러 핸들링
+- ✅ 프론트엔드 재시도 로직
+
+**부록 E 추가: 릴리즈 게이트 (자동 테스트)**:
+- ✅ Release 0.1 게이트: 10개 필수 테스트 정의
+- ✅ 보안 테스트 6개 (ADMIN 권한, OAuth URL, CSRF, DB 제약, 쿨다운, 이메일)
+- ✅ 기능 테스트 2개 (로그아웃, 레이트리밋)
+- ✅ CI/CD 통합 (GitHub Actions)
+- ✅ "이 테스트 통과 = 출시 가능" 명확한 기준
+
+**출시 준비도**:
+- ✅ 보안 의사결정 완료 (CSRF, ADMIN 권한, PASS 전략)
+- ✅ 법적 컴플라이언스 준비 (Google Play, 아동법, GDPR)
+- ✅ 운영 방어 전략 (레이트리밋, 자동 제재, Sybil 방어)
+- ✅ 배포 게이트 정의 (자동 테스트 기준)
+- **다음 단계**: Phase 12 구현 착수 → 2주 내 Release 0.1 목표
+
+---
 
 ### v4.0 (2026-02-19) 🎯 **PASS 최소화 전략 확정**
 **3차 리서치 보고서 반영 - PASS 비용 절감 + 스펙 정밀화**:
