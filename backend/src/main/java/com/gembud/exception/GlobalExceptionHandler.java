@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -173,6 +174,54 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
             .status(HttpStatus.FORBIDDEN)
+            .body(errorResponse);
+    }
+
+    /**
+     * Handle data integrity violation exception.
+     *
+     * Phase 12: DB 유니크 제약 위반 시 친화적인 에러 메시지 반환
+     * 예: 중복 광고 보기, 중복 평가 등
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(
+        DataIntegrityViolationException ex,
+        WebRequest request
+    ) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+
+        // 친화적인 메시지 생성
+        String userMessage = "이미 처리된 요청입니다";
+        String errorCode = "DUPLICATE_ACTION";
+
+        // 제약 위반 타입별 메시지 커스터마이징
+        String rootCauseMessage = ex.getRootCause() != null
+            ? ex.getRootCause().getMessage()
+            : ex.getMessage();
+
+        if (rootCauseMessage != null) {
+            if (rootCauseMessage.contains("ad_views")) {
+                userMessage = "오늘 이 광고를 이미 보셨습니다";
+            } else if (rootCauseMessage.contains("evaluations")) {
+                userMessage = "이미 평가를 완료하셨습니다";
+            } else if (rootCauseMessage.contains("users") && rootCauseMessage.contains("email")) {
+                userMessage = "이미 사용 중인 이메일입니다";
+            } else if (rootCauseMessage.contains("users") && rootCauseMessage.contains("nickname")) {
+                userMessage = "이미 사용 중인 닉네임입니다";
+            }
+        }
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.CONFLICT.value())
+            .error(HttpStatus.CONFLICT.getReasonPhrase())
+            .code(errorCode)
+            .message(userMessage)
+            .path(request.getDescription(false).replace("uri=", ""))
+            .build();
+
+        return ResponseEntity
+            .status(HttpStatus.CONFLICT)
             .body(errorResponse);
     }
 
