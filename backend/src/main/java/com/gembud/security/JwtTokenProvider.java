@@ -11,8 +11,8 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
 import java.util.Date;
+import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
 
 /**
@@ -139,7 +139,7 @@ public class JwtTokenProvider {
             .getPayload();
     }
 
-    private Key getSigningKey() {
+    private SecretKey getSigningKey() {
         byte[] keyBytes = jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
