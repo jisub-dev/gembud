@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,11 +20,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 /**
  * Spring Security configuration for JWT-based and OAuth2 authentication.
  *
+ * Phase 12: Method-level security enabled for RBAC
+ *
  * @author Gembud Team
  * @since 2026-02-16
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity  // Phase 12: Spring Boot 3 권장 (replaces @EnableGlobalMethodSecurity)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
