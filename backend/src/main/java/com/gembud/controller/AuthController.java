@@ -53,11 +53,12 @@ public class AuthController {
         setTokenCookies(response, authResponse.getAccessToken(), authResponse.getRefreshToken());
 
         // Remove tokens from response body (Phase 12 security)
-        authResponse.setAccessToken(null);
-        authResponse.setRefreshToken(null);
-        authResponse.setTokenType(null);
+        AuthResponse responseBody = AuthResponse.builder()
+            .email(authResponse.getEmail())
+            .nickname(authResponse.getNickname())
+            .build();
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(authResponse);
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
     }
 
     /**
@@ -78,11 +79,12 @@ public class AuthController {
         setTokenCookies(response, authResponse.getAccessToken(), authResponse.getRefreshToken());
 
         // Remove tokens from response body (Phase 12 security)
-        authResponse.setAccessToken(null);
-        authResponse.setRefreshToken(null);
-        authResponse.setTokenType(null);
+        AuthResponse responseBody = AuthResponse.builder()
+            .email(authResponse.getEmail())
+            .nickname(authResponse.getNickname())
+            .build();
 
-        return ResponseEntity.ok(authResponse);
+        return ResponseEntity.ok(responseBody);
     }
 
     /**
@@ -103,8 +105,9 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        RefreshTokenRequest request = new RefreshTokenRequest();
-        request.setRefreshToken(refreshToken);
+        RefreshTokenRequest request = RefreshTokenRequest.builder()
+            .refreshToken(refreshToken)
+            .build();
 
         AuthResponse authResponse = authService.refreshToken(request);
 
