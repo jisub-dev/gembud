@@ -4,6 +4,8 @@ import com.gembud.dto.response.GameOptionResponse;
 import com.gembud.dto.response.GameResponse;
 import com.gembud.entity.Game;
 import com.gembud.entity.GameOption;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.GameOptionRepository;
 import com.gembud.repository.GameRepository;
 import java.util.List;
@@ -49,7 +51,7 @@ public class GameService {
     @Transactional(readOnly = true)
     public GameResponse getGameById(Long gameId) {
         Game game = gameRepository.findById(gameId)
-            .orElseThrow(() -> new IllegalArgumentException("Game not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
         List<GameOption> options = gameOptionRepository.findByGameId(gameId);
         List<GameOptionResponse> optionResponses = options.stream()

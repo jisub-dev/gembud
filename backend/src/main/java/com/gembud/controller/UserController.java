@@ -1,8 +1,12 @@
 package com.gembud.controller;
 
+import com.gembud.dto.ApiResponse;
 import com.gembud.entity.User;
 import com.gembud.repository.UserRepository;
 import com.gembud.security.CustomUserDetails;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Gembud Team
  * @since 2026-02-19 (Phase 12)
  */
+@Tag(name = "User", description = "사용자 정보 API")
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -34,17 +39,22 @@ public class UserController {
      * @param userDetails authenticated user details
      * @return user information (email, nickname)
      */
+    @Operation(summary = "Get current user", description = "현재 로그인한 사용자 정보 조회 (OAuth 콜백 후 사용)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "사용자 정보 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
     @GetMapping("/me")
-    public ResponseEntity<Map<String, String>> getCurrentUser(
+    public ResponseEntity<ApiResponse<Map<String, String>>> getCurrentUser(
         @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         User user = userRepository.findByEmail(userDetails.getEmail())
             .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        Map<String, String> response = new HashMap<>();
-        response.put("email", user.getEmail() != null ? user.getEmail() : "");
-        response.put("nickname", user.getNickname());
+        Map<String, String> data = new HashMap<>();
+        data.put("email", user.getEmail() != null ? user.getEmail() : "");
+        data.put("nickname", user.getNickname());
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(data));
     }
 }

@@ -1,8 +1,12 @@
 package com.gembud.controller;
 
+import com.gembud.dto.ApiResponse;
 import com.gembud.dto.response.ChatMessageResponse;
 import com.gembud.security.CustomUserDetails;
 import com.gembud.service.ChatService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -25,8 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Gembud Team
  * @since 2026-02-17
  */
+@Tag(name = "Chat", description = "채팅 API")
 @RestController
-@RequestMapping("/api/chat")
+@RequestMapping("/chat")
 @RequiredArgsConstructor
 public class ChatController {
 
@@ -40,8 +45,14 @@ public class ChatController {
      * @param limit maximum number of messages (default: 50)
      * @return list of messages
      */
+    @Operation(summary = "Get recent messages", description = "채팅방의 최근 메시지 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "메시지 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "채팅방 접근 권한 없음")
+    })
     @GetMapping("/rooms/{chatRoomId}/messages")
-    public ResponseEntity<List<ChatMessageResponse>> getRecentMessages(
+    public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> getRecentMessages(
         @AuthenticationPrincipal CustomUserDetails userDetails,
         @PathVariable Long chatRoomId,
         @RequestParam(defaultValue = "50") int limit
@@ -52,7 +63,7 @@ public class ChatController {
             limit
         );
 
-        return ResponseEntity.ok(messages);
+        return ResponseEntity.ok(ApiResponse.success(messages));
     }
 
     /**
@@ -61,12 +72,17 @@ public class ChatController {
      * @param roomId game room ID
      * @return chat room ID
      */
+    @Operation(summary = "Get chat room by game room", description = "게임 방 ID로 채팅방 ID 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "채팅방 ID 반환"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "채팅방을 찾을 수 없음")
+    })
     @GetMapping("/rooms/by-game-room/{roomId}")
-    public ResponseEntity<Long> getChatRoomByGameRoomId(
+    public ResponseEntity<ApiResponse<Long>> getChatRoomByGameRoomId(
         @PathVariable Long roomId
     ) {
         Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
-        return ResponseEntity.ok(chatRoomId);
+        return ResponseEntity.ok(ApiResponse.success(chatRoomId));
     }
 
     /**
@@ -76,8 +92,15 @@ public class ChatController {
      * @param request create direct chat request
      * @return created chat room ID
      */
+    @Operation(summary = "Create direct chat", description = "1:1 채팅방 생성")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "채팅방 생성 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
+    })
     @PostMapping("/rooms/direct")
-    public ResponseEntity<ChatRoomIdResponse> createDirectChatRoom(
+    public ResponseEntity<ApiResponse<ChatRoomIdResponse>> createDirectChatRoom(
         @AuthenticationPrincipal CustomUserDetails userDetails,
         @RequestBody CreateDirectChatRequest request
     ) {
@@ -86,7 +109,7 @@ public class ChatController {
             request.getFriendId()
         );
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(new ChatRoomIdResponse(chatRoomId));
+            .body(ApiResponse.created(new ChatRoomIdResponse(chatRoomId)));
     }
 
     /**
@@ -96,8 +119,14 @@ public class ChatController {
      * @param request create group chat request
      * @return created chat room ID
      */
+    @Operation(summary = "Create group chat", description = "그룹 채팅방 생성")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "채팅방 생성 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
     @PostMapping("/rooms/group")
-    public ResponseEntity<ChatRoomIdResponse> createGroupChatRoom(
+    public ResponseEntity<ApiResponse<ChatRoomIdResponse>> createGroupChatRoom(
         @AuthenticationPrincipal CustomUserDetails userDetails,
         @RequestBody CreateGroupChatRequest request
     ) {
@@ -106,7 +135,7 @@ public class ChatController {
             userDetails.getUserId()
         );
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(new ChatRoomIdResponse(chatRoomId));
+            .body(ApiResponse.created(new ChatRoomIdResponse(chatRoomId)));
     }
 
     /**
@@ -117,14 +146,21 @@ public class ChatController {
      * @param request add member request
      * @return no content
      */
+    @Operation(summary = "Add member to chat", description = "그룹 채팅방에 멤버 추가")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "멤버 추가 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "채팅방 관리 권한 없음"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "채팅방 또는 사용자를 찾을 수 없음")
+    })
     @PostMapping("/rooms/{chatRoomId}/members")
-    public ResponseEntity<Void> addMemberToChatRoom(
+    public ResponseEntity<ApiResponse<Void>> addMemberToChatRoom(
         @AuthenticationPrincipal CustomUserDetails userDetails,
         @PathVariable Long chatRoomId,
         @RequestBody AddMemberRequest request
     ) {
         chatService.addMemberToChatRoom(chatRoomId, request.getUserId());
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(null));
     }
 
     // Request DTOs

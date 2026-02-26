@@ -11,7 +11,7 @@ interface GameCardProps {
  */
 const GameCard = ({ game }: GameCardProps) => {
   return (
-    <Link to={`/games/${game.id}`}>
+    <Link to={`/games/${game.id}/rooms`}>
       <Card className="group overflow-hidden p-0 relative aspect-[3/4]">
         {/* Game Image with Gradient Overlay */}
         <div className="relative w-full h-full">

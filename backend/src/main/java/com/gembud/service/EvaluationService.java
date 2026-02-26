@@ -1,20 +1,50 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.EvaluationRequest;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.EvaluationResponse;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Evaluation;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.RoomParticipant;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.EvaluationRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomParticipantRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.List;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 
 /**
  * Service for evaluation operations.
@@ -47,17 +77,17 @@ public class EvaluationService {
         String evaluatorEmail
     ) {
         User evaluator = userRepository.findByEmail(evaluatorEmail)
-            .orElseThrow(() -> new IllegalArgumentException("Evaluator not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         User evaluated = userRepository.findById(request.getEvaluatedId())
-            .orElseThrow(() -> new IllegalArgumentException("Evaluated user not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         // Check if room is closed
         if (room.getStatus() != Room.RoomStatus.CLOSED) {
-            throw new IllegalStateException("Can only evaluate after room is closed");
+            throw new BusinessException(ErrorCode.ROOM_NOT_CLOSED_FOR_EVALUATION);
         }
 
         // Check if evaluator was in the room
@@ -74,12 +104,12 @@ public class EvaluationService {
         if (evaluationRepository.findByRoomIdAndEvaluatorIdAndEvaluatedId(
             roomId, evaluator.getId(), evaluated.getId()
         ).isPresent()) {
-            throw new IllegalStateException("Already evaluated this user for this room");
+            throw new BusinessException(ErrorCode.ALREADY_EVALUATED);
         }
 
         // Cannot evaluate self
         if (evaluator.getId().equals(evaluated.getId())) {
-            throw new IllegalArgumentException("Cannot evaluate yourself");
+            throw new BusinessException(ErrorCode.CANNOT_EVALUATE_SELF);
         }
 
         // Check monthly evaluation limit (Phase 11: Anti-manipulation)
@@ -143,7 +173,7 @@ public class EvaluationService {
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         // Check if user was in the room
         participantRepository.findByRoomIdAndUserId(roomId, user.getId())
@@ -179,9 +209,7 @@ public class EvaluationService {
         );
 
         if (count >= 3) {
-            throw new IllegalStateException(
-                "이번 달에 이미 이 사용자를 3회 평가했습니다. 다음 달에 다시 평가할 수 있습니다."
-            );
+            throw new BusinessException(ErrorCode.EVALUATION_LIMIT_EXCEEDED);
         }
     }
 

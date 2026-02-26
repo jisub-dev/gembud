@@ -70,62 +70,14 @@ public class GlobalExceptionHandler {
             .timestamp(LocalDateTime.now())
             .status(HttpStatus.BAD_REQUEST.value())
             .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
-            .code("VAL001")
-            .message("Validation failed")
+            .code(ErrorCode.INVALID_INPUT.getCode())
+            .message(ErrorCode.INVALID_INPUT.getMessage())
             .path(request.getDescription(false).replace("uri=", ""))
             .details(errors)
             .build();
 
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
-            .body(errorResponse);
-    }
-
-    /**
-     * Handle IllegalArgumentException.
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
-        IllegalArgumentException ex,
-        WebRequest request
-    ) {
-        log.warn("Illegal argument exception: {}", ex.getMessage());
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-            .timestamp(LocalDateTime.now())
-            .status(HttpStatus.BAD_REQUEST.value())
-            .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
-            .code("VAL001")
-            .message(ex.getMessage())
-            .path(request.getDescription(false).replace("uri=", ""))
-            .build();
-
-        return ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(errorResponse);
-    }
-
-    /**
-     * Handle IllegalStateException.
-     */
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalStateException(
-        IllegalStateException ex,
-        WebRequest request
-    ) {
-        log.warn("Illegal state exception: {}", ex.getMessage());
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-            .timestamp(LocalDateTime.now())
-            .status(HttpStatus.CONFLICT.value())
-            .error(HttpStatus.CONFLICT.getReasonPhrase())
-            .code("VAL001")
-            .message(ex.getMessage())
-            .path(request.getDescription(false).replace("uri=", ""))
-            .build();
-
-        return ResponseEntity
-            .status(HttpStatus.CONFLICT)
             .body(errorResponse);
     }
 
@@ -143,8 +95,8 @@ public class GlobalExceptionHandler {
             .timestamp(LocalDateTime.now())
             .status(HttpStatus.UNAUTHORIZED.value())
             .error(HttpStatus.UNAUTHORIZED.getReasonPhrase())
-            .code("AUTH001")
-            .message("Invalid email or password")
+            .code(ErrorCode.INVALID_CREDENTIALS.getCode())
+            .message(ErrorCode.INVALID_CREDENTIALS.getMessage())
             .path(request.getDescription(false).replace("uri=", ""))
             .build();
 
@@ -167,8 +119,8 @@ public class GlobalExceptionHandler {
             .timestamp(LocalDateTime.now())
             .status(HttpStatus.FORBIDDEN.value())
             .error(HttpStatus.FORBIDDEN.getReasonPhrase())
-            .code("AUTH003")
-            .message("Access denied")
+            .code(ErrorCode.FORBIDDEN.getCode())
+            .message(ErrorCode.FORBIDDEN.getMessage())
             .path(request.getDescription(false).replace("uri=", ""))
             .build();
 
@@ -239,8 +191,8 @@ public class GlobalExceptionHandler {
             .timestamp(LocalDateTime.now())
             .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
             .error(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
-            .code("SRV001")
-            .message("An unexpected error occurred")
+            .code(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
+            .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
             .path(request.getDescription(false).replace("uri=", ""))
             .build();
 

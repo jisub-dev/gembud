@@ -1,5 +1,6 @@
 import api from './api';
 import { Game } from '@/types/game';
+import { ApiResponse } from '@/types/api';
 
 /**
  * Game service for API integration.
@@ -13,15 +14,15 @@ export const gameService = {
    * Get all games.
    */
   async getGames(): Promise<Game[]> {
-    const response = await api.get<Game[]>('/games');
-    return response.data;
+    const response = await api.get<ApiResponse<Game[]>>('/games');
+    return response.data.data;
   },
 
   /**
    * Get game by ID.
    */
   async getGameById(id: number): Promise<Game> {
-    const response = await api.get<Game>(`/games/${id}`);
-    return response.data;
+    const response = await api.get<ApiResponse<Game>>(`/games/${id}`);
+    return response.data.data;
   },
 };

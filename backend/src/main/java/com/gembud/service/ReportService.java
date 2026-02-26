@@ -1,19 +1,47 @@
 package com.gembud.service;
 
 import com.gembud.entity.Report;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Report.ReportCategory;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Report.ReportPriority;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Report.ReportStatus;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ReportRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.List;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 
 /**
  * Service for report management.
@@ -52,14 +80,14 @@ public class ReportService {
         String description
     ) {
         User reporter = userRepository.findByEmail(reporterEmail)
-            .orElseThrow(() -> new IllegalArgumentException("Reporter not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         User reported = userRepository.findById(reportedId)
-            .orElseThrow(() -> new IllegalArgumentException("Reported user not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // Cannot report yourself
         if (reporter.getId().equals(reportedId)) {
-            throw new IllegalArgumentException("Cannot report yourself");
+            throw new BusinessException(ErrorCode.CANNOT_REPORT_SELF);
         }
 
         Room room = null;
@@ -70,7 +98,7 @@ public class ReportService {
             // Check if already reported in this room
             if (reportRepository.existsByReporterIdAndReportedIdAndRoomId(
                 reporter.getId(), reportedId, roomId)) {
-                throw new IllegalArgumentException("Already reported this user in this room");
+                throw new BusinessException(ErrorCode.DUPLICATE_REPORT);
             }
         }
 
@@ -123,7 +151,7 @@ public class ReportService {
 
         if (pendingCount >= 3) {
             User reported = userRepository.findById(reportedId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
             // Skip if already suspended
             if (reported.isSuspended()) {
@@ -154,7 +182,7 @@ public class ReportService {
      */
     public List<Report> getMyReports(String reporterEmail) {
         User reporter = userRepository.findByEmail(reporterEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return reportRepository.findByReporterId(reporter.getId());
     }
@@ -177,7 +205,7 @@ public class ReportService {
      */
     public List<Report> getReportsAgainstUser(Long reportedId) {
         if (!userRepository.existsById(reportedId)) {
-            throw new IllegalArgumentException("User not found");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         return reportRepository.findByReportedId(reportedId);
@@ -192,10 +220,10 @@ public class ReportService {
     @Transactional
     public Report markAsReviewed(Long reportId) {
         Report report = reportRepository.findById(reportId)
-            .orElseThrow(() -> new IllegalArgumentException("Report not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
 
         if (report.getStatus() != ReportStatus.PENDING) {
-            throw new IllegalStateException("Report is not in PENDING status");
+            throw new BusinessException(ErrorCode.REPORT_NOT_PENDING);
         }
 
         report.markAsReviewed();
@@ -212,10 +240,10 @@ public class ReportService {
     @Transactional
     public Report resolveReport(Long reportId, String adminComment) {
         Report report = reportRepository.findById(reportId)
-            .orElseThrow(() -> new IllegalArgumentException("Report not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
 
         if (report.getStatus() == ReportStatus.RESOLVED) {
-            throw new IllegalStateException("Report is already resolved");
+            throw new BusinessException(ErrorCode.REPORT_ALREADY_RESOLVED);
         }
 
         report.resolve(adminComment);
@@ -245,7 +273,7 @@ public class ReportService {
     @Transactional
     public void deleteReport(Long reportId) {
         if (!reportRepository.existsById(reportId)) {
-            throw new IllegalArgumentException("Report not found");
+            throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
         }
 
         reportRepository.deleteById(reportId);

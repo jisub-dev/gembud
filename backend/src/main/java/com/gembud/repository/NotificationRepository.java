@@ -60,6 +60,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
      * @return number of deleted notifications
      */
     @Modifying
-    @Query("DELETE FROM Notification n WHERE n.isRead = true AND n.createdAt < CURRENT_TIMESTAMP - INTERVAL '30 days'")
+    @Query(value = "DELETE FROM notifications WHERE is_read = true AND created_at < CURRENT_TIMESTAMP - INTERVAL '30 days'", nativeQuery = true)
     int deleteOldReadNotifications();
 }

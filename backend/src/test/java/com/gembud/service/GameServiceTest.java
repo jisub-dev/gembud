@@ -165,8 +165,8 @@ class GameServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> gameService.getGameById(999L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Game not found");
+            .isInstanceOf(com.gembud.exception.BusinessException.class)
+            .hasMessageContaining("Game not found");
     }
 
     @Test

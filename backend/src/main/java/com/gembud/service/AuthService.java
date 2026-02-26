@@ -5,6 +5,8 @@ import com.gembud.dto.request.RefreshTokenRequest;
 import com.gembud.dto.request.SignupRequest;
 import com.gembud.dto.response.AuthResponse;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
 import com.gembud.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -40,11 +42,11 @@ public class AuthService {
     @Transactional
     public AuthResponse signup(SignupRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
+            throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
         }
 
         if (userRepository.existsByNickname(request.getNickname())) {
-            throw new IllegalArgumentException("Nickname already exists");
+            throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
         }
 
         User user = User.builder()
@@ -109,12 +111,12 @@ public class AuthService {
         String refreshToken = request.getRefreshToken();
 
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new IllegalArgumentException("Invalid refresh token");
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         String email = jwtTokenProvider.getEmailFromToken(refreshToken);
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         String newAccessToken = jwtTokenProvider.generateAccessToken(email, user.getRole().name());
 

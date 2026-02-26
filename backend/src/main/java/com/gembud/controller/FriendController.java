@@ -1,8 +1,12 @@
 package com.gembud.controller;
 
+import com.gembud.dto.ApiResponse;
 import com.gembud.dto.request.FriendRequest;
 import com.gembud.dto.response.FriendResponse;
 import com.gembud.service.FriendService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Gembud Team
  * @since 2026-02-17
  */
+@Tag(name = "Friend", description = "친구 관리 API")
 @RestController
-@RequestMapping("/api/friends")
+@RequestMapping("/friends")
 @RequiredArgsConstructor
 public class FriendController {
 
@@ -39,8 +44,15 @@ public class FriendController {
      * @param request friend request
      * @return created friend relationship
      */
+    @Operation(summary = "Send friend request", description = "친구 요청 전송")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "친구 요청 전송 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 친구 또는 요청이 존재함")
+    })
     @PostMapping("/requests")
-    public ResponseEntity<FriendResponse> sendFriendRequest(
+    public ResponseEntity<ApiResponse<FriendResponse>> sendFriendRequest(
         @AuthenticationPrincipal UserDetails userDetails,
         @Valid @RequestBody FriendRequest request
     ) {
@@ -48,7 +60,7 @@ public class FriendController {
             userDetails.getUsername(),
             request
         );
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
 
     /**
@@ -58,8 +70,14 @@ public class FriendController {
      * @param requestId friend request ID
      * @return updated friend relationship
      */
+    @Operation(summary = "Accept friend request", description = "친구 요청 수락")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "친구 요청 수락 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "요청을 찾을 수 없음")
+    })
     @PutMapping("/requests/{requestId}/accept")
-    public ResponseEntity<FriendResponse> acceptFriendRequest(
+    public ResponseEntity<ApiResponse<FriendResponse>> acceptFriendRequest(
         @AuthenticationPrincipal UserDetails userDetails,
         @PathVariable Long requestId
     ) {
@@ -67,7 +85,7 @@ public class FriendController {
             userDetails.getUsername(),
             requestId
         );
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -77,8 +95,14 @@ public class FriendController {
      * @param requestId friend request ID
      * @return updated friend relationship
      */
+    @Operation(summary = "Reject friend request", description = "친구 요청 거절")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "친구 요청 거절 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "요청을 찾을 수 없음")
+    })
     @PutMapping("/requests/{requestId}/reject")
-    public ResponseEntity<FriendResponse> rejectFriendRequest(
+    public ResponseEntity<ApiResponse<FriendResponse>> rejectFriendRequest(
         @AuthenticationPrincipal UserDetails userDetails,
         @PathVariable Long requestId
     ) {
@@ -86,7 +110,7 @@ public class FriendController {
             userDetails.getUsername(),
             requestId
         );
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -96,13 +120,19 @@ public class FriendController {
      * @param friendId friend user ID
      * @return no content
      */
+    @Operation(summary = "Unfriend", description = "친구 삭제")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "친구 삭제 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "친구 관계를 찾을 수 없음")
+    })
     @DeleteMapping("/{friendId}")
-    public ResponseEntity<Void> unfriend(
+    public ResponseEntity<ApiResponse<Void>> unfriend(
         @AuthenticationPrincipal UserDetails userDetails,
         @PathVariable Long friendId
     ) {
         friendService.unfriend(userDetails.getUsername(), friendId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.noContent());
     }
 
     /**
@@ -111,12 +141,17 @@ public class FriendController {
      * @param userDetails authenticated user
      * @return list of friends
      */
+    @Operation(summary = "Get friends", description = "내 친구 목록 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "친구 목록 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
     @GetMapping
-    public ResponseEntity<List<FriendResponse>> getMyFriends(
+    public ResponseEntity<ApiResponse<List<FriendResponse>>> getMyFriends(
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         List<FriendResponse> friends = friendService.getMyFriends(userDetails.getUsername());
-        return ResponseEntity.ok(friends);
+        return ResponseEntity.ok(ApiResponse.success(friends));
     }
 
     /**
@@ -125,14 +160,19 @@ public class FriendController {
      * @param userDetails authenticated user
      * @return list of pending requests
      */
+    @Operation(summary = "Get pending requests", description = "받은 친구 요청 목록 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "요청 목록 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
     @GetMapping("/requests/pending")
-    public ResponseEntity<List<FriendResponse>> getPendingRequests(
+    public ResponseEntity<ApiResponse<List<FriendResponse>>> getPendingRequests(
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         List<FriendResponse> requests = friendService.getPendingRequests(
             userDetails.getUsername()
         );
-        return ResponseEntity.ok(requests);
+        return ResponseEntity.ok(ApiResponse.success(requests));
     }
 
     /**
@@ -141,13 +181,18 @@ public class FriendController {
      * @param userDetails authenticated user
      * @return list of sent requests
      */
+    @Operation(summary = "Get sent requests", description = "보낸 친구 요청 목록 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "요청 목록 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
     @GetMapping("/requests/sent")
-    public ResponseEntity<List<FriendResponse>> getSentRequests(
+    public ResponseEntity<ApiResponse<List<FriendResponse>>> getSentRequests(
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         List<FriendResponse> requests = friendService.getSentRequests(
             userDetails.getUsername()
         );
-        return ResponseEntity.ok(requests);
+        return ResponseEntity.ok(ApiResponse.success(requests));
     }
 }

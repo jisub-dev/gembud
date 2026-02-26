@@ -1,4 +1,5 @@
 import api from './api';
+import { ApiResponse } from '@/types/api';
 
 export interface SignupRequest {
   email: string;
@@ -26,8 +27,8 @@ export const authService = {
    * Phase 12: Tokens delivered via HTTP-only cookies
    */
   async signup(data: SignupRequest): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/signup', data);
-    return response.data;
+    const response = await api.post<ApiResponse<AuthResponse>>('/auth/signup', data);
+    return response.data.data;
   },
 
   /**
@@ -35,8 +36,8 @@ export const authService = {
    * Phase 12: Tokens delivered via HTTP-only cookies
    */
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/login', data);
-    return response.data;
+    const response = await api.post<ApiResponse<AuthResponse>>('/auth/login', data);
+    return response.data.data;
   },
 
   /**
@@ -44,8 +45,8 @@ export const authService = {
    * Phase 12: New endpoint to get user info after OAuth callback
    */
   async getCurrentUser(): Promise<{ email: string; nickname: string }> {
-    const response = await api.get<{ email: string; nickname: string }>('/users/me');
-    return response.data;
+    const response = await api.get<ApiResponse<{ email: string; nickname: string }>>('/users/me');
+    return response.data.data;
   },
 
   /**

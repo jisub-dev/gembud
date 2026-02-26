@@ -1,26 +1,68 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.ChatMessageRequest;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.ChatMessageResponse;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.ChatMessage;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.ChatRoom;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.ChatRoomMember;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ChatMessageRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ChatRoomMemberRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ChatRoomRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.util.HtmlSanitizer;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.Collections;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.List;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.data.domain.PageRequest;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.data.domain.Pageable;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 
 /**
  * Service for chat operations.
@@ -58,16 +100,12 @@ public class ChatService {
 
         // Verify chat room exists
         ChatRoom chatRoom = chatRoomRepository.findById(request.getChatRoomId())
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Chat room not found: " + request.getChatRoomId()
-            ));
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
         // Verify user is a member of the chat room
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserId(
             request.getChatRoomId(), userId)) {
-            throw new IllegalStateException(
-                "User is not a member of this chat room"
-            );
+            throw new BusinessException(ErrorCode.NOT_CHAT_MEMBER);
         }
 
         // Sanitize message to prevent XSS attacks
@@ -125,7 +163,7 @@ public class ChatService {
                 return ChatMessageResponse.from(directMessage);
 
             default:
-                throw new IllegalStateException("Unknown chat room type: " + chatRoom.getType());
+                throw new BusinessException(ErrorCode.UNKNOWN_CHAT_ROOM_TYPE);
         }
     }
 
@@ -146,7 +184,7 @@ public class ChatService {
 
         // Verify user is a member of the chat room
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, userId)) {
-            throw new IllegalStateException("User is not a member of this chat room");
+            throw new BusinessException(ErrorCode.NOT_CHAT_MEMBER);
         }
 
         // Get recent messages (Phase 11: ROOM_CHAT now saves last 50)

@@ -1,9 +1,13 @@
 package com.gembud.controller;
 
+import com.gembud.dto.ApiResponse;
 import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
 import com.gembud.dto.response.RoomResponse;
 import com.gembud.service.RoomService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Gembud Team
  * @since 2026-02-16
  */
+@Tag(name = "Room", description = "방 관리 API")
 @RestController
 @RequestMapping("/rooms")
 @RequiredArgsConstructor
@@ -40,13 +45,20 @@ public class RoomController {
      * @param userDetails authenticated user
      * @return created room
      */
+    @Operation(summary = "Create room", description = "새로운 방 생성")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "방 생성 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "낮은 온도로 방 생성 불가")
+    })
     @PostMapping
-    public ResponseEntity<RoomResponse> createRoom(
+    public ResponseEntity<ApiResponse<RoomResponse>> createRoom(
         @Valid @RequestBody CreateRoomRequest request,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         RoomResponse response = roomService.createRoom(request, userDetails.getUsername());
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
 
     /**
@@ -55,11 +67,15 @@ public class RoomController {
      * @param gameId game ID
      * @return list of rooms
      */
+    @Operation(summary = "Get rooms by game", description = "게임별 방 목록 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "방 목록 조회 성공")
+    })
     @GetMapping
-    public ResponseEntity<List<RoomResponse>> getRoomsByGame(
+    public ResponseEntity<ApiResponse<List<RoomResponse>>> getRoomsByGame(
         @RequestParam Long gameId
     ) {
-        return ResponseEntity.ok(roomService.getRoomsByGame(gameId));
+        return ResponseEntity.ok(ApiResponse.success(roomService.getRoomsByGame(gameId)));
     }
 
     /**
@@ -68,9 +84,14 @@ public class RoomController {
      * @param roomId room ID
      * @return room details
      */
+    @Operation(summary = "Get room by ID", description = "방 상세 정보 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "방 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
+    })
     @GetMapping("/{roomId}")
-    public ResponseEntity<RoomResponse> getRoomById(@PathVariable Long roomId) {
-        return ResponseEntity.ok(roomService.getRoomById(roomId));
+    public ResponseEntity<ApiResponse<RoomResponse>> getRoomById(@PathVariable Long roomId) {
+        return ResponseEntity.ok(ApiResponse.success(roomService.getRoomById(roomId)));
     }
 
     /**
@@ -81,14 +102,21 @@ public class RoomController {
      * @param userDetails authenticated user
      * @return updated room
      */
+    @Operation(summary = "Join room", description = "방 입장")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "방 입장 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 비밀번호 또는 방이 가득 참"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
+    })
     @PostMapping("/{roomId}/join")
-    public ResponseEntity<RoomResponse> joinRoom(
+    public ResponseEntity<ApiResponse<RoomResponse>> joinRoom(
         @PathVariable Long roomId,
         @RequestBody JoinRoomRequest request,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         RoomResponse response = roomService.joinRoom(roomId, request, userDetails.getUsername());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -98,13 +126,19 @@ public class RoomController {
      * @param userDetails authenticated user
      * @return no content
      */
+    @Operation(summary = "Leave room", description = "방 나가기")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "방 나가기 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
+    })
     @PostMapping("/{roomId}/leave")
-    public ResponseEntity<Void> leaveRoom(
+    public ResponseEntity<ApiResponse<Void>> leaveRoom(
         @PathVariable Long roomId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         roomService.leaveRoom(roomId, userDetails.getUsername());
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.noContent());
     }
 
     /**
@@ -114,12 +148,19 @@ public class RoomController {
      * @param userDetails authenticated user
      * @return no content
      */
+    @Operation(summary = "Close room", description = "방 종료 (방장만 가능)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "방 종료 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "방장이 아님"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
+    })
     @DeleteMapping("/{roomId}")
-    public ResponseEntity<Void> closeRoom(
+    public ResponseEntity<ApiResponse<Void>> closeRoom(
         @PathVariable Long roomId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         roomService.closeRoom(roomId, userDetails.getUsername());
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

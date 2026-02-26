@@ -1,25 +1,65 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.CreateRoomRequest;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.dto.request.JoinRoomRequest;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.RoomResponse;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Game;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.RoomFilter;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.RoomParticipant;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.GameRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomFilterRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomParticipantRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.List;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.Map;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 
 /**
  * Service for room operations.
@@ -50,26 +90,20 @@ public class RoomService {
     @Transactional
     public RoomResponse createRoom(CreateRoomRequest request, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // Phase 11: Check if user is suspended
         if (user.isSuspended()) {
-            throw new IllegalStateException(
-                String.format("Cannot create room: You are suspended until %s due to multiple reports. " +
-                    "Please contact support for more information.", user.getSuspendedUntil())
-            );
+            throw new BusinessException(ErrorCode.USER_SUSPENDED);
         }
 
         // Check temperature restriction (< 30°C cannot create rooms)
         if (!temperatureService.canCreateRoom(user.getId())) {
-            throw new IllegalStateException(
-                "Cannot create room: temperature is below 30°C. " +
-                "Improve your rating by participating in games and receiving positive evaluations."
-            );
+            throw new BusinessException(ErrorCode.LOW_TEMPERATURE);
         }
 
         Game game = gameRepository.findById(request.getGameId())
-            .orElseThrow(() -> new IllegalArgumentException("Game not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
         // Encode password if private
         String encodedPassword = null;
@@ -141,7 +175,7 @@ public class RoomService {
     @Transactional(readOnly = true)
     public RoomResponse getRoomById(Long roomId) {
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
         return buildRoomResponse(room);
     }
 
@@ -156,39 +190,36 @@ public class RoomService {
     @Transactional
     public RoomResponse joinRoom(Long roomId, JoinRoomRequest request, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // Phase 11: Check if user is suspended
         if (user.isSuspended()) {
-            throw new IllegalStateException(
-                String.format("Cannot join room: You are suspended until %s due to multiple reports. " +
-                    "Please contact support for more information.", user.getSuspendedUntil())
-            );
+            throw new BusinessException(ErrorCode.USER_SUSPENDED);
         }
 
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         // Check if room is full
         if (room.getStatus() == Room.RoomStatus.FULL) {
-            throw new IllegalStateException("Room is full");
+            throw new BusinessException(ErrorCode.ROOM_FULL);
         }
 
         // Check if room is closed
         if (room.getStatus() == Room.RoomStatus.CLOSED) {
-            throw new IllegalStateException("Room is closed");
+            throw new BusinessException(ErrorCode.ROOM_CLOSED);
         }
 
         // Check if already in room
         if (participantRepository.findByRoomIdAndUserId(roomId, user.getId()).isPresent()) {
-            throw new IllegalStateException("Already in this room");
+            throw new BusinessException(ErrorCode.ALREADY_IN_ROOM);
         }
 
         // Verify password if private
         if (Boolean.TRUE.equals(room.getIsPrivate()) && room.getPassword() != null) {
             if (request.getPassword() == null ||
                 !passwordEncoder.matches(request.getPassword(), room.getPassword())) {
-                throw new IllegalArgumentException("Invalid password");
+                throw new BusinessException(ErrorCode.INVALID_ROOM_PASSWORD);
             }
         }
 
@@ -224,10 +255,10 @@ public class RoomService {
     @Transactional
     public void leaveRoom(Long roomId, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         RoomParticipant participant = participantRepository.findByRoomIdAndUserId(roomId, user.getId())
             .orElseThrow(() -> new IllegalArgumentException("Not in this room"));
@@ -279,16 +310,16 @@ public class RoomService {
     @Transactional
     public void closeRoom(Long roomId, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         RoomParticipant participant = participantRepository.findByRoomIdAndUserId(roomId, user.getId())
             .orElseThrow(() -> new IllegalArgumentException("Not in this room"));
 
         if (!participant.getIsHost()) {
-            throw new IllegalArgumentException("Only host can close the room");
+            throw new BusinessException(ErrorCode.NOT_HOST);
         }
 
         room.close();

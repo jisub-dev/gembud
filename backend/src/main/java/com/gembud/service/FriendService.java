@@ -1,17 +1,41 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.FriendRequest;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.FriendResponse;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Friend;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Friend.FriendStatus;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.FriendRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.List;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 
 /**
  * Service for friend operations.
@@ -37,19 +61,19 @@ public class FriendService {
     @Transactional
     public FriendResponse sendFriendRequest(String userEmail, FriendRequest request) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         User friend = userRepository.findById(request.getFriendId())
-            .orElseThrow(() -> new IllegalArgumentException("Friend user not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // Cannot send request to self
         if (user.getId().equals(friend.getId())) {
-            throw new IllegalArgumentException("Cannot send friend request to yourself");
+            throw new BusinessException(ErrorCode.CANNOT_ADD_SELF_AS_FRIEND);
         }
 
         // Check if request already exists (bidirectional)
         if (friendRepository.requestExists(user.getId(), friend.getId())) {
-            throw new IllegalStateException("Friend request already exists");
+            throw new BusinessException(ErrorCode.FRIEND_REQUEST_ALREADY_EXISTS);
         }
 
         // Create friend request
@@ -74,19 +98,19 @@ public class FriendService {
     @Transactional
     public FriendResponse acceptFriendRequest(String userEmail, Long requestId) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Friend friendRequest = friendRepository.findById(requestId)
-            .orElseThrow(() -> new IllegalArgumentException("Friend request not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
 
         // Only the receiver can accept the request
         if (!friendRequest.getFriend().getId().equals(user.getId())) {
-            throw new IllegalStateException("Only the receiver can accept this request");
+            throw new BusinessException(ErrorCode.NOT_REQUEST_RECEIVER);
         }
 
         // Check if already accepted
         if (friendRequest.getStatus() == FriendStatus.ACCEPTED) {
-            throw new IllegalStateException("Friend request already accepted");
+            throw new BusinessException(ErrorCode.FRIEND_REQUEST_ALREADY_ACCEPTED);
         }
 
         // Accept request
@@ -106,14 +130,14 @@ public class FriendService {
     @Transactional
     public FriendResponse rejectFriendRequest(String userEmail, Long requestId) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Friend friendRequest = friendRepository.findById(requestId)
-            .orElseThrow(() -> new IllegalArgumentException("Friend request not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
 
         // Only the receiver can reject the request
         if (!friendRequest.getFriend().getId().equals(user.getId())) {
-            throw new IllegalStateException("Only the receiver can reject this request");
+            throw new BusinessException(ErrorCode.NOT_REQUEST_RECEIVER);
         }
 
         // Reject request
@@ -132,11 +156,11 @@ public class FriendService {
     @Transactional
     public void unfriend(String userEmail, Long friendId) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // Check if they are friends
         if (!friendRepository.areFriends(user.getId(), friendId)) {
-            throw new IllegalStateException("Not friends with this user");
+            throw new BusinessException(ErrorCode.NOT_FRIENDS);
         }
 
         // Delete friendship (bidirectional)
@@ -151,7 +175,7 @@ public class FriendService {
      */
     public List<FriendResponse> getMyFriends(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return friendRepository.findAcceptedFriends(user.getId()).stream()
             .map(FriendResponse::from)
@@ -166,7 +190,7 @@ public class FriendService {
      */
     public List<FriendResponse> getPendingRequests(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return friendRepository.findByFriendIdAndStatus(user.getId(), FriendStatus.PENDING).stream()
             .map(FriendResponse::from)
@@ -181,7 +205,7 @@ public class FriendService {
      */
     public List<FriendResponse> getSentRequests(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return friendRepository.findByUserIdAndStatus(user.getId(), FriendStatus.PENDING).stream()
             .map(FriendResponse::from)

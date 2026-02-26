@@ -55,10 +55,14 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/api/auth/**",
-                    "/api/public/**",
+                    "/auth/**",
+                    "/public/**",
                     "/oauth2/**",
-                    "/login/oauth2/**"
+                    "/login/oauth2/**",
+                    "/games/**",  // Public access to game list
+                    "/v3/api-docs/**",  // Swagger API docs
+                    "/swagger-ui/**",   // Swagger UI resources
+                    "/swagger-ui.html"  // Swagger UI page
                 ).permitAll()
                 .anyRequest().authenticated()
             )

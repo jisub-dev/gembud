@@ -1,16 +1,38 @@
 package com.gembud.service;
 
 import com.gembud.entity.Notification;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Notification.NotificationType;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.NotificationRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import java.util.List;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 
 /**
  * Service for notification management.
@@ -45,7 +67,7 @@ public class NotificationService {
         Long relatedId
     ) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Notification notification = Notification.builder()
             .user(user)
@@ -73,7 +95,7 @@ public class NotificationService {
      */
     public List<Notification> getMyNotifications(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
     }
@@ -86,7 +108,7 @@ public class NotificationService {
      */
     public List<Notification> getUnreadNotifications(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return notificationRepository.findUnreadByUserId(user.getId());
     }
@@ -99,7 +121,7 @@ public class NotificationService {
      */
     public long getUnreadCount(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return notificationRepository.countUnreadByUserId(user.getId());
     }
@@ -114,14 +136,14 @@ public class NotificationService {
     @Transactional
     public Notification markAsRead(Long notificationId, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Notification notification = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
 
         // Verify notification belongs to user
         if (!notification.getUser().getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Notification does not belong to user");
+            throw new BusinessException(ErrorCode.NOTIFICATION_NOT_BELONG_TO_USER);
         }
 
         notification.markAsRead();
@@ -137,7 +159,7 @@ public class NotificationService {
     @Transactional
     public int markAllAsRead(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         int count = notificationRepository.markAllAsReadByUserId(user.getId());
         log.info("Marked {} notifications as read for user {}", count, user.getNickname());
@@ -154,14 +176,14 @@ public class NotificationService {
     @Transactional
     public void deleteNotification(Long notificationId, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Notification notification = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND));
 
         // Verify notification belongs to user
         if (!notification.getUser().getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Notification does not belong to user");
+            throw new BusinessException(ErrorCode.NOTIFICATION_NOT_BELONG_TO_USER);
         }
 
         notificationRepository.delete(notification);

@@ -1,12 +1,15 @@
 package com.gembud.controller;
 
 import com.gembud.config.JwtConfig;
+import com.gembud.dto.ApiResponse;
 import com.gembud.dto.request.LoginRequest;
 import com.gembud.dto.request.RefreshTokenRequest;
 import com.gembud.dto.request.SignupRequest;
 import com.gembud.dto.response.AuthResponse;
 import com.gembud.service.AuthService;
-import jakarta.servlet.http.Cookie;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Gembud Team
  * @since 2026-02-16
  */
+@Tag(name = "Authentication", description = "인증 API (회원가입, 로그인, 토큰 갱신)")
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -44,8 +48,14 @@ public class AuthController {
      * @param response HTTP response for setting cookies
      * @return authentication response (email, nickname only)
      */
+    @Operation(summary = "Sign up", description = "신규 회원 가입 (토큰은 HTTP-only 쿠키로 전달)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "회원가입 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 존재하는 이메일")
+    })
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(
+    public ResponseEntity<ApiResponse<AuthResponse>> signup(
         @Valid @RequestBody SignupRequest request,
         HttpServletResponse response
     ) {
@@ -58,7 +68,7 @@ public class AuthController {
             .nickname(authResponse.getNickname())
             .build();
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(responseBody);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(responseBody));
     }
 
     /**
@@ -70,8 +80,14 @@ public class AuthController {
      * @param response HTTP response for setting cookies
      * @return authentication response (email, nickname only)
      */
+    @Operation(summary = "Login", description = "사용자 로그인 (토큰은 HTTP-only 쿠키로 전달)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그인 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패 (이메일 또는 비밀번호 불일치)")
+    })
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
         @Valid @RequestBody LoginRequest request,
         HttpServletResponse response
     ) {
@@ -84,7 +100,7 @@ public class AuthController {
             .nickname(authResponse.getNickname())
             .build();
 
-        return ResponseEntity.ok(responseBody);
+        return ResponseEntity.ok(ApiResponse.success(responseBody));
     }
 
     /**
@@ -96,8 +112,13 @@ public class AuthController {
      * @param response HTTP response for setting new access token cookie
      * @return empty response (new token in cookie)
      */
+    @Operation(summary = "Refresh token", description = "Access 토큰 갱신 (쿠키에서 refresh 토큰 읽어 새 access 토큰 발급)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "토큰 갱신 성공 (새 토큰은 쿠키로 전달)"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Refresh 토큰 없음 또는 만료됨")
+    })
     @PostMapping("/refresh")
-    public ResponseEntity<Void> refresh(
+    public ResponseEntity<ApiResponse<Void>> refresh(
         @CookieValue(name = "refreshToken", required = false) String refreshToken,
         HttpServletResponse response
     ) {
@@ -121,7 +142,7 @@ public class AuthController {
             .build();
 
         response.addHeader("Set-Cookie", accessCookie.toString());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
@@ -132,8 +153,12 @@ public class AuthController {
      * @param response HTTP response for clearing cookies
      * @return empty response
      */
+    @Operation(summary = "Logout", description = "로그아웃 (인증 쿠키 제거)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공")
+    })
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse response) {
         // Clear access token cookie
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", "")
             .httpOnly(true)
@@ -155,7 +180,7 @@ public class AuthController {
         response.addHeader("Set-Cookie", accessCookie.toString());
         response.addHeader("Set-Cookie", refreshCookie.toString());
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**

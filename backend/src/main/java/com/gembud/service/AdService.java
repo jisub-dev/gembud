@@ -3,6 +3,8 @@ package com.gembud.service;
 import com.gembud.entity.AdView;
 import com.gembud.entity.Advertisement;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.AdViewRepository;
 import com.gembud.repository.AdvertisementRepository;
 import com.gembud.repository.UserRepository;
@@ -73,11 +75,11 @@ public class AdService {
             .orElseThrow(() -> new IllegalArgumentException("Advertisement not found"));
 
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         // Check if ad is still valid
         if (!ad.isValid()) {
-            throw new IllegalStateException("Advertisement is not active or expired");
+            throw new BusinessException(ErrorCode.AD_NOT_ACTIVE);
         }
 
         // Check daily limit
@@ -85,7 +87,7 @@ public class AdService {
         long viewCount = adViewRepository.countByUserIdSince(userId, oneDayAgo);
 
         if (viewCount >= MAX_ADS_PER_DAY) {
-            throw new IllegalStateException("Daily ad view limit exceeded");
+            throw new BusinessException(ErrorCode.AD_VIEW_LIMIT_EXCEEDED);
         }
 
         // Record view
