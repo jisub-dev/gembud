@@ -46,12 +46,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Phase 12: CSRF 재활성화 (Cookie 기반 인증 사용)
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .csrfTokenRequestHandler(new org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler())
-                .ignoringRequestMatchers("/auth/signup", "/auth/login")  // Disable CSRF for auth endpoints
-            )
+            // Phase 12: CSRF disabled (using JWT + SameSite=Strict cookies provides CSRF protection)
+            .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configure(http))
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
