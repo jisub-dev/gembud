@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRoom, useJoinRoom, useLeaveRoom } from '@/hooks/queries/useRooms';
+import { RoomParticipants } from '@/components/room/RoomParticipants';
 
 /**
  * Room detail page for viewing room information and joining/leaving.
@@ -163,12 +164,12 @@ export function RoomDetailPage() {
         </div>
 
         {/* Participants Section */}
-        <div className="bg-[#18181b] border-2 border-gray-700 rounded-lg p-6 mb-6">
-          <h3 className="text-lg font-semibold mb-4">참가자</h3>
-          <div className="text-gray-400 text-center py-4">
-            참가자 목록 (구현 예정)
-          </div>
-          {/* TODO: Add RoomParticipants component */}
+        <div className="bg-dark-secondary border-2 border-neon-purple/30 rounded-lg p-6 mb-6 shadow-glow-purple">
+          <h3 className="text-xl font-gaming mb-4 text-neon-purple">참가자</h3>
+          <RoomParticipants
+            participants={room.participants}
+            maxParticipants={room.maxParticipants}
+          />
         </div>
 
         {/* Action Buttons */}
