@@ -50,6 +50,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(new org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler())
+                .ignoringRequestMatchers("/auth/signup", "/auth/login")  // Disable CSRF for auth endpoints
             )
             .cors(cors -> cors.configure(http))
             .sessionManagement(session ->
