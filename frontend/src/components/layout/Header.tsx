@@ -2,6 +2,14 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useState } from 'react';
 
+// Helper function to get temperature color
+function getTemperatureColor(temperature: number): string {
+  if (temperature >= 40) return 'text-neon-cyan'; // High temperature
+  if (temperature >= 36.5) return 'text-neon-green'; // Normal temperature
+  if (temperature >= 30) return 'text-orange-400'; // Low temperature
+  return 'text-neon-pink'; // Very low temperature
+}
+
 export default function Header() {
   const { user, logout } = useAuthStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -69,7 +77,9 @@ export default function Header() {
                     </div>
                     <div className="hidden sm:block text-left">
                       <p className="text-sm font-medium text-text-primary">{user.nickname}</p>
-                      <p className="text-xs text-neon-green font-gaming">36.5°C</p>
+                      <p className={`text-xs font-gaming ${getTemperatureColor(user.temperature)}`}>
+                        {user.temperature}°C
+                      </p>
                     </div>
                     <svg
                       className={`w-4 h-4 text-text-secondary transition-transform ${showProfileMenu ? 'rotate-180' : ''}`}
