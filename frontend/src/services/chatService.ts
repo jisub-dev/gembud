@@ -43,3 +43,4 @@ export const chatService = {
     await api.post(`/chat/rooms/${chatRoomId}/members`, { userId });
   },
 };
+export default chatService;

@@ -18,3 +18,4 @@ export const matchingService = {
     return response.data.data;
   },
 };
+export default matchingService;

@@ -26,3 +26,4 @@ export const gameService = {
     return response.data.data;
   },
 };
+export default gameService;

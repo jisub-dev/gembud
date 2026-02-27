@@ -47,3 +47,5 @@ export const friendService = {
     return response.data.data;
   },
 };
+
+export default friendService;

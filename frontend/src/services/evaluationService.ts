@@ -39,3 +39,4 @@ export const evaluationService = {
     return response.data.data;
   },
 };
+export default evaluationService;

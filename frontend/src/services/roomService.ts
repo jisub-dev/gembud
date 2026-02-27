@@ -42,3 +42,4 @@ export const roomService = {
     await api.delete(`/rooms/${roomId}`);
   },
 };
+export default roomService;

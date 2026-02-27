@@ -42,3 +42,4 @@ export const notificationService = {
     await api.delete(`/notifications/${notificationId}`);
   },
 };
+export default notificationService;

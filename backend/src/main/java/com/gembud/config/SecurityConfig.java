@@ -16,6 +16,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.HttpStatus;
 
 /**
  * Spring Security configuration for JWT-based and OAuth2 authentication.
@@ -55,11 +57,13 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
+                    "/api/auth/**",  // Auth endpoints (signup, login)
                     "/auth/**",
                     "/public/**",
                     "/oauth2/**",
                     "/login/oauth2/**",
-                    "/games/**",  // Public access to game list
+                    "/api/games/**",  // Public access to game list
+                    "/games/**",
                     "/v3/api-docs/**",  // Swagger API docs
                     "/swagger-ui/**",   // Swagger UI resources
                     "/swagger-ui.html"  // Swagger UI page
@@ -68,6 +72,9 @@ public class SecurityConfig {
             )
             .oauth2Login(oauth2 -> oauth2
                 .successHandler(oAuth2SuccessHandler)
+            )
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
