@@ -44,8 +44,8 @@ export const authService = {
    * Get current user info
    * Phase 12: New endpoint to get user info after OAuth callback
    */
-  async getCurrentUser(): Promise<{ email: string; nickname: string }> {
-    const response = await api.get<ApiResponse<{ email: string; nickname: string }>>('/users/me');
+  async getCurrentUser(): Promise<{ id: number; email: string; nickname: string; temperature: number; isPremium?: boolean; premiumExpiresAt?: string | null }> {
+    const response = await api.get('/users/me');
     return response.data.data;
   },
 

@@ -71,4 +71,30 @@ public interface RoomParticipantRepository extends JpaRepository<RoomParticipant
      * @param userId user ID
      */
     void deleteByRoomIdAndUserId(Long roomId, Long userId);
+
+    /**
+     * Find all rooms a user is participating in (non-closed).
+     *
+     * @param userId user ID
+     * @return list of participants with room info
+     */
+    @Query("SELECT rp FROM RoomParticipant rp JOIN FETCH rp.room r WHERE rp.user.id = :userId AND r.status <> 'CLOSED' ORDER BY rp.joinedAt DESC")
+    List<RoomParticipant> findActiveRoomsByUserId(@Param("userId") Long userId);
+
+    /**
+     * Find all participants for multiple rooms (batch load).
+     *
+     * @param roomIds list of room IDs
+     * @return list of participants
+     */
+    List<RoomParticipant> findByRoomIdIn(List<Long> roomIds);
+
+    /**
+     * Check if a user is already participating in any non-closed room.
+     *
+     * @param userId user ID
+     * @return true if user is already in an active room
+     */
+    @Query("SELECT COUNT(rp) > 0 FROM RoomParticipant rp WHERE rp.user.id = :userId AND rp.room.status <> 'CLOSED'")
+    boolean existsActiveParticipationByUserId(@Param("userId") Long userId);
 }

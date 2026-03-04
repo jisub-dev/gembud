@@ -41,5 +41,11 @@ export const roomService = {
   async closeRoom(roomId: number): Promise<void> {
     await api.delete(`/rooms/${roomId}`);
   },
+
+  // 내가 참여 중인 방 목록
+  async getMyRooms(): Promise<Room[]> {
+    const response = await api.get<ApiResponse<Room[]>>('/rooms/my');
+    return response.data.data;
+  },
 };
 export default roomService;

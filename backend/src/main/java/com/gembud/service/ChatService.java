@@ -332,6 +332,18 @@ public class ChatService {
     }
 
     /**
+     * Get all chat rooms the user is a member of.
+     *
+     * @param userId user ID
+     * @return list of chat rooms
+     */
+    public List<ChatRoom> getMyChatRooms(Long userId) {
+        return chatRoomMemberRepository.findChatRoomsByUserId(userId).stream()
+            .map(ChatRoomMember::getChatRoom)
+            .collect(Collectors.toList());
+    }
+
+    /**
      * Create a group chat room.
      *
      * @param name group chat name

@@ -1,3 +1,4 @@
+import { Lock, Users, Gamepad2 } from 'lucide-react';
 import type { Room } from '@/types/room';
 
 interface RoomCardProps {
@@ -5,12 +6,6 @@ interface RoomCardProps {
   onClick?: (roomId: number) => void;
 }
 
-/**
- * Room card component for displaying room information in a grid.
- *
- * @author Gembud Team
- * @since 2026-02-22
- */
 export function RoomCard({ room, onClick }: RoomCardProps) {
   const statusStyles = {
     OPEN: 'border-green-500 hover:shadow-green-500/50',
@@ -52,8 +47,9 @@ export function RoomCard({ room, onClick }: RoomCardProps) {
         `}>
           {statusLabels[room.status]}
         </span>
-        <span className="text-sm text-gray-400">
-          👥 {room.currentParticipants}/{room.maxParticipants}
+        <span className="flex items-center gap-1 text-sm text-gray-400">
+          <Users size={14} />
+          {room.currentParticipants}/{room.maxParticipants}
         </span>
       </div>
 
@@ -63,19 +59,22 @@ export function RoomCard({ room, onClick }: RoomCardProps) {
       </h3>
 
       {/* Game Name */}
-      <p className="text-sm text-gray-400 mb-1">
-        🎮 {room.gameName}
+      <p className="flex items-center gap-1.5 text-sm text-gray-400 mb-1">
+        <Gamepad2 size={14} />
+        {room.gameName}
       </p>
 
       {/* Host */}
-      <p className="text-sm text-gray-400 mb-1">
-        👤 {room.hostNickname}
+      <p className="flex items-center gap-1.5 text-sm text-gray-400 mb-1">
+        <Users size={14} />
+        {room.createdBy}
       </p>
 
       {/* Private Badge */}
       {room.isPrivate && (
-        <span className="inline-block px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs mt-2">
-          🔒 비공개
+        <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs mt-2">
+          <Lock size={11} />
+          비공개
         </span>
       )}
     </div>

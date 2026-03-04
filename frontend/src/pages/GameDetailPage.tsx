@@ -1,12 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { ChevronLeft, Gamepad2, ArrowRight } from 'lucide-react';
 import { useGame } from '@/hooks/queries/useGames';
 
-/**
- * Game detail page with description and navigation to rooms
- *
- * @author Gembud Team
- * @since 2026-02-26
- */
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -24,11 +19,9 @@ export default function GameDetailPage() {
     return (
       <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center">
         <div className="text-center">
+          <Gamepad2 size={48} className="text-gray-600 mx-auto mb-4" />
           <div className="text-white text-xl mb-4">게임을 찾을 수 없습니다</div>
-          <button
-            onClick={() => navigate('/')}
-            className="text-purple-400 hover:text-purple-300"
-          >
+          <button onClick={() => navigate('/')} className="text-purple-400 hover:text-purple-300">
             홈으로 돌아가기
           </button>
         </div>
@@ -42,9 +35,10 @@ export default function GameDetailPage() {
         {/* Back Button */}
         <button
           onClick={() => navigate('/')}
-          className="text-gray-400 hover:text-white mb-6 transition"
+          className="flex items-center gap-1.5 text-gray-400 hover:text-white mb-6 transition"
         >
-          ← 뒤로가기
+          <ChevronLeft size={18} />
+          뒤로가기
         </button>
 
         {/* Game Header */}
@@ -92,15 +86,17 @@ export default function GameDetailPage() {
 
         {/* Call to Action */}
         <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-2 border-purple-500 rounded-lg p-8 text-center">
+          <Gamepad2 size={40} className="text-purple-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-4">함께 게임하실 분을 찾고 계신가요?</h2>
           <p className="text-gray-300 mb-6">
             {game.name}을(를) 즐기는 게이머들과 함께하세요!
           </p>
           <button
             onClick={() => navigate(`/games/${game.id}/rooms`)}
-            className="px-8 py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition text-lg"
+            className="inline-flex items-center gap-2 px-8 py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition text-lg"
           >
             방 목록 보기
+            <ArrowRight size={20} />
           </button>
         </div>
       </div>

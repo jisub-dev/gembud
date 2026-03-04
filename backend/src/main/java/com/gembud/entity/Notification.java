@@ -40,7 +40,8 @@ public class Notification {
         ROOM_INVITE,            // 방 초대
         ROOM_JOIN,              // 방 참가
         EVALUATION_RECEIVED,    // 평가 받음
-        REPORT_RESOLVED         // 신고 처리 완료
+        REPORT_RESOLVED,        // 신고 처리 완료
+        ACCOUNT_SUSPENDED       // 계정 정지
     }
 
     @Id

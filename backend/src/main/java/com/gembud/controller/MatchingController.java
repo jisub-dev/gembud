@@ -2,6 +2,8 @@ package com.gembud.controller;
 
 import com.gembud.dto.ApiResponse;
 import com.gembud.dto.response.RecommendedRoomResponse;
+import com.gembud.entity.User;
+import com.gembud.repository.UserRepository;
 import com.gembud.security.CustomUserDetails;
 import com.gembud.service.MatchingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +32,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class MatchingController {
 
     private final MatchingService matchingService;
+    private final UserRepository userRepository;
+
+    private static final int MAX_LIMIT_FREE = 10;
+    private static final int MAX_LIMIT_PREMIUM = 20;
 
     /**
      * Get recommended rooms for a game.
@@ -50,10 +56,16 @@ public class MatchingController {
         @PathVariable Long gameId,
         @RequestParam(defaultValue = "10") int limit
     ) {
+        User user = userRepository.findByEmail(userDetails.getEmail())
+            .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        int maxLimit = user.isPremium() ? MAX_LIMIT_PREMIUM : MAX_LIMIT_FREE;
+        int effectiveLimit = Math.min(limit, maxLimit);
+
         List<RecommendedRoomResponse> recommendations = matchingService.getRecommendedRooms(
             userDetails.getUsername(),
             gameId,
-            limit
+            effectiveLimit
         );
 
         return ResponseEntity.ok(ApiResponse.success(recommendations));

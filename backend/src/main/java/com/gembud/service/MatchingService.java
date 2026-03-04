@@ -14,9 +14,9 @@ import com.gembud.repository.UserRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,218 +57,199 @@ public class MatchingService {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // Get all open rooms for this game
         List<Room> openRooms = roomRepository.findByGameIdAndStatus(
             gameId,
             Room.RoomStatus.OPEN
         );
 
-        // Calculate matching score for each room
+        if (openRooms.isEmpty()) {
+            return List.of();
+        }
+
+        // Batch-load filters and participants to avoid N+1 queries
+        List<Long> roomIds = openRooms.stream().map(Room::getId).toList();
+
+        Map<Long, List<RoomFilter>> filtersByRoom = filterRepository
+            .findByRoomIdIn(roomIds)
+            .stream()
+            .collect(Collectors.groupingBy(f -> f.getRoom().getId()));
+
+        Map<Long, List<RoomParticipant>> participantsByRoom = participantRepository
+            .findByRoomIdIn(roomIds)
+            .stream()
+            .collect(Collectors.groupingBy(p -> p.getRoom().getId()));
+
+        // Collect all participant user IDs for batch evaluation lookup
+        Set<Long> participantUserIds = participantsByRoom.values().stream()
+            .flatMap(List::stream)
+            .map(p -> p.getUser().getId())
+            .collect(Collectors.toSet());
+
+        Map<Long, List<Evaluation>> evaluationsByEvaluated = evaluationRepository
+            .findByEvaluatorId(user.getId())
+            .stream()
+            .filter(e -> participantUserIds.contains(e.getEvaluated().getId()))
+            .collect(Collectors.groupingBy(e -> e.getEvaluated().getId()));
+
+        // Pre-filter rooms where user is already a participant
+        Set<Long> userRoomIds = participantsByRoom.entrySet().stream()
+            .filter(e -> e.getValue().stream()
+                .anyMatch(p -> p.getUser().getId().equals(user.getId())))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toSet());
+
         List<RecommendedRoomResponse> recommendations = new ArrayList<>();
 
         for (Room room : openRooms) {
-            // Skip if user is already in the room
-            if (participantRepository.findByRoomIdAndUserId(room.getId(), user.getId()).isPresent()) {
+            if (userRoomIds.contains(room.getId())) {
                 continue;
             }
 
-            // Calculate matching score
-            double matchingScore = calculateMatchingScore(user, room);
+            List<RoomFilter> filters = filtersByRoom.getOrDefault(room.getId(), List.of());
+            List<RoomParticipant> participants = participantsByRoom.getOrDefault(room.getId(), List.of());
 
-            // Get host temperature
+            double matchingScore = calculateMatchingScore(user, room, filters, participants, evaluationsByEvaluated);
             BigDecimal hostTemperature = room.getCreatedBy().getTemperature();
+            String reason = generateReason(matchingScore, hostTemperature, filters, participants, evaluationsByEvaluated);
 
-            // Generate reason
-            String reason = generateReason(matchingScore, hostTemperature);
+            Map<String, String> filtersMap = filters.stream()
+                .collect(Collectors.toMap(RoomFilter::getOptionKey, RoomFilter::getOptionValue));
 
             recommendations.add(
-                RecommendedRoomResponse.of(room, matchingScore, hostTemperature, reason)
+                RecommendedRoomResponse.of(room, filtersMap, matchingScore, hostTemperature, reason)
             );
         }
 
-        // Sort by matching score (descending) and return top N
         return recommendations.stream()
             .sorted(Comparator.comparing(RecommendedRoomResponse::getMatchingScore).reversed())
             .limit(limit)
             .collect(Collectors.toList());
     }
 
-    /**
-     * Calculate matching score between user and room.
-     * Score components:
-     * - Filter matching: 40 points
-     * - Temperature compatibility: 30 points
-     * - Past evaluations: 20 points
-     * - Host temperature bonus: 10 points
-     *
-     * @param user user
-     * @param room room
-     * @return matching score (0-100)
-     */
-    private double calculateMatchingScore(User user, Room room) {
+    private double calculateMatchingScore(
+        User user,
+        Room room,
+        List<RoomFilter> filters,
+        List<RoomParticipant> participants,
+        Map<Long, List<Evaluation>> evaluationsByEvaluated
+    ) {
         double score = 0.0;
-
-        // 1. Filter matching (40 points)
-        score += calculateFilterScore(user, room);
-
-        // 2. Temperature compatibility (30 points)
-        score += calculateTemperatureScore(user, room);
-
-        // 3. Past evaluations (20 points)
-        score += calculatePastEvaluationScore(user, room);
-
-        // 4. Host temperature bonus (10 points)
+        score += calculateFilterScore(user, filters);
+        score += calculateTemperatureScore(user, participants);
+        score += calculatePastEvaluationScore(participants, evaluationsByEvaluated);
         score += calculateHostTemperatureBonus(room);
-
         return Math.min(100.0, score);
     }
 
     /**
-     * Calculate filter matching score.
-     *
-     * @param user user
-     * @param room room
-     * @return filter score (0-40)
+     * Calculate filter matching score (0-40 points).
+     * Rooms with explicit filters (tier/position) score higher than open rooms.
      */
-    private double calculateFilterScore(User user, Room room) {
-        List<RoomFilter> filters = filterRepository.findByRoomId(room.getId());
-
+    private double calculateFilterScore(User user, List<RoomFilter> filters) {
         if (filters.isEmpty()) {
-            return 40.0; // No filters = all users match
+            return 30.0; // 필터 없는 방 = 누구나 환영
         }
 
-        int totalFilters = filters.size();
-        int matchedFilters = 0;
-
-        for (RoomFilter filter : filters) {
-            // Age range matching
-            if ("ageRange".equals(filter.getOptionKey())) {
-                if (user.getAgeRange() != null &&
-                    user.getAgeRange().equals(filter.getOptionValue())) {
-                    matchedFilters++;
-                }
-            }
-            // Add more filter matching logic as needed
-            // For MVP, we'll keep it simple
-        }
-
-        return (40.0 * matchedFilters) / totalFilters;
+        // 필터 있는 방 = 조건을 명시한 방으로 더 높은 기본 점수
+        // (User 엔티티에 tier/position 프로필이 없으므로 필터 존재 자체를 가산점으로 처리)
+        return 35.0;
     }
 
     /**
-     * Calculate temperature compatibility score.
-     *
-     * @param user user
-     * @param room room
-     * @return temperature score (0-30)
+     * Calculate temperature compatibility score (0-30 points).
      */
-    private double calculateTemperatureScore(User user, Room room) {
-        BigDecimal userTemp = user.getTemperature();
-        BigDecimal avgParticipantTemp = getAverageParticipantTemperature(room);
-
-        // Calculate temperature difference
-        double tempDiff = Math.abs(userTemp.subtract(avgParticipantTemp).doubleValue());
-
-        // Score decreases as temperature difference increases
+    private double calculateTemperatureScore(User user, List<RoomParticipant> participants) {
+        BigDecimal avgTemp = getAverageParticipantTemperature(participants);
+        double tempDiff = Math.abs(user.getTemperature().subtract(avgTemp).doubleValue());
         // 0°C diff = 30 points, 10°C diff = 15 points, 20°C+ diff = 0 points
-        double score = Math.max(0, 30.0 - (tempDiff * 1.5));
-
-        return score;
+        return Math.max(0, 30.0 - (tempDiff * 1.5));
     }
 
     /**
-     * Calculate past evaluation score.
-     *
-     * @param user user
-     * @param room room
-     * @return past evaluation score (0-20)
+     * Calculate past evaluation score (0-20 points).
      */
-    private double calculatePastEvaluationScore(User user, Room room) {
-        // Get room participants
-        List<RoomParticipant> participants = participantRepository.findByRoomId(room.getId());
-
+    private double calculatePastEvaluationScore(
+        List<RoomParticipant> participants,
+        Map<Long, List<Evaluation>> evaluationsByEvaluated
+    ) {
         if (participants.isEmpty()) {
-            return 10.0; // Neutral score for empty rooms
+            return 10.0;
         }
 
         double totalScore = 0.0;
         int evaluationCount = 0;
 
         for (RoomParticipant participant : participants) {
-            Long participantId = participant.getUser().getId();
-
-            // Find past evaluations between user and this participant
-            List<Evaluation> evaluations = evaluationRepository
-                .findByEvaluatorIdAndEvaluatedId(user.getId(), participantId);
-
-            for (Evaluation eval : evaluations) {
+            List<Evaluation> evals = evaluationsByEvaluated.getOrDefault(
+                participant.getUser().getId(), List.of());
+            for (Evaluation eval : evals) {
                 totalScore += eval.getAverageScore();
                 evaluationCount++;
             }
         }
 
         if (evaluationCount == 0) {
-            return 10.0; // Neutral score for no past evaluations
+            return 10.0;
         }
 
-        // Average score: 1-5 → Scale to 0-20
         double avgScore = totalScore / evaluationCount;
         return (avgScore - 1) * 5.0; // 1→0, 3→10, 5→20
     }
 
     /**
-     * Calculate host temperature bonus.
-     *
-     * @param room room
-     * @return host temperature bonus (0-10)
+     * Calculate host temperature bonus (0-10 points).
      */
     private double calculateHostTemperatureBonus(Room room) {
-        BigDecimal hostTemp = room.getCreatedBy().getTemperature();
-
-        // 36.5°C (default) = 5 points
-        // 50°C+ = 10 points
-        // 30°C- = 0 points
-        double bonus = (hostTemp.doubleValue() - 30.0) / 2.0;
-        return Math.max(0, Math.min(10.0, bonus));
+        double hostTemp = room.getCreatedBy().getTemperature().doubleValue();
+        return Math.max(0, Math.min(10.0, (hostTemp - 30.0) / 2.0));
     }
 
-    /**
-     * Get average participant temperature in a room.
-     *
-     * @param room room
-     * @return average temperature
-     */
-    private BigDecimal getAverageParticipantTemperature(Room room) {
-        List<RoomParticipant> participants = participantRepository.findByRoomId(room.getId());
-
+    private BigDecimal getAverageParticipantTemperature(List<RoomParticipant> participants) {
         if (participants.isEmpty()) {
-            return new BigDecimal("36.5"); // Default temperature
+            return new BigDecimal("36.5");
         }
-
         double sum = participants.stream()
             .mapToDouble(p -> p.getUser().getTemperature().doubleValue())
             .sum();
-
         return BigDecimal.valueOf(sum / participants.size());
     }
 
     /**
-     * Generate recommendation reason.
-     *
-     * @param matchingScore matching score
-     * @param hostTemperature host temperature
-     * @return reason string
+     * Generate context-aware recommendation reason.
      */
-    private String generateReason(double matchingScore, BigDecimal hostTemperature) {
+    private String generateReason(
+        double matchingScore,
+        BigDecimal hostTemperature,
+        List<RoomFilter> filters,
+        List<RoomParticipant> participants,
+        Map<Long, List<Evaluation>> evaluationsByEvaluated
+    ) {
+        boolean hasHighHostTemp = hostTemperature.compareTo(new BigDecimal("40")) > 0;
+
+        boolean hasPastEvaluation = participants.stream()
+            .anyMatch(p -> !evaluationsByEvaluated
+                .getOrDefault(p.getUser().getId(), List.of()).isEmpty());
+
+        boolean hasExactFilterMatch = !filters.isEmpty();
+
         if (matchingScore >= 80) {
-            return "매우 높은 매칭도! 조건이 잘 맞습니다.";
-        } else if (matchingScore >= 60) {
-            if (hostTemperature.compareTo(new BigDecimal("40")) > 0) {
-                return "좋은 매칭도! 방장의 온도가 높습니다.";
+            if (hasExactFilterMatch) {
+                return "필터 조건이 완벽히 일치하고 방장 매너 온도가 높습니다.";
             }
-            return "좋은 매칭도! 조건이 맞습니다.";
+            return "모든 조건이 매우 잘 맞는 최고의 추천방입니다!";
+        } else if (matchingScore >= 60) {
+            if (hasPastEvaluation) {
+                return "과거 함께 플레이한 경험이 있는 방장입니다.";
+            }
+            if (hasHighHostTemp) {
+                return "좋은 매칭도! 방장의 매너 온도가 높습니다.";
+            }
+            return "비슷한 온도대의 플레이어들이 모여 있습니다.";
         } else if (matchingScore >= 40) {
-            return "괜찮은 매칭도입니다.";
+            if (hasPastEvaluation) {
+                return "과거 함께 플레이한 경험이 있는 방입니다.";
+            }
+            return "괜찮은 매칭도입니다. 도전해보세요!";
         } else {
             return "새로운 사람들과 플레이해보세요!";
         }

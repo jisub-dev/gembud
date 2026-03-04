@@ -2,6 +2,7 @@ package com.gembud.dto.response;
 
 import com.gembud.entity.Room;
 import java.math.BigDecimal;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -40,9 +41,10 @@ public class RecommendedRoomResponse {
     private String reason;
 
     /**
-     * Create from room with score.
+     * Create from room with score and filters.
      *
      * @param room room entity
+     * @param filters room filters map
      * @param matchingScore matching score
      * @param hostTemperature host's temperature
      * @param reason recommendation reason
@@ -50,12 +52,27 @@ public class RecommendedRoomResponse {
      */
     public static RecommendedRoomResponse of(
         Room room,
+        Map<String, String> filters,
         Double matchingScore,
         BigDecimal hostTemperature,
         String reason
     ) {
+        RoomResponse roomResponse = RoomResponse.builder()
+            .id(room.getId())
+            .gameId(room.getGame().getId())
+            .gameName(room.getGame().getName())
+            .title(room.getTitle())
+            .description(room.getDescription())
+            .maxParticipants(room.getMaxParticipants())
+            .currentParticipants(room.getCurrentParticipants())
+            .isPrivate(room.getIsPrivate())
+            .status(room.getStatus().name())
+            .createdBy(room.getCreatedBy().getNickname())
+            .createdAt(room.getCreatedAt())
+            .filters(filters)
+            .build();
         return RecommendedRoomResponse.builder()
-            .room(RoomResponse.from(room))
+            .room(roomResponse)
             .matchingScore(matchingScore)
             .hostTemperature(hostTemperature)
             .reason(reason)

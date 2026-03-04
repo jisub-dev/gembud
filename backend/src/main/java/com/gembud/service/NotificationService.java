@@ -191,6 +191,22 @@ public class NotificationService {
     }
 
     /**
+     * Notify user that their account has been suspended.
+     *
+     * @param user       suspended user
+     * @param suspendUntil suspension expiration time
+     */
+    @Transactional
+    public void notifyUserSuspended(User user, java.time.LocalDateTime suspendUntil) {
+        String content = String.format(
+            "신고 누적으로 인해 %s까지 계정이 정지되었습니다.",
+            suspendUntil.toLocalDate()
+        );
+        createNotification(user.getId(), NotificationType.ACCOUNT_SUSPENDED, content, null);
+        log.warn("Suspension notification sent to user {}", user.getNickname());
+    }
+
+    /**
      * Clean up old read notifications (scheduled task).
      *
      * @return number of deleted notifications

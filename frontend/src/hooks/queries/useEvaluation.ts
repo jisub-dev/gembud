@@ -1,5 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import evaluationService from '@/services/evaluationService';
+import type { EvaluationRequest } from '@/types/evaluation';
 
 /**
  * React Query hooks for evaluation
@@ -8,31 +9,33 @@ import evaluationService from '@/services/evaluationService';
  * @since 2026-02-26
  */
 
-interface EvaluateUserParams {
-  roomId: number;
-  evaluatedUserId: number;
-  score: number;
-  tags: string[];
-  comment?: string;
-}
-
 // Submit evaluation
 export function useEvaluateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ roomId, ...data }: EvaluateUserParams) =>
-      evaluationService.evaluateUser(roomId, data),
+    mutationFn: ({ roomId, ...data }: { roomId: number } & EvaluationRequest) =>
+      evaluationService.createEvaluation(roomId, data),
     onSuccess: () => {
-      // Invalidate user profile queries if needed
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
   });
 }
 
-// Get evaluations received (for profile page)
+// Get evaluations received by a user (for profile page)
 export function useGetEvaluations(userId: number) {
-  // This would be implemented when profile page needs it
-  // For now, we'll implement evaluation submission only
-  return null;
+  return useQuery({
+    queryKey: ['evaluations', 'user', userId],
+    queryFn: () => evaluationService.getUserEvaluations(userId),
+    enabled: !!userId,
+  });
+}
+
+// Get temperature stats for a user (for profile page)
+export function useUserTemperature(userId: number) {
+  return useQuery({
+    queryKey: ['temperature', userId],
+    queryFn: () => evaluationService.getUserTemperature(userId),
+    enabled: !!userId,
+  });
 }

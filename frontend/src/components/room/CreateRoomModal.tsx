@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { X, Gamepad2, Lock } from 'lucide-react';
 import { useCreateRoom } from '@/hooks/queries/useRooms';
+import { useToast } from '@/hooks/useToast';
 import type { CreateRoomRequest } from '@/types/room';
 
 interface CreateRoomModalProps {
@@ -9,12 +11,6 @@ interface CreateRoomModalProps {
   onSuccess?: () => void;
 }
 
-/**
- * Modal for creating a new room
- *
- * @author Gembud Team
- * @since 2026-02-26
- */
 export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: CreateRoomModalProps) {
   const [formData, setFormData] = useState<CreateRoomRequest>({
     gameId,
@@ -26,22 +22,21 @@ export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: Create
   });
 
   const createRoomMutation = useCreateRoom();
+  const toast = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
     if (!formData.title.trim()) {
-      alert('방 제목을 입력해주세요');
+      toast.error('방 제목을 입력해주세요');
       return;
     }
 
     if (formData.isPrivate && !formData.password?.trim()) {
-      alert('비공개 방은 비밀번호가 필요합니다');
+      toast.error('비공개 방은 비밀번호가 필요합니다');
       return;
     }
 
-    // Remove password if not private
     const dataToSubmit = {
       ...formData,
       password: formData.isPrivate ? formData.password : undefined,
@@ -49,12 +44,12 @@ export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: Create
 
     createRoomMutation.mutate(dataToSubmit, {
       onSuccess: () => {
-        alert('방이 생성되었습니다!');
+        toast.success('방이 생성되었습니다!');
         onSuccess?.();
         onClose();
       },
       onError: (error: any) => {
-        alert(error.response?.data?.message || '방 생성에 실패했습니다');
+        toast.error(error.response?.data?.message || '방 생성에 실패했습니다');
       },
     });
   };
@@ -67,9 +62,9 @@ export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: Create
           <h2 className="text-2xl font-bold text-white">방 만들기</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl font-bold w-8 h-8 flex items-center justify-center"
+            className="text-gray-400 hover:text-white w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 transition"
           >
-            ×
+            <X size={20} />
           </button>
         </div>
 
@@ -78,8 +73,9 @@ export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: Create
           {/* Game Name (Read-only) */}
           <div>
             <label className="block text-sm font-semibold text-gray-300 mb-2">게임</label>
-            <div className="px-4 py-3 bg-[#0e0e10] border border-gray-600 rounded text-gray-400">
-              🎮 {gameName}
+            <div className="flex items-center gap-2 px-4 py-3 bg-[#0e0e10] border border-gray-600 rounded text-gray-400">
+              <Gamepad2 size={16} />
+              {gameName}
             </div>
           </div>
 
@@ -120,9 +116,7 @@ export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: Create
               className="w-full px-4 py-3 bg-[#0e0e10] border border-gray-600 rounded focus:border-purple-500 focus:outline-none text-white"
             >
               {[2, 3, 4, 5, 6, 8, 10].map((num) => (
-                <option key={num} value={num}>
-                  {num}명
-                </option>
+                <option key={num} value={num}>{num}명</option>
               ))}
             </select>
           </div>
@@ -136,7 +130,10 @@ export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: Create
                 onChange={(e) => setFormData({ ...formData, isPrivate: e.target.checked })}
                 className="w-5 h-5 accent-purple-500"
               />
-              <span className="text-sm font-semibold text-gray-300">비공개 방 (비밀번호 필요)</span>
+              <span className="flex items-center gap-2 text-sm font-semibold text-gray-300">
+                <Lock size={14} />
+                비공개 방 (비밀번호 필요)
+              </span>
             </label>
           </div>
 

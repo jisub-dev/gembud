@@ -45,6 +45,7 @@ public enum ErrorCode {
     NOT_IN_ROOM(HttpStatus.BAD_REQUEST, "ROOM005", "Not in this room"),
     INVALID_ROOM_PASSWORD(HttpStatus.UNAUTHORIZED, "ROOM006", "Invalid room password"),
     NOT_HOST(HttpStatus.FORBIDDEN, "ROOM007", "Only host can perform this action"),
+    ALREADY_IN_OTHER_ROOM(HttpStatus.CONFLICT, "ROOM008", "이미 다른 대기방에 참가 중입니다."),
 
     // Evaluation
     ROOM_NOT_CLOSED_FOR_EVALUATION(HttpStatus.BAD_REQUEST, "EVAL001", "Can only evaluate after room is closed"),

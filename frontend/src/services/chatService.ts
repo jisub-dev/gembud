@@ -1,5 +1,5 @@
 import api from './api';
-import type { ChatMessage, CreateDirectChatRequest, CreateGroupChatRequest } from '@/types/chat';
+import type { ChatMessage, ChatRoomInfo, CreateDirectChatRequest, CreateGroupChatRequest } from '@/types/chat';
 import { ApiResponse } from '@/types/api';
 
 /**
@@ -41,6 +41,12 @@ export const chatService = {
   // 채팅방 멤버 추가
   async addMember(chatRoomId: number, userId: number): Promise<void> {
     await api.post(`/chat/rooms/${chatRoomId}/members`, { userId });
+  },
+
+  // 내가 참여 중인 채팅방 목록
+  async getMyChatRooms(): Promise<ChatRoomInfo[]> {
+    const response = await api.get<ApiResponse<ChatRoomInfo[]>>('/chat/rooms/my');
+    return response.data.data;
   },
 };
 export default chatService;

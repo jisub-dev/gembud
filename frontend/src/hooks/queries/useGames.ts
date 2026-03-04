@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { gameService } from '@/services/gameService';
-import type { Game, GameOption } from '@/types/game';
 
 /**
  * TanStack Query hooks for game-related API calls.

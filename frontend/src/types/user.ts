@@ -5,4 +5,6 @@ export interface User {
   temperature: number;
   profileImageUrl?: string;
   ageRange?: string;
+  isPremium?: boolean;
+  premiumExpiresAt?: string | null;
 }

@@ -50,4 +50,13 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
         @Param("chatRoomId") Long chatRoomId,
         @Param("userId") Long userId
     );
+
+    /**
+     * Find all chat rooms a user is a member of.
+     *
+     * @param userId user ID
+     * @return list of chat room members with chat room info
+     */
+    @Query("SELECT m FROM ChatRoomMember m JOIN FETCH m.chatRoom c WHERE m.user.id = :userId ORDER BY c.createdAt DESC")
+    List<ChatRoomMember> findChatRoomsByUserId(@Param("userId") Long userId);
 }

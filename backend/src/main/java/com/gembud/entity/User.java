@@ -75,6 +75,12 @@ public class User {
     @Column(name = "suspended_until")
     private LocalDateTime suspendedUntil;
 
+    @Column(name = "is_premium", nullable = false)
+    private boolean premium = false;
+
+    @Column(name = "premium_expires_at")
+    private LocalDateTime premiumExpiresAt;
+
     /**
      * User role (Phase 12: ADMIN separation).
      */
@@ -183,6 +189,29 @@ public class User {
      */
     public void liftSuspension() {
         this.suspendedUntil = null;
+    }
+
+    /**
+     * Check if user has an active premium subscription.
+     */
+    public boolean isPremium() {
+        return premium && (premiumExpiresAt == null || premiumExpiresAt.isAfter(LocalDateTime.now()));
+    }
+
+    /**
+     * Activate premium subscription until the given expiry date.
+     */
+    public void activatePremium(LocalDateTime expiresAt) {
+        this.premium = true;
+        this.premiumExpiresAt = expiresAt;
+    }
+
+    /**
+     * Deactivate premium subscription.
+     */
+    public void deactivatePremium() {
+        this.premium = false;
+        this.premiumExpiresAt = null;
     }
 
     /**

@@ -62,6 +62,24 @@ public class RoomController {
     }
 
     /**
+     * Get rooms the current user is participating in.
+     *
+     * @param userDetails authenticated user
+     * @return list of rooms
+     */
+    @Operation(summary = "Get my rooms", description = "내가 참여 중인 방 목록 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "방 목록 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<RoomResponse>>> getMyRooms(
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(roomService.getMyRooms(userDetails.getUsername())));
+    }
+
+    /**
      * Get rooms by game.
      *
      * @param gameId game ID

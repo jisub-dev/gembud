@@ -34,6 +34,7 @@ export interface CreateRoomRequest {
 export interface RecommendedRoom {
   roomId: number;
   matchingScore: number;
+  hostTemperature?: number;
   reason: string;
   room: Room;
 }

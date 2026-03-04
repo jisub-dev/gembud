@@ -58,6 +58,7 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
+    private final NotificationService notificationService;
 
     /**
      * Create a new report with category (Phase 11).
@@ -168,9 +169,7 @@ public class ReportService {
             log.warn("[AUTO-SANCTION] User {} suspended until {} ({} pending reports)",
                 reported.getNickname(), suspendUntil, pendingCount);
 
-            // TODO: Send notification to admins and user
-            // notificationService.notifyAdminsAutoSanction(reported, pendingCount);
-            // notificationService.notifyUserSuspended(reported, suspendUntil);
+            notificationService.notifyUserSuspended(reported, suspendUntil);
         }
     }
 

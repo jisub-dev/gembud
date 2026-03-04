@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomService } from '@/services/roomService';
 import { roomKeys } from './useRoomQueries';
-import type { Room, CreateRoomRequest } from '@/types/room';
+import type { CreateRoomRequest } from '@/types/room';
 
 /**
  * TanStack Query hooks for room-related API calls.
@@ -63,10 +63,9 @@ export function useJoinRoom() {
     mutationFn: ({ roomId, password }: { roomId: number; password?: string }) =>
       roomService.joinRoom(roomId, password),
     onSuccess: (_, variables) => {
-      // 방 상세 정보 다시 불러오기 (참가자 수 업데이트)
       queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomId) });
-      // 방 목록도 갱신 (currentParticipants 업데이트)
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
     },
   });
 }
@@ -83,6 +82,7 @@ export function useLeaveRoom() {
     onSuccess: (_, roomId) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.detail(roomId) });
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
     },
   });
 }
@@ -97,8 +97,8 @@ export function useCloseRoom() {
   return useMutation({
     mutationFn: (roomId: number) => roomService.closeRoom(roomId),
     onSuccess: () => {
-      // 모든 방 목록 캐시 무효화
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
     },
   });
 }

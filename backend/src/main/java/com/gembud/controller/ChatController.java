@@ -2,6 +2,8 @@ package com.gembud.controller;
 
 import com.gembud.dto.ApiResponse;
 import com.gembud.dto.response.ChatMessageResponse;
+import com.gembud.dto.response.ChatRoomResponse;
+import com.gembud.entity.ChatRoom;
 import com.gembud.security.CustomUserDetails;
 import com.gembud.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +38,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatController {
 
     private final ChatService chatService;
+
+    /**
+     * Get chat rooms the current user is a member of.
+     *
+     * @param userDetails authenticated user
+     * @return list of chat rooms
+     */
+    @Operation(summary = "Get my chat rooms", description = "내가 참여 중인 채팅방 목록 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "채팅방 목록 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+    })
+    @GetMapping("/rooms/my")
+    public ResponseEntity<ApiResponse<List<ChatRoomResponse>>> getMyChatRooms(
+        @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        List<ChatRoomResponse> rooms = chatService.getMyChatRooms(userDetails.getUserId()).stream()
+            .map(ChatRoomResponse::from)
+            .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(ApiResponse.success(rooms));
+    }
 
     /**
      * Get recent messages from a chat room.

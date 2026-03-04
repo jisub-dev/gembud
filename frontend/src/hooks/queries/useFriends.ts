@@ -28,7 +28,7 @@ export function useFriends() {
 export function useFriendRequests() {
   return useQuery({
     queryKey: friendKeys.requests(),
-    queryFn: friendService.getFriendRequests,
+    queryFn: friendService.getPendingRequests,
   });
 }
 
@@ -36,7 +36,7 @@ export function useFriendRequests() {
 export function useSentFriendRequests() {
   return useQuery({
     queryKey: friendKeys.sent(),
-    queryFn: friendService.getSentFriendRequests,
+    queryFn: friendService.getSentRequests,
   });
 }
 
@@ -45,7 +45,7 @@ export function useSendFriendRequest() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (friendEmail: string) => friendService.sendFriendRequest(friendEmail),
+    mutationFn: (email: string) => friendService.sendFriendRequest(email),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: friendKeys.sent() });
     },

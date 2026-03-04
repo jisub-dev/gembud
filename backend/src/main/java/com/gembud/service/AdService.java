@@ -44,10 +44,9 @@ public class AdService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // TODO: Exclude premium users when premium feature is implemented
-        // if (user.isPremium()) {
-        //     return Collections.emptyList();
-        // }
+        if (user.isPremium()) {
+            return Collections.emptyList();
+        }
 
         // Check daily limit
         LocalDateTime oneDayAgo = LocalDateTime.now().minusDays(1);

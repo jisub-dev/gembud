@@ -17,19 +17,24 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  isAuthenticated: false, // Will be checked on mount
-  isLoading: false,
+  isAuthenticated: false,
+  isLoading: true, // true until session restore attempt completes
   error: null,
 
   signup: async (data: SignupRequest) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await authService.signup(data);
-      // Phase 12: Tokens are in HTTP-only cookies now
+      await authService.signup(data);
+      // Fetch full user info after signup (id, temperature included)
+      const user = await authService.getCurrentUser();
       set({
         user: {
-          email: response.email,
-          nickname: response.nickname,
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          temperature: user.temperature,
+          isPremium: user.isPremium,
+          premiumExpiresAt: user.premiumExpiresAt,
         },
         isAuthenticated: true,
         isLoading: false,
@@ -46,12 +51,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (data: LoginRequest) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await authService.login(data);
-      // Phase 12: Tokens are in HTTP-only cookies now
+      await authService.login(data);
+      // Fetch full user info after login (id, temperature included)
+      const user = await authService.getCurrentUser();
       set({
         user: {
-          email: response.email,
-          nickname: response.nickname,
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          temperature: user.temperature,
+          isPremium: user.isPremium,
+          premiumExpiresAt: user.premiumExpiresAt,
         },
         isAuthenticated: true,
         isLoading: false,
@@ -90,9 +100,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (success === 'true') {
       try {
         // Fetch user info (cookies are sent automatically)
-        const user = await authService.getCurrentUser();
+        const u = await authService.getCurrentUser();
         set({
-          user,
+          user: {
+            id: u.id,
+            email: u.email,
+            nickname: u.nickname,
+            temperature: u.temperature,
+            isPremium: u.isPremium,
+            premiumExpiresAt: u.premiumExpiresAt,
+          },
           isAuthenticated: true,
         });
       } catch (error: any) {

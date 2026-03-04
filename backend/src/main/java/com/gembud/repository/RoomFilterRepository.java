@@ -28,4 +28,12 @@ public interface RoomFilterRepository extends JpaRepository<RoomFilter, Long> {
      * @param roomId room ID
      */
     void deleteByRoomId(Long roomId);
+
+    /**
+     * Find all filters for multiple rooms (batch load).
+     *
+     * @param roomIds list of room IDs
+     * @return list of filters
+     */
+    List<RoomFilter> findByRoomIdIn(List<Long> roomIds);
 }

@@ -1,19 +1,21 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useState } from 'react';
+import { Bell, ChevronDown, User, LogOut, Crown } from 'lucide-react';
+import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
+import PremiumBadge from '@/components/common/PremiumBadge';
 
-// Helper function to get temperature color
 function getTemperatureColor(temperature: number): string {
-  if (temperature >= 40) return 'text-neon-cyan'; // High temperature
-  if (temperature >= 36.5) return 'text-neon-green'; // Normal temperature
-  if (temperature >= 30) return 'text-orange-400'; // Low temperature
-  return 'text-neon-pink'; // Very low temperature
+  if (temperature >= 40) return 'text-neon-cyan';
+  if (temperature >= 36.5) return 'text-neon-green';
+  if (temperature >= 30) return 'text-orange-400';
+  return 'text-neon-pink';
 }
 
 export default function Header() {
   const { user, logout } = useAuthStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [unreadCount] = useState(3); // TODO: Phase 9에서 실제 알림 개수로 교체
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   return (
     <header className="sticky top-0 z-50 bg-dark-secondary border-b border-neon-purple/30 shadow-glow-purple backdrop-blur-sm">
@@ -44,19 +46,7 @@ export default function Header() {
                   to="/notifications"
                   className="relative p-2 rounded-lg hover:bg-dark-tertiary transition-colors group"
                 >
-                  <svg
-                    className="w-6 h-6 text-text-secondary group-hover:text-neon-cyan transition-colors"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    />
-                  </svg>
+                  <Bell className="w-6 h-6 text-text-secondary group-hover:text-neon-cyan transition-colors" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-neon-pink rounded-full flex items-center justify-center text-xs font-gaming font-bold animate-glow-pulse">
                       {unreadCount}
@@ -76,19 +66,17 @@ export default function Header() {
                       </span>
                     </div>
                     <div className="hidden sm:block text-left">
-                      <p className="text-sm font-medium text-text-primary">{user.nickname}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-text-primary">{user.nickname}</p>
+                        {user.isPremium && <PremiumBadge />}
+                      </div>
                       <p className={`text-xs font-gaming ${getTemperatureColor(user.temperature)}`}>
                         {user.temperature}°C
                       </p>
                     </div>
-                    <svg
+                    <ChevronDown
                       className={`w-4 h-4 text-text-secondary transition-transform ${showProfileMenu ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    />
                   </button>
 
                   {/* Dropdown Menu */}
@@ -96,18 +84,30 @@ export default function Header() {
                     <div className="absolute right-0 mt-2 w-48 bg-dark-secondary border border-neon-purple/30 rounded-lg shadow-glow-purple overflow-hidden animate-fade-in">
                       <Link
                         to={`/profile/${user.id}`}
-                        className="block px-4 py-3 hover:bg-dark-tertiary transition-colors text-text-primary"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-dark-tertiary transition-colors text-text-primary"
                         onClick={() => setShowProfileMenu(false)}
                       >
+                        <User size={16} className="text-gray-400" />
                         내 프로필
                       </Link>
+                      {!user.isPremium && (
+                        <Link
+                          to="/premium"
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-dark-tertiary transition-colors text-yellow-400"
+                          onClick={() => setShowProfileMenu(false)}
+                        >
+                          <Crown size={16} />
+                          PRO 업그레이드
+                        </Link>
+                      )}
                       <button
                         onClick={() => {
                           logout();
                           setShowProfileMenu(false);
                         }}
-                        className="block w-full text-left px-4 py-3 hover:bg-dark-tertiary transition-colors text-neon-pink"
+                        className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-dark-tertiary transition-colors text-neon-pink"
                       >
+                        <LogOut size={16} />
                         로그아웃
                       </button>
                     </div>
@@ -115,7 +115,6 @@ export default function Header() {
                 </div>
               </>
             ) : (
-              /* Auth Buttons for Logged Out Users */
               <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
@@ -139,7 +138,6 @@ export default function Header() {
   );
 }
 
-// Navigation Link Component
 function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <Link

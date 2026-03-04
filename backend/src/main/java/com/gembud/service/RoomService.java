@@ -154,6 +154,21 @@ public class RoomService {
     }
 
     /**
+     * Get rooms the current user is participating in.
+     *
+     * @param userEmail current user email
+     * @return list of room responses
+     */
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getMyRooms(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return participantRepository.findActiveRoomsByUserId(user.getId()).stream()
+            .map(rp -> buildRoomResponse(rp.getRoom()))
+            .collect(Collectors.toList());
+    }
+
+    /**
      * Get rooms by game.
      *
      * @param gameId game ID
@@ -210,7 +225,12 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ROOM_CLOSED);
         }
 
-        // Check if already in room
+        // Check if already participating in any active room
+        if (participantRepository.existsActiveParticipationByUserId(user.getId())) {
+            throw new BusinessException(ErrorCode.ALREADY_IN_OTHER_ROOM);
+        }
+
+        // Check if already in this specific room
         if (participantRepository.findByRoomIdAndUserId(roomId, user.getId()).isPresent()) {
             throw new BusinessException(ErrorCode.ALREADY_IN_ROOM);
         }

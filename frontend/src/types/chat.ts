@@ -22,3 +22,11 @@ export interface ChatRoom {
   name?: string;
   memberCount: number;
 }
+
+export interface ChatRoomInfo {
+  id: number;
+  type: 'ROOM_CHAT' | 'DIRECT_CHAT' | 'GROUP_CHAT';
+  name?: string;
+  relatedRoomId?: number;
+  relatedRoomTitle?: string;
+}

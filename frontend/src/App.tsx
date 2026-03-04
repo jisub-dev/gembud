@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
+import { ToastContainer } from './components/common/ToastContainer';
+import { authService } from './services/authService';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -18,6 +21,7 @@ import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
 import FriendListPage from './pages/FriendListPage';
 import NotificationsPage from './pages/NotificationsPage';
+import PremiumPage from './pages/PremiumPage';
 
 // Protected Route Wrapper
 interface ProtectedRouteProps {
@@ -25,7 +29,9 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (isLoading) return null;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -34,20 +40,36 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
   return <>{children}</>;
 }
 
-// Temporary placeholder component (Phase별로 실제 페이지로 교체)
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-dark-primary">
-      <div className="text-center">
-        <h1 className="text-4xl font-display text-text-primary mb-4">{title}</h1>
-        <p className="text-text-secondary">이 페이지는 Phase별로 구현 예정입니다.</p>
-      </div>
-    </div>
-  );
-}
-
 function App() {
+  const { isAuthenticated } = useAuthStore();
+
+  useEffect(() => {
+    // 새로고침 시 HTTP-only 쿠키로 세션 복원
+    if (!isAuthenticated) {
+      authService.getCurrentUser()
+        .then((user) => {
+          useAuthStore.setState({
+            user: {
+              id: user.id,
+              email: user.email,
+              nickname: user.nickname,
+              temperature: user.temperature,
+              isPremium: user.isPremium,
+              premiumExpiresAt: user.premiumExpiresAt,
+            },
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        })
+        .catch(() => {
+          useAuthStore.setState({ isLoading: false });
+        });
+    }
+  }, []);
+
   return (
+    <>
+    <ToastContainer />
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
@@ -122,12 +144,23 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Premium: 프리미엄 구독 (Protected) */}
+          <Route
+            path="premium"
+            element={
+              <ProtectedRoute>
+                <PremiumPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </>
   );
 }
 
