@@ -1,65 +1,27 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.CreateRoomRequest;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.dto.request.JoinRoomRequest;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.RoomResponse;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Game;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.RoomFilter;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.RoomParticipant;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.repository.GameRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomFilterRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomParticipantRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.List;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.Map;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 
 /**
  * Service for room operations.
@@ -281,7 +243,7 @@ public class RoomService {
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         RoomParticipant participant = participantRepository.findByRoomIdAndUserId(roomId, user.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Not in this room"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
 
         boolean wasHost = participant.getIsHost();
 
@@ -336,7 +298,7 @@ public class RoomService {
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         RoomParticipant participant = participantRepository.findByRoomIdAndUserId(roomId, user.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Not in this room"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
 
         if (!participant.getIsHost()) {
             throw new BusinessException(ErrorCode.NOT_HOST);

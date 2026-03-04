@@ -1,68 +1,28 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.ChatMessageRequest;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.ChatMessageResponse;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.ChatMessage;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.ChatRoom;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.ChatRoomMember;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ChatMessageRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ChatRoomMemberRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ChatRoomRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.util.HtmlSanitizer;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
-import java.util.Collections;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.List;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.data.domain.Pageable;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 
 /**
  * Service for chat operations.
@@ -72,6 +32,7 @@ import com.gembud.exception.ErrorCode;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class ChatService {
 
@@ -90,28 +51,23 @@ public class ChatService {
      *
      * @param userId user ID
      * @param request message request
-     * @return message response (null if ROOM_CHAT and not saved)
+     * @return message response
      */
     @Transactional
     public ChatMessageResponse sendMessage(Long userId, ChatMessageRequest request) {
-        // Verify user exists
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // Verify chat room exists
         ChatRoom chatRoom = chatRoomRepository.findById(request.getChatRoomId())
             .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
-        // Verify user is a member of the chat room
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserId(
             request.getChatRoomId(), userId)) {
             throw new BusinessException(ErrorCode.NOT_CHAT_MEMBER);
         }
 
-        // Sanitize message to prevent XSS attacks
         String sanitizedMessage = htmlSanitizer.sanitizeAndLimit(request.getMessage(), 1000);
 
-        // Handle message based on chat room type
         switch (chatRoom.getType()) {
             case ROOM_CHAT:
                 // Phase 11: Save last 50 ROOM_CHAT messages for evidence (신고 증거)
@@ -122,18 +78,15 @@ public class ChatService {
                     .build();
                 roomMessage = chatMessageRepository.save(roomMessage);
 
-                // Delete old messages (keep only last 50)
                 long roomMessageCount = chatMessageRepository.countByChatRoomId(chatRoom.getId());
                 if (roomMessageCount > ROOM_CHAT_MESSAGE_LIMIT) {
                     chatMessageRepository.deleteOldMessages(
                         chatRoom.getId(), ROOM_CHAT_MESSAGE_LIMIT
                     );
                 }
-
                 return ChatMessageResponse.from(roomMessage);
 
             case GROUP_CHAT:
-                // Save GROUP_CHAT message
                 ChatMessage groupMessage = ChatMessage.builder()
                     .chatRoom(chatRoom)
                     .user(user)
@@ -141,25 +94,21 @@ public class ChatService {
                     .build();
                 groupMessage = chatMessageRepository.save(groupMessage);
 
-                // Delete old messages (keep only last 100)
                 long messageCount = chatMessageRepository.countByChatRoomId(chatRoom.getId());
                 if (messageCount > GROUP_CHAT_MESSAGE_LIMIT) {
                     chatMessageRepository.deleteOldMessages(
                         chatRoom.getId(), GROUP_CHAT_MESSAGE_LIMIT
                     );
                 }
-
                 return ChatMessageResponse.from(groupMessage);
 
             case DIRECT_CHAT:
-                // Save DIRECT_CHAT message (keep all)
                 ChatMessage directMessage = ChatMessage.builder()
                     .chatRoom(chatRoom)
                     .user(user)
                     .message(sanitizedMessage)
                     .build();
                 directMessage = chatMessageRepository.save(directMessage);
-
                 return ChatMessageResponse.from(directMessage);
 
             default:
@@ -178,20 +127,15 @@ public class ChatService {
     public List<ChatMessageResponse> getRecentMessages(
         Long chatRoomId, Long userId, int limit) {
 
-        // Verify chat room exists
-        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
-            .orElseThrow(() -> new IllegalArgumentException("Chat room not found: " + chatRoomId));
+        chatRoomRepository.findById(chatRoomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
-        // Verify user is a member of the chat room
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, userId)) {
             throw new BusinessException(ErrorCode.NOT_CHAT_MEMBER);
         }
 
-        // Get recent messages (Phase 11: ROOM_CHAT now saves last 50)
         Pageable pageable = PageRequest.of(0, limit);
-        List<ChatMessage> messages = chatMessageRepository.findRecentMessages(
-            chatRoomId, pageable
-        );
+        List<ChatMessage> messages = chatMessageRepository.findRecentMessages(chatRoomId, pageable);
 
         return messages.stream()
             .map(ChatMessageResponse::from)
@@ -207,12 +151,9 @@ public class ChatService {
     @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 3 * * *")
     public void cleanupExpiredMessages() {
         java.time.LocalDateTime sevenDaysAgo = java.time.LocalDateTime.now().minusDays(7);
-
-        // Delete ROOM_CHAT messages older than 7 days
         int deletedCount = chatMessageRepository.deleteOldRoomChatMessages(sevenDaysAgo);
-
         if (deletedCount > 0) {
-            System.out.println("[ChatService] Cleaned up " + deletedCount + " expired ROOM_CHAT messages");
+            log.info("Cleaned up {} expired ROOM_CHAT messages", deletedCount);
         }
     }
 
@@ -224,11 +165,9 @@ public class ChatService {
      */
     @Transactional
     public Long createChatRoomForGameRoom(Long roomId) {
-        // Verify room exists
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found: " + roomId));
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
-        // Create ROOM_CHAT
         ChatRoom chatRoom = ChatRoom.builder()
             .type(ChatRoom.ChatRoomType.ROOM_CHAT)
             .relatedRoom(room)
@@ -246,20 +185,16 @@ public class ChatService {
      */
     @Transactional
     public void addMemberToChatRoom(Long chatRoomId, Long userId) {
-        // Verify chat room exists
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
-            .orElseThrow(() -> new IllegalArgumentException("Chat room not found: " + chatRoomId));
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
-        // Verify user exists
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // Check if already a member
         if (chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, userId)) {
-            return; // Already a member
+            return;
         }
 
-        // Add member
         ChatRoomMember member = ChatRoomMember.builder()
             .chatRoom(chatRoom)
             .user(user)
@@ -275,7 +210,6 @@ public class ChatService {
      */
     @Transactional
     public void removeMemberFromChatRoom(Long chatRoomId, Long userId) {
-        // Find and delete the membership
         chatRoomMemberRepository.findByChatRoomIdAndUserId(chatRoomId, userId)
             .ifPresent(chatRoomMemberRepository::delete);
     }
@@ -289,9 +223,7 @@ public class ChatService {
     public Long getChatRoomByGameRoomId(Long roomId) {
         return chatRoomRepository.findByRelatedRoomId(roomId)
             .map(ChatRoom::getId)
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Chat room not found for game room: " + roomId
-            ));
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
     }
 
     /**
@@ -303,30 +235,18 @@ public class ChatService {
      */
     @Transactional
     public Long createDirectChatRoom(Long userId1, Long userId2) {
-        // Verify users exist
         User user1 = userRepository.findById(userId1)
-            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId1));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         User user2 = userRepository.findById(userId2)
-            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId2));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // Create DIRECT_CHAT
         ChatRoom chatRoom = ChatRoom.builder()
             .type(ChatRoom.ChatRoomType.DIRECT_CHAT)
             .build();
         chatRoom = chatRoomRepository.save(chatRoom);
 
-        // Add both users as members
-        ChatRoomMember member1 = ChatRoomMember.builder()
-            .chatRoom(chatRoom)
-            .user(user1)
-            .build();
-        chatRoomMemberRepository.save(member1);
-
-        ChatRoomMember member2 = ChatRoomMember.builder()
-            .chatRoom(chatRoom)
-            .user(user2)
-            .build();
-        chatRoomMemberRepository.save(member2);
+        chatRoomMemberRepository.save(ChatRoomMember.builder().chatRoom(chatRoom).user(user1).build());
+        chatRoomMemberRepository.save(ChatRoomMember.builder().chatRoom(chatRoom).user(user2).build());
 
         return chatRoom.getId();
     }
@@ -352,23 +272,16 @@ public class ChatService {
      */
     @Transactional
     public Long createGroupChatRoom(String name, Long creatorId) {
-        // Verify creator exists
         User creator = userRepository.findById(creatorId)
-            .orElseThrow(() -> new IllegalArgumentException("Creator not found: " + creatorId));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // Create GROUP_CHAT
         ChatRoom chatRoom = ChatRoom.builder()
             .type(ChatRoom.ChatRoomType.GROUP_CHAT)
             .name(name)
             .build();
         chatRoom = chatRoomRepository.save(chatRoom);
 
-        // Add creator as member
-        ChatRoomMember member = ChatRoomMember.builder()
-            .chatRoom(chatRoom)
-            .user(creator)
-            .build();
-        chatRoomMemberRepository.save(member);
+        chatRoomMemberRepository.save(ChatRoomMember.builder().chatRoom(chatRoom).user(creator).build());
 
         return chatRoom.getId();
     }

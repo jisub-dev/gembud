@@ -11,6 +11,7 @@ import {
 } from '@/hooks/queries/useFriends';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import type { Friend, FriendRequest } from '@/types/friend';
 
 /**
  * Friend list page with friend requests
@@ -167,14 +168,13 @@ export default function FriendListPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {friends.map((friend: any) => (
+                  {friends.map((friend: Friend) => (
                     <div key={friend.id} className="flex items-center justify-between p-4 bg-[#0e0e10] rounded hover:bg-[#1a1a1f] transition">
                       <div>
-                        <div className="font-semibold">{friend.nickname}</div>
-                        <div className="text-sm text-gray-400">{friend.email}</div>
+                        <div className="font-semibold">{friend.friendNickname}</div>
                       </div>
                       <button
-                        onClick={() => handleRemove(friend.id, friend.nickname)}
+                        onClick={() => handleRemove(friend.friendId, friend.friendNickname)}
                         className="flex items-center gap-1.5 px-3 py-2 bg-red-500 hover:bg-red-600 rounded text-sm font-semibold transition"
                       >
                         <Trash2 size={14} />
@@ -198,11 +198,10 @@ export default function FriendListPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {requests.map((request: any) => (
+                  {requests.map((request: FriendRequest) => (
                     <div key={request.id} className="flex items-center justify-between p-4 bg-[#0e0e10] rounded">
                       <div>
-                        <div className="font-semibold">{request.senderNickname}</div>
-                        <div className="text-sm text-gray-400">{request.senderEmail}</div>
+                        <div className="font-semibold">{request.userNickname}</div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -240,11 +239,10 @@ export default function FriendListPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {sentRequests.map((request: any) => (
+                  {sentRequests.map((request: FriendRequest) => (
                     <div key={request.id} className="flex items-center justify-between p-4 bg-[#0e0e10] rounded">
                       <div>
-                        <div className="font-semibold">{request.receiverNickname}</div>
-                        <div className="text-sm text-gray-400">{request.receiverEmail}</div>
+                        <div className="font-semibold">{request.friendNickname}</div>
                         <div className="flex items-center gap-1 text-xs text-purple-400 mt-1">
                           <Clock size={11} />
                           대기 중

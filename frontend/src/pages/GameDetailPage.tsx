@@ -1,6 +1,16 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Gamepad2, ArrowRight } from 'lucide-react';
 import { useGame } from '@/hooks/queries/useGames';
+import type { GameOption } from '@/types/game';
+
+function parseOptionValues(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,11 +75,11 @@ export default function GameDetailPage() {
           <div className="bg-[#18181b] border-2 border-gray-700 rounded-lg p-6 mb-6">
             <h2 className="text-2xl font-semibold mb-4">게임 옵션</h2>
             <div className="space-y-4">
-              {game.options.map((option: any) => (
+              {game.options.map((option: GameOption) => (
                 <div key={option.id}>
                   <h3 className="text-lg font-semibold text-purple-400 mb-2">{option.optionKey}</h3>
                   <div className="flex flex-wrap gap-2">
-                    {JSON.parse(option.optionValues).map((value: string, index: number) => (
+                    {parseOptionValues(option.optionValues).map((value, index) => (
                       <span
                         key={index}
                         className="px-3 py-1 bg-[#0e0e10] border border-gray-600 rounded text-sm"

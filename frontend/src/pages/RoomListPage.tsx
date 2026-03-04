@@ -31,11 +31,11 @@ export function RoomListPage() {
     if (!rooms) return [];
 
     const selectedTierValues = selectedTiers
-      .map(id => tierOptions.find(o => o.id === id)?.value)
+      .map(id => tierOptions.find(o => o.id === id)?.optionKey)
       .filter(Boolean) as string[];
 
     const selectedPositionValues = selectedPositions
-      .map(id => positionOptions.find(o => o.id === id)?.value)
+      .map(id => positionOptions.find(o => o.id === id)?.optionKey)
       .filter(Boolean) as string[];
 
     return rooms.filter(room => {

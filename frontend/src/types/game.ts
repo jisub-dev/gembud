@@ -7,10 +7,10 @@
 
 export interface GameOption {
   id: number;
-  name: string;
-  type: 'TIER' | 'POSITION' | 'OTHER';
-  value: string;
-  displayOrder: number;
+  optionKey: string;
+  optionType: 'TIER' | 'POSITION' | 'OTHER';
+  optionValues: string; // JSON-encoded string array, e.g. '["Gold","Platinum"]'
+  isCommon: boolean;
 }
 
 export interface Game {

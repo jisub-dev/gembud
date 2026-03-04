@@ -4,11 +4,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { useSubscriptionStatus, useActivatePremium, useCancelPremium } from '@/hooks/queries/useSubscription';
 import { subscriptionService } from '@/services/subscriptionService';
-import { useAuthStore } from '@/store/authStore';
 
 vi.mock('@/services/subscriptionService');
+
+// Use vi.hoisted to avoid temporal dead zone in vi.mock factory
+const { mockAuthStore } = vi.hoisted(() => {
+  const store = vi.fn(() => ({ isAuthenticated: true, user: null })) as any;
+  store.getState = vi.fn(() => ({ user: null }));
+  store.setState = vi.fn();
+  return { mockAuthStore: store };
+});
+
 vi.mock('@/store/authStore', () => ({
-  useAuthStore: vi.fn(() => ({ isAuthenticated: true, user: { id: 1, email: 'test@test.com', nickname: 'Test', temperature: 36.5 } })),
+  useAuthStore: mockAuthStore,
 }));
 
 function createWrapper() {
@@ -18,6 +26,8 @@ function createWrapper() {
   return ({ children }: { children: React.ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
 }
+
+const mockUser = { id: 1, email: 'test@test.com', nickname: 'Test', temperature: 36.5, isPremium: false };
 
 const mockStatus = {
   isPremium: false,
@@ -38,6 +48,9 @@ const mockPremiumStatus = {
 describe('useSubscriptionStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthStore.mockReturnValue({ isAuthenticated: true, user: mockUser });
+    mockAuthStore.getState = vi.fn(() => ({ user: mockUser }));
+    mockAuthStore.setState = vi.fn();
   });
 
   it('should return non-premium status when not subscribed', async () => {
@@ -64,7 +77,7 @@ describe('useSubscriptionStatus', () => {
   });
 
   it('should not fetch when not authenticated', async () => {
-    vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: false, user: null } as any);
+    mockAuthStore.mockReturnValue({ isAuthenticated: false, user: null });
 
     const { result } = renderHook(() => useSubscriptionStatus(), {
       wrapper: createWrapper(),
@@ -78,13 +91,9 @@ describe('useSubscriptionStatus', () => {
 describe('useActivatePremium', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuthStore).mockReturnValue({
-      isAuthenticated: true,
-      user: { id: 1, email: 'test@test.com', nickname: 'Test', temperature: 36.5 },
-    } as any);
-    vi.mocked(useAuthStore).getState = vi.fn().mockReturnValue({
-      user: { id: 1, email: 'test@test.com', nickname: 'Test', temperature: 36.5, isPremium: false },
-    });
+    mockAuthStore.mockReturnValue({ isAuthenticated: true, user: mockUser });
+    mockAuthStore.getState = vi.fn(() => ({ user: mockUser }));
+    mockAuthStore.setState = vi.fn();
   });
 
   it('should call activate service with correct months', async () => {
@@ -104,13 +113,10 @@ describe('useActivatePremium', () => {
 describe('useCancelPremium', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuthStore).mockReturnValue({
-      isAuthenticated: true,
-      user: { id: 1, email: 'test@test.com', nickname: 'Test', temperature: 36.5, isPremium: true },
-    } as any);
-    vi.mocked(useAuthStore).getState = vi.fn().mockReturnValue({
-      user: { id: 1, email: 'test@test.com', nickname: 'Test', temperature: 36.5, isPremium: true },
-    });
+    const premiumUser = { ...mockUser, isPremium: true };
+    mockAuthStore.mockReturnValue({ isAuthenticated: true, user: premiumUser });
+    mockAuthStore.getState = vi.fn(() => ({ user: premiumUser }));
+    mockAuthStore.setState = vi.fn();
   });
 
   it('should call cancel service', async () => {

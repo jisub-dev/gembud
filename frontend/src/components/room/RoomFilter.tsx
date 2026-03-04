@@ -74,7 +74,7 @@ export function RoomFilter({
                   }
                 `}
               >
-                {option.name}
+                {option.optionKey}
               </button>
             ))}
           </div>
@@ -98,7 +98,7 @@ export function RoomFilter({
                   }
                 `}
               >
-                {option.name}
+                {option.optionKey}
               </button>
             ))}
           </div>

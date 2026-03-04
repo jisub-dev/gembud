@@ -47,12 +47,12 @@ export function useGameOptions(gameId: number) {
   const { data: game, ...rest } = useGame(gameId);
 
   const tierOptions = useMemo(() =>
-    game?.options.filter(opt => opt.type === 'TIER') ?? [],
+    game?.options.filter(opt => opt.optionType === 'TIER') ?? [],
     [game]
   );
 
   const positionOptions = useMemo(() =>
-    game?.options.filter(opt => opt.type === 'POSITION') ?? [],
+    game?.options.filter(opt => opt.optionType === 'POSITION') ?? [],
     [game]
   );
 

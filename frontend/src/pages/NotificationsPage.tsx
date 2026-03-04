@@ -7,6 +7,7 @@ import {
   useDeleteNotification,
 } from '@/hooks/queries/useNotifications';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import type { Notification } from '@/types/notification';
 
 export default function NotificationsPage() {
   const { data: notifications = [], isLoading } = useNotifications();
@@ -74,7 +75,7 @@ export default function NotificationsPage() {
     return date.toLocaleDateString('ko-KR');
   };
 
-  const unreadCount = notifications.filter((n: any) => !n.isRead).length;
+  const unreadCount = notifications.filter((n: Notification) => !n.isRead).length;
 
   return (
     <>
@@ -132,7 +133,7 @@ export default function NotificationsPage() {
               <div className="text-gray-400 text-lg">알림이 없습니다</div>
             </div>
           ) : (
-            notifications.map((notification: any) => (
+            notifications.map((notification: Notification) => (
               <div
                 key={notification.id}
                 className={`bg-[#18181b] border-2 ${
