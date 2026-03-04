@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subscriptionService } from '@/services/subscriptionService';
 import { useAuthStore } from '@/store/authStore';
+import type { SubscriptionStatusResponse } from '@/types/subscription';
 
 export function useSubscriptionStatus() {
   const { isAuthenticated } = useAuthStore();
@@ -18,8 +19,19 @@ export function useActivatePremium() {
 
   return useMutation({
     mutationFn: (months: number) => subscriptionService.activate(months),
-    onSuccess: () => {
+    onSuccess: (data: SubscriptionStatusResponse) => {
       queryClient.invalidateQueries({ queryKey: ['subscriptionStatus'] });
+      // Sync isPremium into authStore so UI reflects change immediately
+      const { user } = useAuthStore.getState();
+      if (user) {
+        useAuthStore.setState({
+          user: {
+            ...user,
+            isPremium: data.isPremium,
+            premiumExpiresAt: data.premiumExpiresAt ?? undefined,
+          },
+        });
+      }
     },
   });
 }
@@ -29,8 +41,19 @@ export function useCancelPremium() {
 
   return useMutation({
     mutationFn: () => subscriptionService.cancel(),
-    onSuccess: () => {
+    onSuccess: (data: SubscriptionStatusResponse) => {
       queryClient.invalidateQueries({ queryKey: ['subscriptionStatus'] });
+      // Sync isPremium into authStore so UI reflects change immediately
+      const { user } = useAuthStore.getState();
+      if (user) {
+        useAuthStore.setState({
+          user: {
+            ...user,
+            isPremium: data.isPremium,
+            premiumExpiresAt: data.premiumExpiresAt ?? undefined,
+          },
+        });
+      }
     },
   });
 }

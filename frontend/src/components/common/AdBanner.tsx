@@ -4,6 +4,13 @@ import { adService } from '@/services/adService';
 
 type BannerType = 'leaderboard' | 'rectangle' | 'inline';
 
+const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT_ID ?? 'ca-pub-XXXXXXXXXXXXXXXX';
+const AD_SLOTS: Record<BannerType, string> = {
+  leaderboard: import.meta.env.VITE_ADSENSE_SLOT_LEADERBOARD ?? '0000000000',
+  rectangle:   import.meta.env.VITE_ADSENSE_SLOT_RECTANGLE   ?? '0000000001',
+  inline:      import.meta.env.VITE_ADSENSE_SLOT_INLINE       ?? '0000000002',
+};
+
 interface AdBannerProps {
   type: BannerType;
   adData?: AdData | null;
@@ -24,6 +31,7 @@ const SIZES: Record<BannerType, { width: number; height: number; label: string }
  */
 export default function AdBanner({ type, adData, className = '' }: AdBannerProps) {
   const viewRecorded = useRef(false);
+  const insRef = useRef<HTMLModElement>(null);
   const size = SIZES[type];
 
   // Record view once per mount for self-hosted ads
@@ -34,16 +42,26 @@ export default function AdBanner({ type, adData, className = '' }: AdBannerProps
     }
   }, [adData]);
 
+  // Initialize AdSense slot
+  useEffect(() => {
+    if (!adData && insRef.current) {
+      try {
+        ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+      } catch {}
+    }
+  }, [adData]);
+
   if (!adData) {
     // AdSense fallback slot — rendered inert if script not loaded
     return (
       <div className={`flex flex-col items-center ${className}`} style={{ minHeight: size.height }}>
         <span className="text-text-muted text-xs mb-1 self-start">광고</span>
         <ins
+          ref={insRef}
           className="adsbygoogle block"
           style={{ display: 'block', width: size.width, height: size.height }}
-          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
-          data-ad-slot="0000000000"
+          data-ad-client={ADSENSE_CLIENT}
+          data-ad-slot={AD_SLOTS[type]}
           data-ad-format="fixed"
         />
       </div>

@@ -90,11 +90,12 @@ public class SubscriptionService {
 
     /**
      * Get subscription status for user.
+     * Auto-deactivates premium if premiumExpiresAt is in the past but flag is still set.
      *
      * @param userId user ID
      * @return subscription status
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public SubscriptionStatusResponse getStatus(Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -104,6 +105,13 @@ public class SubscriptionService {
 
         if (active.isPresent()) {
             return buildStatusResponse(user, active.get());
+        }
+
+        // Auto-deactivate if DB flag is set but expiry has passed (data inconsistency guard)
+        if (user.getPremiumExpiresAt() != null
+                && user.getPremiumExpiresAt().isBefore(LocalDateTime.now())) {
+            user.deactivatePremium();
+            userRepository.save(user);
         }
 
         return SubscriptionStatusResponse.builder()
@@ -125,10 +133,8 @@ public class SubscriptionService {
         for (Subscription sub : expired) {
             sub.expire();
             User user = sub.getUser();
-            if (!user.isPremium()) {
-                user.deactivatePremium();
-                userRepository.save(user);
-            }
+            user.deactivatePremium();
+            userRepository.save(user);
         }
 
         if (!expired.isEmpty()) {

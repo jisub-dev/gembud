@@ -22,6 +22,9 @@ import ProfilePage from './pages/ProfilePage';
 import FriendListPage from './pages/FriendListPage';
 import NotificationsPage from './pages/NotificationsPage';
 import PremiumPage from './pages/PremiumPage';
+import AboutPage from './pages/AboutPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsPage from './pages/TermsPage';
 
 // Protected Route Wrapper
 interface ProtectedRouteProps {
@@ -154,6 +157,11 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Static / Policy Pages (Public) */}
+          <Route path="about" element={<AboutPage />} />
+          <Route path="privacy" element={<PrivacyPolicyPage />} />
+          <Route path="terms" element={<TermsPage />} />
         </Route>
 
         {/* Fallback */}

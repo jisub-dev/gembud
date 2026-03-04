@@ -46,8 +46,9 @@ export function useCreateRoom() {
   return useMutation({
     mutationFn: (data: CreateRoomRequest) => roomService.createRoom(data),
     onSuccess: (newRoom) => {
-      // 해당 게임의 방 목록 캐시 무효화
       queryClient.invalidateQueries({ queryKey: roomKeys.list(newRoom.gameId) });
+      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
+      queryClient.invalidateQueries({ queryKey: ['myChatRooms'] });
     },
   });
 }
