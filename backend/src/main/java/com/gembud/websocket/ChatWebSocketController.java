@@ -55,6 +55,12 @@ public class ChatWebSocketController {
         try {
             Long userId = extractUserId(principal);
 
+            if (!chatRoomId.equals(request.getChatRoomId())) {
+                messagingTemplate.convertAndSendToUser(
+                    principal.getName(), "/queue/errors", "chatRoomId mismatch");
+                return;
+            }
+
             log.debug("Received message from user {} to chat room {}: {}",
                 userId, chatRoomId, request.getMessage());
 

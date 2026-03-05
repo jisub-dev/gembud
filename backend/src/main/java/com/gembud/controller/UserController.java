@@ -2,6 +2,8 @@ package com.gembud.controller;
 
 import com.gembud.dto.ApiResponse;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
 import com.gembud.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -85,6 +87,11 @@ public class UserController {
     ) {
         User user = userRepository.findByEmail(userDetails.getEmail())
             .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        if (!user.getNickname().equals(request.getNickname())
+                && userRepository.existsByNickname(request.getNickname())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        }
 
         user.updateProfile(request.getNickname(), null, null);
         userRepository.save(user);

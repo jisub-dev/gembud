@@ -33,8 +33,11 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtConfig jwtConfig;
 
-    @Value("${app.oauth2.redirect-uri:http://localhost:5173/auth/callback}")
+    @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
     private String redirectUri;
+
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
 
     /**
      * Handles successful OAuth2 authentication.
@@ -74,7 +77,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // Set access token cookie (HTTP-only, Secure, SameSite=Strict)
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
             .httpOnly(true)
-            .secure(true)  // HTTPS only
+            .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getAccessTokenExpiration() / 1000)  // seconds
             .sameSite("Strict")
@@ -83,7 +86,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // Set refresh token cookie (HTTP-only, Secure, SameSite=Strict)
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
             .httpOnly(true)
-            .secure(true)  // HTTPS only
+            .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getRefreshTokenExpiration() / 1000)  // seconds
             .sameSite("Strict")

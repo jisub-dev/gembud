@@ -67,6 +67,11 @@ public class RoomService {
             throw new BusinessException(ErrorCode.LOW_TEMPERATURE);
         }
 
+        // Check if user is already in an active room
+        if (participantRepository.existsActiveParticipationByUserId(user.getId())) {
+            throw new BusinessException(ErrorCode.ALREADY_IN_OTHER_ROOM);
+        }
+
         Game game = gameRepository.findById(request.getGameId())
             .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
@@ -313,6 +318,13 @@ public class RoomService {
 
         room.close();
         roomRepository.save(room);
+
+        try {
+            Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+            broadcastRoomUpdate(chatRoomId);
+        } catch (BusinessException e) {
+            // No chat room linked — proceed silently
+        }
     }
 
     /**

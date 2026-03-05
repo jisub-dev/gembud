@@ -29,7 +29,11 @@ springdoc:
 
 app:
   oauth2:
-    redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/auth/callback}
+    redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth2/callback}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
+  websocket:
+    allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173}
 
 logging:
   level:

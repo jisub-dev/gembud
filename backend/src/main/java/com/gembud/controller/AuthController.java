@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -38,6 +39,9 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtConfig jwtConfig;
+
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
 
     /**
      * Registers a new user.
@@ -135,7 +139,7 @@ public class AuthController {
         // Set new access token cookie
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", authResponse.getAccessToken())
             .httpOnly(true)
-            .secure(true)
+            .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getAccessTokenExpiration() / 1000)
             .sameSite("Strict")
@@ -162,7 +166,7 @@ public class AuthController {
         // Clear access token cookie
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", "")
             .httpOnly(true)
-            .secure(true)
+            .secure(cookieSecure)
             .path("/")
             .maxAge(0)
             .sameSite("Strict")
@@ -171,7 +175,7 @@ public class AuthController {
         // Clear refresh token cookie
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", "")
             .httpOnly(true)
-            .secure(true)
+            .secure(cookieSecure)
             .path("/")
             .maxAge(0)
             .sameSite("Strict")
@@ -193,7 +197,7 @@ public class AuthController {
     private void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
             .httpOnly(true)
-            .secure(true)
+            .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getAccessTokenExpiration() / 1000)
             .sameSite("Strict")
@@ -201,7 +205,7 @@ public class AuthController {
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
             .httpOnly(true)
-            .secure(true)
+            .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getRefreshTokenExpiration() / 1000)
             .sameSite("Strict")

@@ -36,6 +36,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -72,6 +73,9 @@ class RoomServiceTest {
 
     @Mock
     private ChatService chatService;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private RoomService roomService;
@@ -122,6 +126,7 @@ class RoomServiceTest {
 
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(temperatureService.canCreateRoom(1L)).thenReturn(true);
+        when(participantRepository.existsActiveParticipationByUserId(1L)).thenReturn(false);
         when(gameRepository.findById(1L)).thenReturn(Optional.of(game));
         when(roomRepository.save(any(Room.class))).thenAnswer(inv -> {
             Room r = inv.getArgument(0);
@@ -214,7 +219,7 @@ class RoomServiceTest {
         // Then
         assertThat(response).isNotNull();
         verify(participantRepository).save(any(RoomParticipant.class));
-        verify(chatService).addMemberToChatRoom(10L, 2L);
+        verify(chatService).addMemberToChatRoomInternal(10L, 2L);
     }
 
     @Test
@@ -343,6 +348,7 @@ class RoomServiceTest {
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(participantRepository.findByRoomIdAndUserId(1L, 1L)).thenReturn(Optional.of(hostParticipant));
         when(roomRepository.save(any(Room.class))).thenReturn(room);
+        when(chatService.getChatRoomByGameRoomId(1L)).thenReturn(10L);
 
         // When
         roomService.closeRoom(1L, "user@example.com");
