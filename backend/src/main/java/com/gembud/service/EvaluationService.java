@@ -1,50 +1,23 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.EvaluationRequest;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.EvaluationResponse;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Evaluation;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.RoomParticipant;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.repository.EvaluationRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomParticipantRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.List;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 
 /**
  * Service for evaluation operations.
@@ -93,12 +66,12 @@ public class EvaluationService {
         // Check if evaluator was in the room
         RoomParticipant evaluatorParticipant = participantRepository
             .findByRoomIdAndUserId(roomId, evaluator.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Evaluator was not in this room"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.EVALUATOR_NOT_IN_ROOM));
 
         // Check if evaluated was in the room
         RoomParticipant evaluatedParticipant = participantRepository
             .findByRoomIdAndUserId(roomId, evaluated.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Evaluated user was not in this room"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.EVALUATED_NOT_IN_ROOM));
 
         // Check if already evaluated
         if (evaluationRepository.findByRoomIdAndEvaluatorIdAndEvaluatedId(
@@ -170,14 +143,14 @@ public class EvaluationService {
     @Transactional(readOnly = true)
     public List<Long> getEvaluatableParticipants(Long roomId, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         // Check if user was in the room
         participantRepository.findByRoomIdAndUserId(roomId, user.getId())
-            .orElseThrow(() -> new IllegalArgumentException("User was not in this room"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.EVALUATOR_NOT_IN_ROOM));
 
         // Get all participants except self
         List<RoomParticipant> participants = participantRepository.findByRoomId(roomId);
@@ -223,7 +196,7 @@ public class EvaluationService {
      */
     private void updateTemperatureWithWeight(Long evaluatedId, Evaluation evaluation, Long evaluatorId) {
         User user = userRepository.findById(evaluatedId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         double averageScore = evaluation.getAverageScore();
         java.math.BigDecimal weightedDelta = temperatureService.calculateWeightedTemperatureDelta(

@@ -1,44 +1,20 @@
 package com.gembud.service;
 
 import com.gembud.entity.Report;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Report.ReportCategory;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Report.ReportPriority;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Report.ReportStatus;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ReportRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.RoomRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.List;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.stereotype.Service;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
@@ -94,7 +70,7 @@ public class ReportService {
         Room room = null;
         if (roomId != null) {
             room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
             // Check if already reported in this room
             if (reportRepository.existsByReporterIdAndReportedIdAndRoomId(

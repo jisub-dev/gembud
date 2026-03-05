@@ -47,5 +47,20 @@ export const roomService = {
     const response = await api.get<ApiResponse<Room[]>>('/rooms/my');
     return response.data.data;
   },
+
+  // 참여자 강퇴 (방장만)
+  async kickParticipant(roomId: number, userId: number): Promise<void> {
+    await api.post(`/rooms/${roomId}/kick/${userId}`);
+  },
+
+  // 방 시작 (방장만)
+  async startRoom(roomId: number): Promise<void> {
+    await api.post(`/rooms/${roomId}/start`);
+  },
+
+  // 방장 이전 (방장만)
+  async transferHost(roomId: number, userId: number): Promise<void> {
+    await api.post(`/rooms/${roomId}/transfer/${userId}`);
+  },
 };
 export default roomService;

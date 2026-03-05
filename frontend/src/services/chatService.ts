@@ -20,10 +20,10 @@ export const chatService = {
 
   // 게임 룸의 채팅룸 ID 조회
   async getChatRoomByGameRoom(gameRoomId: number): Promise<number> {
-    const response = await api.get<ApiResponse<{ chatRoomId: number }>>(
+    const response = await api.get<ApiResponse<number>>(
       `/chat/rooms/by-game-room/${gameRoomId}`
     );
-    return response.data.data.chatRoomId;
+    return response.data.data;
   },
 
   // 1:1 채팅방 생성

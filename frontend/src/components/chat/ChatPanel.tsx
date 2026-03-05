@@ -7,15 +7,16 @@ import { useAuthStore } from '@/store/authStore';
 import type { ChatMessage } from '@/types/chat';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
-const WS_URL = API_BASE_URL.replace('/api', '') + '/ws';
+const WS_URL = API_BASE_URL + '/ws';
 
 interface ChatPanelProps {
   chatRoomId: number;
   canChat?: boolean;
   className?: string;
+  onRoomUpdate?: () => void;
 }
 
-export function ChatPanel({ chatRoomId, canChat = true, className = '' }: ChatPanelProps) {
+export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUpdate }: ChatPanelProps) {
   const { user } = useAuthStore();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -27,41 +28,63 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '' }: ChatPa
   const stompClientRef = useRef<Client | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const onRoomUpdateRef = useRef(onRoomUpdate);
+  useEffect(() => { onRoomUpdateRef.current = onRoomUpdate; }, [onRoomUpdate]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   useEffect(() => {
+    if (!canChat) return;
     chatService.getMessages(chatRoomId, 50)
-      .then((history) => setMessages(history))
+      .then((history) => setMessages([...history].reverse()))
       .catch(() => {});
-  }, [chatRoomId]);
+  }, [chatRoomId, canChat]);
 
   useEffect(() => {
+    // StrictMode에서 double-invoke 방지: 이전 클라이언트가 아직 살아있으면 먼저 정리
+    if (stompClientRef.current) {
+      stompClientRef.current.deactivate();
+      stompClientRef.current = null;
+    }
+
+    let active = true; // cleanup 후 콜백이 state를 건드리지 않도록
+
     const client = new Client({
       webSocketFactory: () => new SockJS(WS_URL, null, { transports: ['websocket', 'xhr-streaming', 'xhr-polling'] }),
       reconnectDelay: 5000,
       onConnect: () => {
+        if (!active) return;
         setConnected(true);
         setConnecting(false);
         setError(null);
 
         client.subscribe(`/topic/chat/${chatRoomId}`, (frame) => {
+          if (!active) return;
           try {
-            const msg: ChatMessage = JSON.parse(frame.body);
-            setMessages((prev) => [...prev, msg]);
+            const msg = JSON.parse(frame.body);
+            if (msg.type === 'ROOM_UPDATE') {
+              onRoomUpdateRef.current?.();
+              return;
+            }
+            setMessages((prev) => {
+              if (msg.id && prev.some((m: ChatMessage) => m.id === msg.id)) return prev;
+              return [...prev, msg as ChatMessage];
+            });
           } catch {}
         });
 
         client.publish({ destination: `/app/chat.join/${chatRoomId}`, body: '' });
       },
-      onDisconnect: () => setConnected(false),
+      onDisconnect: () => { if (active) setConnected(false); },
       onStompError: (frame) => {
+        if (!active) return;
         setError('연결 실패: ' + (frame.headers?.message || '알 수 없는 오류'));
         setConnecting(false);
       },
       onWebSocketError: () => {
+        if (!active) return;
         setError('WebSocket 연결 실패');
         setConnecting(false);
       },
@@ -71,6 +94,8 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '' }: ChatPa
     client.activate();
 
     return () => {
+      active = false;
+      stompClientRef.current = null;
       if (client.connected) {
         client.publish({ destination: `/app/chat.leave/${chatRoomId}`, body: '' });
       }
@@ -92,7 +117,7 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '' }: ChatPa
   }, [inputText, chatRoomId, canChat]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       sendMessage();
     }
@@ -126,6 +151,7 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '' }: ChatPa
         </span>
       </div>
 
+
       {/* Error */}
       {error && (
         <div className="bg-red-500/20 px-3 py-1.5 text-red-400 text-xs text-center flex-shrink-0">
@@ -147,25 +173,25 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '' }: ChatPa
             return (
               <div key={idx} className="text-center">
                 <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
-                  {msg.senderNickname || `사용자 ${msg.senderId}`}님이{' '}
+                  {msg.username || `사용자 ${msg.userId}`}님이{' '}
                   {msg.message === 'User joined the chat' ? '입장' : '퇴장'}했습니다
                 </span>
               </div>
             );
           }
 
-          const isOwn = user && msg.senderId === user.id;
+          const isOwn = user && msg.userId === user.id;
 
           return (
             <div key={idx} className={`flex items-end gap-1.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
               {!isOwn && (
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                  {msg.senderNickname?.[0] || '?'}
+                  {msg.username?.[0] || '?'}
                 </div>
               )}
               <div className={`flex flex-col max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}>
                 {!isOwn && (
-                  <span className="text-xs text-gray-400 mb-0.5 ml-1">{msg.senderNickname}</span>
+                  <span className="text-xs text-gray-400 mb-0.5 ml-1">{msg.username}</span>
                 )}
                 <div
                   className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed ${

@@ -2,6 +2,8 @@ package com.gembud.service;
 
 import com.gembud.entity.Evaluation;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.repository.EvaluationRepository;
 import com.gembud.repository.UserRepository;
 import java.math.BigDecimal;
@@ -36,7 +38,7 @@ public class TemperatureService {
      */
     public double calculateEvaluatorWeight(Long evaluatorId) {
         User evaluator = userRepository.findById(evaluatorId)
-            .orElseThrow(() -> new IllegalArgumentException("Evaluator not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         double temperature = evaluator.getTemperature().doubleValue();
 
@@ -92,7 +94,7 @@ public class TemperatureService {
     @Transactional
     public void updateTemperatureFromEvaluation(Long userId, Evaluation evaluation) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         double averageScore = evaluation.getAverageScore();
         BigDecimal delta = calculateTemperatureDelta(averageScore);
@@ -131,7 +133,7 @@ public class TemperatureService {
     @Transactional(readOnly = true)
     public boolean canCreateRoom(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return user.getTemperature().compareTo(new BigDecimal("30")) >= 0;
     }
@@ -145,7 +147,7 @@ public class TemperatureService {
     @Transactional(readOnly = true)
     public BigDecimal getUserTemperature(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return user.getTemperature();
     }
@@ -159,7 +161,7 @@ public class TemperatureService {
     @Transactional(readOnly = true)
     public TemperatureStats getTemperatureStats(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         List<Evaluation> evaluations = evaluationRepository.findByEvaluatedId(userId);
 

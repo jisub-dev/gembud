@@ -161,24 +161,55 @@ public class RoomController {
 
     /**
      * Close a room (host only).
-     *
-     * @param roomId room ID
-     * @param userDetails authenticated user
-     * @return no content
      */
     @Operation(summary = "Close room", description = "방 종료 (방장만 가능)")
-    @ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "방 종료 성공"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "방장이 아님"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
-    })
     @DeleteMapping("/{roomId}")
     public ResponseEntity<ApiResponse<Void>> closeRoom(
         @PathVariable Long roomId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         roomService.closeRoom(roomId, userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    /**
+     * Kick a participant from a room (host only).
+     */
+    @Operation(summary = "Kick participant", description = "참여자 강퇴 (방장만 가능)")
+    @PostMapping("/{roomId}/kick/{userId}")
+    public ResponseEntity<ApiResponse<Void>> kickParticipant(
+        @PathVariable Long roomId,
+        @PathVariable Long userId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        roomService.kickParticipant(roomId, userId, userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    /**
+     * Transfer host to another participant (host only).
+     */
+    @Operation(summary = "Transfer host", description = "방장 이전 (방장만 가능)")
+    @PostMapping("/{roomId}/transfer/{userId}")
+    public ResponseEntity<ApiResponse<Void>> transferHost(
+        @PathVariable Long roomId,
+        @PathVariable Long userId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        roomService.transferHost(roomId, userId, userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    /**
+     * Start a room (host only). Changes status to IN_PROGRESS.
+     */
+    @Operation(summary = "Start room", description = "방 시작 (방장만 가능)")
+    @PostMapping("/{roomId}/start")
+    public ResponseEntity<ApiResponse<Void>> startRoom(
+        @PathVariable Long roomId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        roomService.startRoom(roomId, userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

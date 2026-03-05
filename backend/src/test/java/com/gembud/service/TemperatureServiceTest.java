@@ -8,7 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gembud.entity.Evaluation;
+import com.gembud.exception.BusinessException;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
 import com.gembud.repository.EvaluationRepository;
 import com.gembud.repository.UserRepository;
 import java.math.BigDecimal;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Tests for TemperatureService.
@@ -50,11 +53,11 @@ class TemperatureServiceTest {
     @BeforeEach
     void setUp() {
         testUser = User.builder()
-            .id(1L)
             .email("test@example.com")
             .nickname("TestUser")
             .temperature(new BigDecimal("36.5"))
             .build();
+        ReflectionTestUtils.setField(testUser, "id", 1L);
 
         // Average score > 3.5 (positive)
         positiveEvaluation = Evaluation.builder()
@@ -201,8 +204,7 @@ class TemperatureServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             temperatureService.updateTemperatureFromEvaluation(999L, positiveEvaluation))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -252,10 +254,10 @@ class TemperatureServiceTest {
     void canCreateRoom_TemperatureBelow30_ShouldReturnFalse() {
         // Given
         User lowTempUser = User.builder()
-            .id(2L)
             .email("lowtemp@example.com")
             .temperature(new BigDecimal("25.0"))
             .build();
+        ReflectionTestUtils.setField(lowTempUser, "id", 2L);
 
         when(userRepository.findById(2L)).thenReturn(Optional.of(lowTempUser));
 
@@ -271,10 +273,10 @@ class TemperatureServiceTest {
     void canCreateRoom_ExactlyAt30_ShouldReturnTrue() {
         // Given
         User boundaryUser = User.builder()
-            .id(3L)
             .email("boundary@example.com")
             .temperature(new BigDecimal("30.0"))
             .build();
+        ReflectionTestUtils.setField(boundaryUser, "id", 3L);
 
         when(userRepository.findById(3L)).thenReturn(Optional.of(boundaryUser));
 
@@ -293,8 +295,7 @@ class TemperatureServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> temperatureService.canCreateRoom(999L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -318,8 +319,7 @@ class TemperatureServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> temperatureService.getUserTemperature(999L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -370,7 +370,6 @@ class TemperatureServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> temperatureService.getTemperatureStats(999L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 }

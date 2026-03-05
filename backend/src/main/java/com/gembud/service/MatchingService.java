@@ -2,6 +2,8 @@ package com.gembud.service;
 
 import com.gembud.dto.response.RecommendedRoomResponse;
 import com.gembud.entity.Evaluation;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Room;
 import com.gembud.entity.RoomFilter;
 import com.gembud.entity.RoomParticipant;
@@ -55,7 +57,7 @@ public class MatchingService {
         int limit
     ) {
         User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         List<Room> openRooms = roomRepository.findByGameIdAndStatus(
             gameId,

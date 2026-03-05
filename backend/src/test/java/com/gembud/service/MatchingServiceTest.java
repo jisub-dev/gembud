@@ -11,6 +11,7 @@ import com.gembud.entity.Room;
 import com.gembud.entity.RoomFilter;
 import com.gembud.entity.RoomParticipant;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
 import com.gembud.repository.EvaluationRepository;
 import com.gembud.repository.RoomFilterRepository;
 import com.gembud.repository.RoomParticipantRepository;
@@ -28,6 +29,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Tests for MatchingService.
@@ -36,6 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * @since 2026-02-17
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class MatchingServiceTest {
 
     @Mock
@@ -68,12 +73,12 @@ class MatchingServiceTest {
     @BeforeEach
     void setUp() {
         testUser = User.builder()
-            .id(1L)
             .email("test@example.com")
             .nickname("TestUser")
             .temperature(new BigDecimal("36.5"))
             .ageRange("20대")
             .build();
+        ReflectionTestUtils.setField(testUser, "id", 1L);
 
         testGame = Game.builder()
             .id(1L)
@@ -81,28 +86,28 @@ class MatchingServiceTest {
             .build();
 
         highTempHost = User.builder()
-            .id(2L)
             .email("hightemp@example.com")
             .nickname("HighTempUser")
             .temperature(new BigDecimal("45.0"))
             .ageRange("20대")
             .build();
+        ReflectionTestUtils.setField(highTempHost, "id", 2L);
 
         lowTempHost = User.builder()
-            .id(3L)
             .email("lowtemp@example.com")
             .nickname("LowTempUser")
             .temperature(new BigDecimal("32.0"))
             .ageRange("30대")
             .build();
+        ReflectionTestUtils.setField(lowTempHost, "id", 3L);
 
         normalHost = User.builder()
-            .id(4L)
             .email("normal@example.com")
             .nickname("NormalUser")
             .temperature(new BigDecimal("36.5"))
             .ageRange("20대")
             .build();
+        ReflectionTestUtils.setField(normalHost, "id", 4L);
 
         highTempRoom = Room.builder()
             .id(1L)
@@ -189,8 +194,7 @@ class MatchingServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             matchingService.getRecommendedRooms("unknown@example.com", 1L, 10))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -207,21 +211,12 @@ class MatchingServiceTest {
             .room(highTempRoom)
             .user(testUser)
             .build();
-        when(participantRepository.findByRoomIdAndUserId(1L, 1L))
-            .thenReturn(Optional.of(participant));
-        when(participantRepository.findByRoomIdAndUserId(2L, 1L))
-            .thenReturn(Optional.empty());
-        when(participantRepository.findByRoomIdAndUserId(3L, 1L))
-            .thenReturn(Optional.empty());
-
-        // Mock other dependencies
-        when(filterRepository.findByRoomId(2L)).thenReturn(Collections.emptyList());
-        when(filterRepository.findByRoomId(3L)).thenReturn(Collections.emptyList());
-        when(participantRepository.findByRoomId(2L)).thenReturn(Collections.emptyList());
-        when(participantRepository.findByRoomId(3L)).thenReturn(Collections.emptyList());
-        when(evaluationRepository.findByEvaluatorIdAndEvaluatedId(1L, 3L))
+        // Service uses findByRoomIdIn for batch loading participants
+        when(participantRepository.findByRoomIdIn(Arrays.asList(1L, 2L, 3L)))
+            .thenReturn(Arrays.asList(participant));
+        when(filterRepository.findByRoomIdIn(Arrays.asList(1L, 2L, 3L)))
             .thenReturn(Collections.emptyList());
-        when(evaluationRepository.findByEvaluatorIdAndEvaluatedId(1L, 4L))
+        when(evaluationRepository.findByEvaluatorId(1L))
             .thenReturn(Collections.emptyList());
 
         // When

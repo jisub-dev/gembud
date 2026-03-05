@@ -1,8 +1,8 @@
 export interface ChatMessage {
   id: number;
   chatRoomId: number;
-  senderId: number;
-  senderNickname: string;
+  userId: number;
+  username: string;
   message: string;
   createdAt: string;
 }

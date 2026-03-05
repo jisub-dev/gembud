@@ -11,8 +11,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gembud.entity.Notification;
+import com.gembud.exception.BusinessException;
 import com.gembud.entity.Notification.NotificationType;
+import com.gembud.exception.BusinessException;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
 import com.gembud.repository.NotificationRepository;
 import com.gembud.repository.UserRepository;
 import java.math.BigDecimal;
@@ -27,6 +30,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Tests for NotificationService.
@@ -55,11 +59,11 @@ class NotificationServiceTest {
     @BeforeEach
     void setUp() {
         testUser = User.builder()
-            .id(1L)
             .email("test@example.com")
             .nickname("TestUser")
             .temperature(new BigDecimal("36.5"))
             .build();
+        ReflectionTestUtils.setField(testUser, "id", 1L);
 
         testNotification = Notification.builder()
             .id(1L)
@@ -120,8 +124,7 @@ class NotificationServiceTest {
                 "내용",
                 2L
             ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -173,8 +176,7 @@ class NotificationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             notificationService.getMyNotifications("unknown@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -239,8 +241,7 @@ class NotificationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             notificationService.markAsRead(999L, "test@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Notification not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -248,10 +249,11 @@ class NotificationServiceTest {
     void markAsRead_WrongUser_ShouldThrowException() {
         // Given
         User otherUser = User.builder()
-            .id(2L)
             .email("other@example.com")
             .nickname("OtherUser")
             .build();
+        ReflectionTestUtils.setField(otherUser, "id", 2L);
+        ReflectionTestUtils.setField(otherUser, "id", 2L);
 
         when(userRepository.findByEmail("other@example.com"))
             .thenReturn(Optional.of(otherUser));
@@ -261,8 +263,7 @@ class NotificationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             notificationService.markAsRead(1L, "other@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Notification does not belong to user");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -303,7 +304,6 @@ class NotificationServiceTest {
     void deleteNotification_WrongUser_ShouldThrowException() {
         // Given
         User otherUser = User.builder()
-            .id(2L)
             .email("other@example.com")
             .nickname("OtherUser")
             .build();
@@ -316,8 +316,7 @@ class NotificationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             notificationService.deleteNotification(1L, "other@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Notification does not belong to user");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test

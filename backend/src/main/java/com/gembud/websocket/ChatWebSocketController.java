@@ -2,6 +2,7 @@ package com.gembud.websocket;
 
 import com.gembud.dto.request.ChatMessageRequest;
 import com.gembud.dto.response.ChatMessageResponse;
+import com.gembud.security.CustomUserDetails;
 import com.gembud.service.ChatService;
 import java.security.Principal;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
 /**
@@ -25,6 +27,7 @@ public class ChatWebSocketController {
 
     private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.gembud.repository.UserRepository userRepository;
 
     /**
      * Handle incoming chat messages.
@@ -35,6 +38,14 @@ public class ChatWebSocketController {
      * @param request message request
      * @param principal authenticated user
      */
+    private Long extractUserId(Principal principal) {
+        if (principal instanceof UsernamePasswordAuthenticationToken auth
+                && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+            return userDetails.getUserId();
+        }
+        throw new IllegalStateException("Cannot extract user ID from principal");
+    }
+
     @MessageMapping("/chat.send/{chatRoomId}")
     public void sendMessage(
         @DestinationVariable Long chatRoomId,
@@ -42,8 +53,7 @@ public class ChatWebSocketController {
         Principal principal
     ) {
         try {
-            // Extract user ID from principal (assumes user ID is stored in principal name)
-            Long userId = Long.parseLong(principal.getName());
+            Long userId = extractUserId(principal);
 
             log.debug("Received message from user {} to chat room {}: {}",
                 userId, chatRoomId, request.getMessage());
@@ -101,16 +111,19 @@ public class ChatWebSocketController {
         Principal principal
     ) {
         try {
-            Long userId = Long.parseLong(principal.getName());
+            Long userId = extractUserId(principal);
+            String nickname = userRepository.findById(userId)
+                .map(u -> u.getNickname())
+                .orElse("사용자 " + userId);
 
             log.info("User {} joined chat room {}", userId, chatRoomId);
 
-            // Send join notification to all room members
             messagingTemplate.convertAndSend(
                 "/topic/chat/" + chatRoomId,
                 ChatMessageResponse.builder()
                     .chatRoomId(chatRoomId)
                     .userId(userId)
+                    .username(nickname)
                     .message("User joined the chat")
                     .build()
             );
@@ -134,16 +147,19 @@ public class ChatWebSocketController {
         Principal principal
     ) {
         try {
-            Long userId = Long.parseLong(principal.getName());
+            Long userId = extractUserId(principal);
+            String nickname = userRepository.findById(userId)
+                .map(u -> u.getNickname())
+                .orElse("사용자 " + userId);
 
             log.info("User {} left chat room {}", userId, chatRoomId);
 
-            // Send leave notification to all room members
             messagingTemplate.convertAndSend(
                 "/topic/chat/" + chatRoomId,
                 ChatMessageResponse.builder()
                     .chatRoomId(chatRoomId)
                     .userId(userId)
+                    .username(nickname)
                     .message("User left the chat")
                     .build()
             );

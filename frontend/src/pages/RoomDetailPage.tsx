@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Gamepad2, User, Users, Lock, LogOut, LogIn } from 'lucide-react';
-import { useRoom, useJoinRoom, useLeaveRoom } from '@/hooks/queries/useRooms';
+import { useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, Gamepad2, User, Users, Lock, LogOut, LogIn, Play } from 'lucide-react';
+import { useRoom, useJoinRoom, useLeaveRoom, useKickParticipant, useStartRoom, useTransferHost } from '@/hooks/queries/useRooms';
+import { roomKeys } from '@/hooks/queries/useRoomQueries';
 import { RoomParticipants } from '@/components/room/RoomParticipants';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { chatService } from '@/services/chatService';
@@ -13,16 +15,26 @@ import { PasswordModal } from '@/components/room/PasswordModal';
 export function RoomDetailPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
 
   const { data: room, isLoading, error } = useRoom(Number(roomId));
   const joinRoomMutation = useJoinRoom();
   const leaveRoomMutation = useLeaveRoom();
+  const kickMutation = useKickParticipant();
+  const startRoomMutation = useStartRoom();
+  const transferHostMutation = useTransferHost();
   const toast = useToast();
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [kickTarget, setKickTarget] = useState<{ userId: number; nickname: string } | null>(null);
+  const [transferTarget, setTransferTarget] = useState<{ userId: number; nickname: string } | null>(null);
   const [chatRoomId, setChatRoomId] = useState<number | null>(null);
+
+  const handleRoomUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: roomKeys.detail(Number(roomId)) });
+  }, [queryClient, roomId]);
 
   // Load chat room ID linked to this game room
   useEffect(() => {
@@ -32,8 +44,8 @@ export function RoomDetailPage() {
       .catch(() => {});
   }, [roomId]);
 
-  // Check if current user is a participant
   const isParticipant = !!(user && room?.participants?.some((p) => p.userId === user.id));
+  const isHost = !!(user && room?.participants?.some((p) => p.userId === user.id && p.isHost));
 
   const handleJoin = () => {
     if (!room) return;
@@ -82,6 +94,46 @@ export function RoomDetailPage() {
       onError: (error: any) => {
         toast.error(error.response?.data?.message || '나가기에 실패했습니다');
       },
+    });
+  };
+
+  const handleKick = (userId: number, nickname: string) => {
+    setKickTarget({ userId, nickname });
+  };
+
+  const confirmKick = () => {
+    if (!room || !kickTarget) return;
+    setKickTarget(null);
+    kickMutation.mutate(
+      { roomId: room.id, userId: kickTarget.userId },
+      {
+        onSuccess: () => toast.success(`${kickTarget.nickname}님을 강퇴했습니다`),
+        onError: (error: any) => toast.error(error.response?.data?.message || '강퇴에 실패했습니다'),
+      }
+    );
+  };
+
+  const handleTransferHost = (userId: number, nickname: string) => {
+    setTransferTarget({ userId, nickname });
+  };
+
+  const confirmTransferHost = () => {
+    if (!room || !transferTarget) return;
+    setTransferTarget(null);
+    transferHostMutation.mutate(
+      { roomId: room.id, userId: transferTarget.userId },
+      {
+        onSuccess: () => toast.success(`${transferTarget.nickname}님에게 방장을 넘겼습니다`),
+        onError: (error: any) => toast.error(error.response?.data?.message || '방장 이전에 실패했습니다'),
+      }
+    );
+  };
+
+  const handleStart = () => {
+    if (!room) return;
+    startRoomMutation.mutate(room.id, {
+      onSuccess: () => toast.success('게임을 시작했습니다'),
+      onError: (error: any) => toast.error(error.response?.data?.message || '시작에 실패했습니다'),
     });
   };
 
@@ -135,6 +187,23 @@ export function RoomDetailPage() {
         onCancel={() => setShowLeaveConfirm(false)}
         confirmLabel="나가기"
         danger
+      />
+    )}
+    {kickTarget && (
+      <ConfirmModal
+        message={`${kickTarget.nickname}님을 강퇴하시겠습니까?`}
+        onConfirm={confirmKick}
+        onCancel={() => setKickTarget(null)}
+        confirmLabel="강퇴"
+        danger
+      />
+    )}
+    {transferTarget && (
+      <ConfirmModal
+        message={`${transferTarget.nickname}님에게 방장을 넘기시겠습니까?`}
+        onConfirm={confirmTransferHost}
+        onCancel={() => setTransferTarget(null)}
+        confirmLabel="넘기기"
       />
     )}
     <div className="min-h-screen bg-[#0e0e10] text-white">
@@ -203,11 +272,15 @@ export function RoomDetailPage() {
               <RoomParticipants
                 participants={room.participants}
                 maxParticipants={room.maxParticipants}
+                currentUserId={user?.id}
+                isCurrentUserHost={isHost}
+                onKick={isHost ? handleKick : undefined}
+                onTransferHost={isHost ? handleTransferHost : undefined}
               />
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               {room.status === 'OPEN' && !isParticipant && (
                 <button
                   onClick={handleJoin}
@@ -218,7 +291,27 @@ export function RoomDetailPage() {
                   {joinRoomMutation.isPending ? '입장 중...' : '입장하기'}
                 </button>
               )}
-              {isParticipant && (
+              {isHost && room.status === 'OPEN' && (
+                <button
+                  onClick={handleStart}
+                  disabled={startRoomMutation.isPending}
+                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition"
+                >
+                  <Play size={17} />
+                  {startRoomMutation.isPending ? '시작 중...' : '게임 시작'}
+                </button>
+              )}
+              {isHost && (
+                <button
+                  onClick={handleLeave}
+                  disabled={leaveRoomMutation.isPending}
+                  className="flex items-center justify-center gap-2 px-5 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-bold rounded-lg transition"
+                >
+                  <LogOut size={17} />
+                  {leaveRoomMutation.isPending ? '나가는 중...' : '나가기'}
+                </button>
+              )}
+              {isParticipant && !isHost && (
                 <button
                   onClick={handleLeave}
                   disabled={leaveRoomMutation.isPending}
@@ -254,6 +347,7 @@ export function RoomDetailPage() {
                 chatRoomId={chatRoomId}
                 canChat={isParticipant}
                 className="h-[500px] lg:h-[calc(100vh-200px)] lg:sticky lg:top-6"
+                onRoomUpdate={handleRoomUpdate}
               />
             ) : (
               <div className="h-[300px] lg:h-[500px] bg-[#18181b] border border-gray-700 rounded-lg flex items-center justify-center">

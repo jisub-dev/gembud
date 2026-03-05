@@ -1,16 +1,45 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { authService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 
 function OAuth2CallbackPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { handleOAuth2Callback } = useAuthStore();
+  const handled = useRef(false);
 
   useEffect(() => {
-    handleOAuth2Callback(searchParams);
-    navigate('/');
-  }, [searchParams, handleOAuth2Callback, navigate]);
+    if (handled.current) return;
+    handled.current = true;
+
+    const success = searchParams.get('success');
+
+    if (success === 'true') {
+      authService.getCurrentUser()
+        .then((u) => {
+          useAuthStore.setState({
+            user: {
+              id: u.id,
+              email: u.email,
+              nickname: u.nickname,
+              temperature: u.temperature,
+              isPremium: u.isPremium,
+              premiumExpiresAt: u.premiumExpiresAt,
+            },
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          navigate('/', { replace: true });
+        })
+        .catch(() => {
+          useAuthStore.setState({ isLoading: false });
+          navigate('/login', { replace: true });
+        });
+    } else {
+      useAuthStore.setState({ isLoading: false });
+      navigate('/login', { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

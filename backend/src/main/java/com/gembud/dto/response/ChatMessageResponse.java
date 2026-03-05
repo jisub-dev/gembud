@@ -50,6 +50,11 @@ public class ChatMessageResponse {
     private LocalDateTime createdAt;
 
     /**
+     * Message type: "CHAT" for normal messages, "ROOM_UPDATE" for room state changes.
+     */
+    private String type;
+
+    /**
      * Convert ChatMessage entity to response DTO.
      *
      * @param chatMessage chat message entity
@@ -63,6 +68,7 @@ public class ChatMessageResponse {
             .username(chatMessage.getUser().getNickname())
             .message(chatMessage.getMessage())
             .createdAt(chatMessage.getCreatedAt())
+            .type("CHAT")
             .build();
     }
 }

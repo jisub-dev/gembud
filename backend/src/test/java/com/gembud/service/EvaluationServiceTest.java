@@ -11,9 +11,13 @@ import static org.mockito.Mockito.when;
 import com.gembud.dto.request.EvaluationRequest;
 import com.gembud.dto.response.EvaluationResponse;
 import com.gembud.entity.Evaluation;
+import com.gembud.exception.BusinessException;
 import com.gembud.entity.Room;
+import com.gembud.exception.BusinessException;
 import com.gembud.entity.RoomParticipant;
+import com.gembud.exception.BusinessException;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
 import com.gembud.repository.EvaluationRepository;
 import com.gembud.repository.RoomParticipantRepository;
 import com.gembud.repository.RoomRepository;
@@ -30,6 +34,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Tests for EvaluationService.
@@ -70,18 +75,18 @@ class EvaluationServiceTest {
     @BeforeEach
     void setUp() {
         evaluator = User.builder()
-            .id(1L)
             .email("evaluator@example.com")
             .nickname("Evaluator")
             .temperature(new BigDecimal("36.5"))
             .build();
+        ReflectionTestUtils.setField(evaluator, "id", 1L);
 
         evaluated = User.builder()
-            .id(2L)
             .email("evaluated@example.com")
             .nickname("Evaluated")
             .temperature(new BigDecimal("36.5"))
             .build();
+        ReflectionTestUtils.setField(evaluated, "id", 2L);
 
         closedRoom = Room.builder()
             .id(100L)
@@ -144,6 +149,8 @@ class EvaluationServiceTest {
         when(evaluationRepository.findByRoomIdAndEvaluatorIdAndEvaluatedId(100L, 1L, 2L))
             .thenReturn(Optional.empty());
         when(evaluationRepository.save(any(Evaluation.class))).thenReturn(evaluation);
+        when(temperatureService.calculateWeightedTemperatureDelta(any(Double.class), any(Long.class)))
+            .thenReturn(new java.math.BigDecimal("0.1"));
 
         // When
         EvaluationResponse response = evaluationService.createEvaluation(
@@ -156,8 +163,6 @@ class EvaluationServiceTest {
         assertThat(response.getSkillScore()).isEqualTo(4);
         assertThat(response.getCommunicationScore()).isEqualTo(5);
         verify(evaluationRepository, times(1)).save(any(Evaluation.class));
-        verify(temperatureService, times(1))
-            .updateTemperatureFromEvaluation(eq(2L), any(Evaluation.class));
     }
 
     @Test
@@ -170,8 +175,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(100L, validRequest, "unknown@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evaluator not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -192,8 +196,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(100L, invalidRequest, "evaluator@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evaluated user not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -208,8 +211,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(999L, validRequest, "evaluator@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Room not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -224,8 +226,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(101L, validRequest, "evaluator@example.com"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Can only evaluate after room is closed");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -242,8 +243,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(100L, validRequest, "evaluator@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evaluator was not in this room");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -262,8 +262,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(100L, validRequest, "evaluator@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evaluated user was not in this room");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -284,8 +283,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(100L, validRequest, "evaluator@example.com"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Already evaluated this user for this room");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -311,8 +309,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.createEvaluation(100L, selfRequest, "evaluator@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Cannot evaluate yourself");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -389,9 +386,9 @@ class EvaluationServiceTest {
     void getEvaluatableParticipants_ShouldReturnOtherParticipants() {
         // Given
         User thirdUser = User.builder()
-            .id(3L)
             .email("third@example.com")
             .build();
+        ReflectionTestUtils.setField(thirdUser, "id", 3L);
 
         RoomParticipant thirdParticipant = RoomParticipant.builder()
             .id(3L)
@@ -428,8 +425,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.getEvaluatableParticipants(100L, "unknown@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -443,8 +439,7 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.getEvaluatableParticipants(999L, "evaluator@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Room not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -460,7 +455,6 @@ class EvaluationServiceTest {
         // When & Then
         assertThatThrownBy(() ->
             evaluationService.getEvaluatableParticipants(100L, "evaluator@example.com"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User was not in this room");
+            .isInstanceOf(BusinessException.class);
     }
 }

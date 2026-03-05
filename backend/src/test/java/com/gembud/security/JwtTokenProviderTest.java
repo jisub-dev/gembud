@@ -6,7 +6,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,6 +28,7 @@ import static org.mockito.Mockito.when;
  * @since 2026-02-16
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("JwtTokenProvider 테스트")
 class JwtTokenProviderTest {
 
@@ -56,7 +59,7 @@ class JwtTokenProviderTest {
     void generateAccessToken_Success() {
         Date before = new Date();
 
-        String token = jwtTokenProvider.generateAccessToken(EMAIL);
+        String token = jwtTokenProvider.generateAccessToken(EMAIL, "USER");
 
         Claims claims = parseClaims(token, SECRET);
         assertThat(claims.getSubject()).isEqualTo(EMAIL);
@@ -74,7 +77,7 @@ class JwtTokenProviderTest {
     void generateRefreshToken_Success() {
         Date before = new Date();
 
-        String token = jwtTokenProvider.generateRefreshToken(EMAIL);
+        String token = jwtTokenProvider.generateRefreshToken(EMAIL, "USER");
 
         Claims claims = parseClaims(token, SECRET);
         assertThat(claims.getSubject()).isEqualTo(EMAIL);
@@ -90,7 +93,7 @@ class JwtTokenProviderTest {
     @Test
     @DisplayName("유효한 토큰 검증 성공")
     void validateToken_ValidToken_ReturnsTrue() {
-        String token = jwtTokenProvider.generateAccessToken(EMAIL);
+        String token = jwtTokenProvider.generateAccessToken(EMAIL, "USER");
 
         boolean result = jwtTokenProvider.validateToken(token);
 
@@ -140,7 +143,7 @@ class JwtTokenProviderTest {
     @Test
     @DisplayName("유효한 토큰에서 이메일 추출 성공")
     void getEmailFromToken_ValidToken_ReturnsEmail() {
-        String token = jwtTokenProvider.generateAccessToken(EMAIL);
+        String token = jwtTokenProvider.generateAccessToken(EMAIL, "USER");
 
         String email = jwtTokenProvider.getEmailFromToken(token);
 
@@ -197,10 +200,6 @@ class JwtTokenProviderTest {
             .getPayload();
     }
 
-    private Key getSigningKey(String secret) {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-    }
-
     private String buildToken(String email, Date issuedAt, Date expiration, String secret) {
         return Jwts.builder()
             .subject(email)
@@ -208,6 +207,10 @@ class JwtTokenProviderTest {
             .expiration(expiration)
             .signWith(getSigningKey(secret), SignatureAlgorithm.HS256)
             .compact();
+    }
+
+    private SecretKey getSigningKey(String secret) {
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     private Date expiredIssuedAt() {

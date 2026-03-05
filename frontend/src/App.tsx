@@ -44,30 +44,28 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
 }
 
 function App() {
-  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    // 새로고침 시 HTTP-only 쿠키로 세션 복원
-    if (!isAuthenticated) {
-      authService.getCurrentUser()
-        .then((user) => {
-          useAuthStore.setState({
-            user: {
-              id: user.id,
-              email: user.email,
-              nickname: user.nickname,
-              temperature: user.temperature,
-              isPremium: user.isPremium,
-              premiumExpiresAt: user.premiumExpiresAt,
-            },
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        })
-        .catch(() => {
-          useAuthStore.setState({ isLoading: false });
+    // 새로고침 시 HTTP-only 쿠키로 세션 복원 (1회만 실행)
+    authService.getCurrentUser()
+      .then((user) => {
+        useAuthStore.setState({
+          user: {
+            id: user.id,
+            email: user.email,
+            nickname: user.nickname,
+            temperature: user.temperature,
+            isPremium: user.isPremium,
+            premiumExpiresAt: user.premiumExpiresAt,
+          },
+          isAuthenticated: true,
+          isLoading: false,
         });
-    }
+      })
+      .catch(() => {
+        // 비로그인 상태 - 정상적인 경우
+        useAuthStore.setState({ isLoading: false });
+      });
   }, []);
 
   return (

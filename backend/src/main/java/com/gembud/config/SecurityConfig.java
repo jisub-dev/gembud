@@ -63,6 +63,7 @@ public class SecurityConfig {
                     "/login/oauth2/**",
                     "/api/games/**",  // Public access to game list
                     "/games/**",
+                    "/ws/**",         // WebSocket handshake (auth handled at STOMP level)
                     "/v3/api-docs/**",  // Swagger API docs
                     "/swagger-ui/**",   // Swagger UI resources
                     "/swagger-ui.html"  // Swagger UI page

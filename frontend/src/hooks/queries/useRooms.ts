@@ -90,7 +90,6 @@ export function useLeaveRoom() {
 
 /**
  * Hook to close a room (host only).
- * Invalidates all room list caches on success.
  */
 export function useCloseRoom() {
   const queryClient = useQueryClient();
@@ -100,6 +99,51 @@ export function useCloseRoom() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ['myRooms'] });
+    },
+  });
+}
+
+/**
+ * Hook to kick a participant (host only).
+ */
+export function useKickParticipant() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ roomId, userId }: { roomId: number; userId: number }) =>
+      roomService.kickParticipant(roomId, userId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomId) });
+    },
+  });
+}
+
+/**
+ * Hook to start a room (host only).
+ */
+export function useStartRoom() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (roomId: number) => roomService.startRoom(roomId),
+    onSuccess: (_, roomId) => {
+      queryClient.invalidateQueries({ queryKey: roomKeys.detail(roomId) });
+      queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Hook to transfer host to another participant (host only).
+ */
+export function useTransferHost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ roomId, userId }: { roomId: number; userId: number }) =>
+      roomService.transferHost(roomId, userId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomId) });
     },
   });
 }

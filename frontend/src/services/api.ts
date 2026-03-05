@@ -35,22 +35,23 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // /auth/refresh, /auth/login 요청 자체의 401은 재시도하지 않음
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       try {
-        // Call refresh endpoint (cookies are sent automatically)
         await axios.post(
           `${API_BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );
-
-        // Retry original request (new access token cookie will be used)
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - redirect to login
-        window.location.href = '/login';
+        // Refresh 실패 - store 상태만 업데이트 (window.location 사용 금지 → 무한루프 원인)
+        const { useAuthStore } = await import('../store/authStore');
+        useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
         return Promise.reject(refreshError);
       }
     }

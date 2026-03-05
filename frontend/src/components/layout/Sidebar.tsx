@@ -147,24 +147,24 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* 채팅방 섹션 */}
-        {!isCollapsed && isAuthenticated && (
-          <div className="mb-1">
-            <SectionHeader
-              title="채팅방"
-              isOpen={chatsOpen}
-              onToggle={() => setChatsOpen(!chatsOpen)}
-              count={myChatRooms.length}
-            />
-            {chatsOpen && (
-              <div className="px-2 pb-1 space-y-0.5">
-                {myChatRooms.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-text-muted italic">참여 중인 채팅방 없음</p>
-                ) : (
-                  myChatRooms.map((chat) => (
+        {/* 채팅방 섹션: ROOM_CHAT 제외, 남은 항목 없으면 숨김 */}
+        {!isCollapsed && isAuthenticated && (() => {
+          const filteredChatRooms = myChatRooms.filter(c => c.type !== 'ROOM_CHAT');
+          if (filteredChatRooms.length === 0) return null;
+          return (
+            <div className="mb-1">
+              <SectionHeader
+                title="채팅방"
+                isOpen={chatsOpen}
+                onToggle={() => setChatsOpen(!chatsOpen)}
+                count={filteredChatRooms.length}
+              />
+              {chatsOpen && (
+                <div className="px-2 pb-1 space-y-0.5">
+                  {filteredChatRooms.map((chat) => (
                     <Link
                       key={chat.id}
-                      to={chat.relatedRoomId ? `/rooms/${chat.relatedRoomId}` : `/chat/${chat.id}`}
+                      to={`/chat/${chat.id}`}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group"
                     >
                       <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center flex-shrink-0">
@@ -176,17 +176,17 @@ export default function Sidebar() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-cyan transition-colors">
-                          {chat.relatedRoomTitle ?? chat.name ?? `채팅 #${chat.id}`}
+                          {chat.name ?? `채팅 #${chat.id}`}
                         </p>
                         <p className="text-xs text-text-muted">{CHAT_TYPE_LABELS[chat.type]}</p>
                       </div>
                     </Link>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* 구분선 */}
         {!isCollapsed && isAuthenticated && (

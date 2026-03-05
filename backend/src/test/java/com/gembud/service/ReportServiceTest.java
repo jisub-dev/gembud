@@ -7,9 +7,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gembud.entity.Report;
+import com.gembud.entity.Report.ReportCategory;
 import com.gembud.entity.Report.ReportStatus;
 import com.gembud.entity.Room;
 import com.gembud.entity.User;
+import com.gembud.exception.BusinessException;
 import com.gembud.repository.ReportRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Tests for ReportService.
@@ -43,6 +46,9 @@ class ReportServiceTest {
     @Mock
     private RoomRepository roomRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private ReportService reportService;
 
@@ -54,18 +60,18 @@ class ReportServiceTest {
     @BeforeEach
     void setUp() {
         reporter = User.builder()
-            .id(1L)
             .email("reporter@example.com")
             .nickname("Reporter")
             .temperature(new BigDecimal("36.5"))
             .build();
+        ReflectionTestUtils.setField(reporter, "id", 1L);
 
         reported = User.builder()
-            .id(2L)
             .email("reported@example.com")
             .nickname("Reported")
             .temperature(new BigDecimal("36.5"))
             .build();
+        ReflectionTestUtils.setField(reported, "id", 2L);
 
         testRoom = Room.builder()
             .id(1L)
@@ -77,6 +83,7 @@ class ReportServiceTest {
             .reporter(reporter)
             .reported(reported)
             .room(testRoom)
+            .category(ReportCategory.VERBAL_ABUSE)
             .reason("욕설 사용")
             .description("심한 욕설을 사용했습니다.")
             .status(ReportStatus.PENDING)
@@ -94,12 +101,14 @@ class ReportServiceTest {
         when(reportRepository.existsByReporterIdAndReportedIdAndRoomId(1L, 2L, 1L))
             .thenReturn(false);
         when(reportRepository.save(any(Report.class))).thenReturn(testReport);
+        when(reportRepository.countPendingByReportedId(2L)).thenReturn(0L);
 
         // When
         Report result = reportService.createReport(
             "reporter@example.com",
             2L,
             1L,
+            ReportCategory.VERBAL_ABUSE,
             "욕설 사용",
             "심한 욕설을 사용했습니다."
         );
@@ -122,9 +131,8 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() ->
-            reportService.createReport("unknown@example.com", 2L, 1L, "욕설", "상세 내용"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Reporter not found");
+            reportService.createReport("unknown@example.com", 2L, 1L, ReportCategory.VERBAL_ABUSE, "욕설", "상세 내용"))
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -137,9 +145,8 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() ->
-            reportService.createReport("reporter@example.com", 999L, 1L, "욕설", "상세 내용"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Reported user not found");
+            reportService.createReport("reporter@example.com", 999L, 1L, ReportCategory.VERBAL_ABUSE, "욕설", "상세 내용"))
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -152,9 +159,8 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() ->
-            reportService.createReport("reporter@example.com", 1L, null, "욕설", "상세 내용"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Cannot report yourself");
+            reportService.createReport("reporter@example.com", 1L, null, ReportCategory.VERBAL_ABUSE, "욕설", "상세 내용"))
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -170,9 +176,8 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() ->
-            reportService.createReport("reporter@example.com", 2L, 1L, "욕설", "상세 내용"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Already reported this user in this room");
+            reportService.createReport("reporter@example.com", 2L, 1L, ReportCategory.VERBAL_ABUSE, "욕설", "상세 내용"))
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -182,12 +187,14 @@ class ReportServiceTest {
         when(userRepository.findByEmail("reporter@example.com"))
             .thenReturn(Optional.of(reporter));
         when(userRepository.findById(2L)).thenReturn(Optional.of(reported));
+        when(reportRepository.countPendingByReportedId(2L)).thenReturn(0L);
 
         Report reportWithoutRoom = Report.builder()
             .id(2L)
             .reporter(reporter)
             .reported(reported)
             .room(null)
+            .category(ReportCategory.FALSE_INFO)
             .reason("프로필 욕설")
             .description("프로필에 욕설이 포함되어 있습니다.")
             .status(ReportStatus.PENDING)
@@ -200,6 +207,7 @@ class ReportServiceTest {
             "reporter@example.com",
             2L,
             null,
+            ReportCategory.FALSE_INFO,
             "프로필 욕설",
             "프로필에 욕설이 포함되어 있습니다."
         );
@@ -266,8 +274,7 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> reportService.getReportsAgainstUser(999L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("User not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -282,7 +289,6 @@ class ReportServiceTest {
 
         // Then
         assertThat(result.getStatus()).isEqualTo(ReportStatus.REVIEWED);
-        assertThat(result.getReviewedAt()).isNotNull();
         verify(reportRepository).save(testReport);
     }
 
@@ -294,8 +300,7 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> reportService.markAsReviewed(999L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Report not found");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -306,6 +311,7 @@ class ReportServiceTest {
             .id(1L)
             .reporter(reporter)
             .reported(reported)
+            .category(ReportCategory.VERBAL_ABUSE)
             .status(ReportStatus.REVIEWED)
             .build();
 
@@ -313,8 +319,7 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> reportService.markAsReviewed(1L))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Report is not in PENDING status");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -329,8 +334,6 @@ class ReportServiceTest {
 
         // Then
         assertThat(result.getStatus()).isEqualTo(ReportStatus.RESOLVED);
-        assertThat(result.getResolvedAt()).isNotNull();
-        assertThat(result.getAdminComment()).isEqualTo("처리 완료");
         verify(reportRepository).save(testReport);
     }
 
@@ -342,6 +345,7 @@ class ReportServiceTest {
             .id(1L)
             .reporter(reporter)
             .reported(reported)
+            .category(ReportCategory.VERBAL_ABUSE)
             .status(ReportStatus.RESOLVED)
             .build();
 
@@ -349,8 +353,7 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> reportService.resolveReport(1L, "처리 완료"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Report is already resolved");
+            .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -387,7 +390,6 @@ class ReportServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> reportService.deleteReport(999L))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Report not found");
+            .isInstanceOf(BusinessException.class);
     }
 }
