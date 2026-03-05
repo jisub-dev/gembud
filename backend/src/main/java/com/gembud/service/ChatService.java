@@ -256,6 +256,17 @@ public class ChatService {
     }
 
     /**
+     * Check if a user is a member of a chat room.
+     *
+     * @param chatRoomId chat room ID
+     * @param userId user ID
+     * @return true if user is a member
+     */
+    public boolean isChatRoomMember(Long chatRoomId, Long userId) {
+        return chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, userId);
+    }
+
+    /**
      * Create a direct chat room between two users.
      *
      * @param userId1 first user ID

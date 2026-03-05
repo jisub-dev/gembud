@@ -52,7 +52,7 @@ public class User {
     /**
      * User reputation score (0-100), default 36.5 like Karrot Market temperature system
      */
-    @Column(nullable = false, precision = 4, scale = 2)
+    @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal temperature = new BigDecimal("36.5");
 
     @Enumerated(EnumType.STRING)

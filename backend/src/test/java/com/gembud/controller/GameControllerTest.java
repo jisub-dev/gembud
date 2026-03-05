@@ -10,6 +10,7 @@ import com.gembud.dto.ApiResponse;
 import com.gembud.dto.response.GameResponse;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
+import com.gembud.security.JwtTokenProvider;
 import com.gembud.service.GameService;
 import java.util.Arrays;
 import java.util.Collections;
@@ -17,8 +18,10 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -31,6 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * @since 2026-02-26
  */
 @WebMvcTest(GameController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class GameControllerTest {
 
     @Autowired
@@ -38,6 +42,12 @@ class GameControllerTest {
 
     @MockBean
     private GameService gameService;
+
+    @MockBean
+    private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private UserDetailsService userDetailsService;
 
     @Test
     @DisplayName("GET /games - should return all games with ApiResponse wrapper")

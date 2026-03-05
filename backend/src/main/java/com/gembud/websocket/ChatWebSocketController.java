@@ -118,6 +118,13 @@ public class ChatWebSocketController {
     ) {
         try {
             Long userId = extractUserId(principal);
+
+            if (!chatService.isChatRoomMember(chatRoomId, userId)) {
+                messagingTemplate.convertAndSendToUser(
+                    principal.getName(), "/queue/errors", "Not a member of this chat room");
+                return;
+            }
+
             String nickname = userRepository.findById(userId)
                 .map(u -> u.getNickname())
                 .orElse("사용자 " + userId);
@@ -154,6 +161,13 @@ public class ChatWebSocketController {
     ) {
         try {
             Long userId = extractUserId(principal);
+
+            if (!chatService.isChatRoomMember(chatRoomId, userId)) {
+                messagingTemplate.convertAndSendToUser(
+                    principal.getName(), "/queue/errors", "Not a member of this chat room");
+                return;
+            }
+
             String nickname = userRepository.findById(userId)
                 .map(u -> u.getNickname())
                 .orElse("사용자 " + userId);

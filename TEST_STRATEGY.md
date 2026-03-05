@@ -10,7 +10,7 @@
 ### Backend
 - **JUnit 5** + **Mockito** (unit tests)
 - **Spring Boot Test** (integration tests)
-- Run: `cd backend && ./mvnw test`
+- Run: `cd backend && ./gradlew test`
 
 ---
 
@@ -105,11 +105,14 @@ cd frontend && npm test
 # Frontend with coverage
 cd frontend && npm run test:coverage
 
-# Backend unit tests
-cd backend && ./mvnw test
+# Backend all tests
+cd backend && ./gradlew test
 
 # Backend single class
-cd backend && ./mvnw test -Dtest=SubscriptionServiceTest
+cd backend && ./gradlew test --tests "com.gembud.service.SubscriptionServiceTest"
+
+# Backend single method
+cd backend && ./gradlew test --tests "com.gembud.service.RoomServiceTest.createRoom_Valid_ShouldCreate"
 ```
 
 ## Test Coverage Goals
