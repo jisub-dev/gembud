@@ -1,5 +1,6 @@
 package com.gembud.service;
 
+import com.gembud.config.JwtConfig;
 import com.gembud.dto.request.LoginRequest;
 import com.gembud.dto.request.RefreshTokenRequest;
 import com.gembud.dto.request.SignupRequest;
@@ -31,13 +32,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenStore refreshTokenStore;
+    private final JwtConfig jwtConfig;
 
     /**
      * Registers a new user.
      *
      * @param request signup request
      * @return authentication response with tokens
-     * @throws IllegalArgumentException if email or nickname already exists
      */
     @Transactional
     public AuthResponse signup(SignupRequest request) {
@@ -61,6 +63,9 @@ public class AuthService {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), user.getRole().name());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail(), user.getRole().name());
 
+        // Store refresh token — invalidates any previous session
+        refreshTokenStore.save(user.getEmail(), refreshToken, jwtConfig.getRefreshTokenExpiration());
+
         return AuthResponse.builder()
             .accessToken(accessToken)
             .refreshToken(refreshToken)
@@ -74,9 +79,8 @@ public class AuthService {
      *
      * @param request login request
      * @return authentication response with tokens
-     * @throws IllegalArgumentException if credentials are invalid
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(
@@ -86,10 +90,13 @@ public class AuthService {
         );
 
         User user = userRepository.findByEmail(request.getEmail())
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), user.getRole().name());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail(), user.getRole().name());
+
+        // Store refresh token — invalidates any previous session (single-session enforcement)
+        refreshTokenStore.save(user.getEmail(), refreshToken, jwtConfig.getRefreshTokenExpiration());
 
         return AuthResponse.builder()
             .accessToken(accessToken)
@@ -100,13 +107,12 @@ public class AuthService {
     }
 
     /**
-     * Refreshes access token using refresh token.
+     * Refreshes access token using refresh token with rotation.
      *
      * @param request refresh token request
-     * @return authentication response with new access token
-     * @throws IllegalArgumentException if refresh token is invalid
+     * @return authentication response with new tokens
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest request) {
         String refreshToken = request.getRefreshToken();
 
@@ -115,16 +121,36 @@ public class AuthService {
         }
 
         String email = jwtTokenProvider.getEmailFromToken(refreshToken);
+
+        // Validate against Redis — reject if token was already rotated or user logged out
+        String stored = refreshTokenStore.get(email);
+        if (stored == null || !stored.equals(refreshToken)) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         String newAccessToken = jwtTokenProvider.generateAccessToken(email, user.getRole().name());
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(email, user.getRole().name());
+
+        // Rotate: replace old refresh token with new one
+        refreshTokenStore.save(email, newRefreshToken, jwtConfig.getRefreshTokenExpiration());
 
         return AuthResponse.builder()
             .accessToken(newAccessToken)
-            .refreshToken(refreshToken)
+            .refreshToken(newRefreshToken)
             .email(user.getEmail())
             .nickname(user.getNickname())
             .build();
+    }
+
+    /**
+     * Invalidate the stored refresh token for a user (logout).
+     *
+     * @param email user email
+     */
+    public void invalidateRefreshToken(String email) {
+        refreshTokenStore.delete(email);
     }
 }

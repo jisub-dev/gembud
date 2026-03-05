@@ -15,7 +15,6 @@ import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
 // Main Pages
 import HomePage from './pages/HomePage';
 import { RoomListPage } from './pages/RoomListPage';
-import { RoomDetailPage } from './pages/RoomDetailPage';
 import GameDetailPage from './pages/GameDetailPage';
 import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
@@ -25,6 +24,7 @@ import PremiumPage from './pages/PremiumPage';
 import AboutPage from './pages/AboutPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsPage from './pages/TermsPage';
+import ErrorPage from './pages/ErrorPage';
 
 // Protected Route Wrapper
 interface ProtectedRouteProps {
@@ -96,15 +96,8 @@ function App() {
             }
           />
 
-          {/* Room Detail: 방 상세 (Protected) */}
-          <Route
-            path="rooms/:roomId"
-            element={
-              <ProtectedRoute>
-                <RoomDetailPage />
-              </ProtectedRoute>
-            }
-          />
+          {/* Room Detail: deprecated — redirect to home */}
+          <Route path="rooms/:roomId" element={<Navigate to="/" replace />} />
 
           {/* Chat: 채팅 (Protected) */}
           <Route
@@ -160,6 +153,9 @@ function App() {
           <Route path="about" element={<AboutPage />} />
           <Route path="privacy" element={<PrivacyPolicyPage />} />
           <Route path="terms" element={<TermsPage />} />
+
+          {/* Error Pages */}
+          <Route path="error/:code" element={<ErrorPage />} />
         </Route>
 
         {/* Fallback */}

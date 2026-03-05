@@ -75,6 +75,9 @@ public class User {
     @Column(name = "suspended_until")
     private LocalDateTime suspendedUntil;
 
+    @Column(name = "nickname_changed_at")
+    private LocalDateTime nicknameChangedAt;
+
     @Column(name = "is_premium", nullable = false)
     private boolean premium = false;
 
@@ -136,6 +139,26 @@ public class User {
         if (ageRange != null) {
             this.ageRange = ageRange;
         }
+    }
+
+    /**
+     * Check whether user is allowed to change nickname (30-day cooldown).
+     *
+     * @return true if no change has been made, or last change was 30+ days ago
+     */
+    public boolean canChangeNickname() {
+        return nicknameChangedAt == null
+            || nicknameChangedAt.isBefore(LocalDateTime.now().minusDays(30));
+    }
+
+    /**
+     * Update nickname and record the change timestamp.
+     *
+     * @param newNickname new nickname value
+     */
+    public void updateNickname(String newNickname) {
+        this.nickname = newNickname;
+        this.nicknameChangedAt = LocalDateTime.now();
     }
 
     /**

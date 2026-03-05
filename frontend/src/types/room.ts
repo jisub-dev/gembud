@@ -6,6 +6,7 @@ export interface ParticipantInfo {
 
 export interface Room {
   id: number;
+  publicId?: string;
   title: string;
   description: string;
   gameId: number;
@@ -18,6 +19,12 @@ export interface Room {
   createdAt: string;
   participants?: ParticipantInfo[];
   filters?: Record<string, string>;
+  inviteCode?: string;
+}
+
+export interface JoinRoomResult {
+  room: Room;
+  chatRoomId: number;
 }
 
 export interface CreateRoomRequest {

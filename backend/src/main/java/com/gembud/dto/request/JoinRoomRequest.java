@@ -21,4 +21,9 @@ public class JoinRoomRequest {
      * Password for private rooms.
      */
     private String password;
+
+    /**
+     * Invite code for private rooms (alternative to password).
+     */
+    private String inviteCode;
 }

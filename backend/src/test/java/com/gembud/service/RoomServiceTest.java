@@ -295,7 +295,7 @@ class RoomServiceTest {
     // ──────────────────────────────────────────────
 
     @Test
-    @DisplayName("leaveRoom - host leaving last should close room")
+    @DisplayName("leaveRoom - last participant leaving should soft-delete room")
     void leaveRoom_LastParticipant_ShouldCloseRoom() {
         // Given
         Room singleRoom = Room.builder()
@@ -331,55 +331,6 @@ class RoomServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.NOT_IN_ROOM);
-    }
-
-    // ──────────────────────────────────────────────
-    // closeRoom
-    // ──────────────────────────────────────────────
-
-    @Test
-    @DisplayName("closeRoom - host should close room successfully")
-    void closeRoom_Host_ShouldClose() {
-        // Given
-        RoomParticipant hostParticipant = RoomParticipant.builder()
-            .room(room).user(user).isHost(true).joinOrder(1).build();
-
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
-        when(participantRepository.findByRoomIdAndUserId(1L, 1L)).thenReturn(Optional.of(hostParticipant));
-        when(roomRepository.save(any(Room.class))).thenReturn(room);
-        when(chatService.getChatRoomByGameRoomId(1L)).thenReturn(10L);
-
-        // When
-        roomService.closeRoom(1L, "user@example.com");
-
-        // Then
-        assertThat(room.getStatus()).isEqualTo(Room.RoomStatus.CLOSED);
-        verify(roomRepository).save(room);
-    }
-
-    @Test
-    @DisplayName("closeRoom - non-host should throw")
-    void closeRoom_NotHost_ShouldThrow() {
-        // Given
-        User nonHost = User.builder()
-            .email("member@example.com")
-            .nickname("Member")
-            .temperature(new BigDecimal("36.5"))
-            .build();
-        ReflectionTestUtils.setField(nonHost, "id", 3L);
-
-        RoomParticipant memberParticipant = RoomParticipant.builder()
-            .room(room).user(nonHost).isHost(false).joinOrder(2).build();
-
-        when(userRepository.findByEmail("member@example.com")).thenReturn(Optional.of(nonHost));
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
-        when(participantRepository.findByRoomIdAndUserId(1L, 3L)).thenReturn(Optional.of(memberParticipant));
-
-        assertThatThrownBy(() -> roomService.closeRoom(1L, "member@example.com"))
-            .isInstanceOf(BusinessException.class)
-            .extracting("errorCode")
-            .isEqualTo(ErrorCode.NOT_HOST);
     }
 
     // ──────────────────────────────────────────────

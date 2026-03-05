@@ -3,6 +3,7 @@ package com.gembud.security;
 import com.gembud.config.JwtConfig;
 import com.gembud.entity.User;
 import com.gembud.repository.UserRepository;
+import com.gembud.service.RefreshTokenStore;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -32,12 +33,16 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtConfig jwtConfig;
+    private final RefreshTokenStore refreshTokenStore;
 
     @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
     private String redirectUri;
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
+
+    @Value("${app.cookie.same-site:Lax}")
+    private String cookieSameSite;
 
     /**
      * Handles successful OAuth2 authentication.
@@ -80,7 +85,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getAccessTokenExpiration() / 1000)  // seconds
-            .sameSite("Strict")
+            .sameSite(cookieSameSite)
             .build();
 
         // Set refresh token cookie (HTTP-only, Secure, SameSite=Strict)
@@ -89,11 +94,14 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getRefreshTokenExpiration() / 1000)  // seconds
-            .sameSite("Strict")
+            .sameSite(cookieSameSite)
             .build();
 
         response.addHeader("Set-Cookie", accessCookie.toString());
         response.addHeader("Set-Cookie", refreshCookie.toString());
+
+        // Store refresh token in Redis — invalidates any previous session
+        refreshTokenStore.save(user.getEmail(), refreshToken, jwtConfig.getRefreshTokenExpiration());
 
         // Redirect to frontend (URL contains only success flag, no PII/tokens)
         String targetUrl = redirectUri + "?success=true";

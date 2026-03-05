@@ -10,8 +10,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -79,6 +83,25 @@ public class Room {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "public_id", nullable = false, unique = true, length = 36)
+    private String publicId;
+
+    @Column(name = "invite_code", unique = true, length = 32)
+    private String inviteCode;
+
+    @Column(name = "invite_code_expires_at")
+    private LocalDateTime inviteCodeExpiresAt;
+
+    @PrePersist
+    protected void onPrePersist() {
+        if (publicId == null) {
+            publicId = UUID.randomUUID().toString();
+        }
+    }
+
     /**
      * Room status enum.
      */
@@ -119,9 +142,49 @@ public class Room {
     }
 
     /**
+     * Soft-delete the room (all participants left).
+     */
+    public void softDelete() {
+        this.status = RoomStatus.CLOSED;
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    /**
      * Start the game.
      */
     public void start() {
         this.status = RoomStatus.IN_PROGRESS;
+    }
+
+    /**
+     * Generate an invite code valid for the given number of hours.
+     *
+     * @param ttlHours time-to-live in hours
+     */
+    public void generateInviteCode(int ttlHours) {
+        byte[] bytes = new byte[12];
+        new SecureRandom().nextBytes(bytes);
+        this.inviteCode = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        this.inviteCodeExpiresAt = LocalDateTime.now().plusHours(ttlHours);
+    }
+
+    /**
+     * Regenerate invite code, replacing the existing one.
+     *
+     * @param ttlHours time-to-live in hours
+     */
+    public void regenerateInviteCode(int ttlHours) {
+        generateInviteCode(ttlHours);
+    }
+
+    /**
+     * Check if the current invite code is still valid.
+     *
+     * @return true if invite code exists and has not expired
+     */
+    public boolean isInviteCodeValid() {
+        return inviteCode != null
+            && inviteCodeExpiresAt != null
+            && inviteCodeExpiresAt.isAfter(LocalDateTime.now());
     }
 }

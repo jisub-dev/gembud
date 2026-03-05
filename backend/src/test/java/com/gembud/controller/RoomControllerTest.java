@@ -3,11 +3,9 @@ package com.gembud.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Disabled;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -281,34 +279,6 @@ class RoomControllerTest {
         mockMvc.perform(post("/rooms/1/leave"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value(204));
-    }
-
-    @Test
-    @DisplayName("DELETE /rooms/{roomId} - should close room (host only)")
-    @WithMockUser(username = "host@example.com")
-    void closeRoom_Success() throws Exception {
-        // Given
-        doNothing().when(roomService).closeRoom(1L, "host@example.com");
-
-        // When & Then
-        mockMvc.perform(delete("/rooms/1"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value(204));
-    }
-
-    @Test
-    @DisplayName("DELETE /rooms/{roomId} - should return 403 when not host")
-    @WithMockUser(username = "user@example.com")
-    void closeRoom_NotHost() throws Exception {
-        // Given
-        doThrow(new BusinessException(ErrorCode.NOT_HOST))
-            .when(roomService).closeRoom(1L, "user@example.com");
-
-        // When & Then
-        mockMvc.perform(delete("/rooms/1"))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value("ROOM007"))
-            .andExpect(jsonPath("$.message").value("Only host can perform this action"));
     }
 
     @Test

@@ -8,9 +8,13 @@ import { roomKeys } from '@/hooks/queries/useRoomQueries';
 import { RoomGrid } from '@/components/room/RoomGrid';
 import { RoomFilter } from '@/components/room/RoomFilter';
 import { CreateRoomModal } from '@/components/room/CreateRoomModal';
+import { PasswordModal } from '@/components/room/PasswordModal';
 import AdBanner from '@/components/common/AdBanner';
 import { useAds } from '@/hooks/queries/useAds';
 import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/hooks/useToast';
+import { roomService } from '@/services/roomService';
+import type { Room } from '@/types/room';
 
 export function RoomListPage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -19,10 +23,16 @@ export function RoomListPage() {
   const { user } = useAuthStore();
   const { data: ads = [] } = useAds();
   const showAds = !user?.isPremium;
+  const toast = useToast();
 
   const [selectedTiers, setSelectedTiers] = useState<number[]>([]);
   const [selectedPositions, setSelectedPositions] = useState<number[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Auto-join state
+  const [joiningRoom, setJoiningRoom] = useState<Room | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const { data: rooms, isLoading: roomsLoading, error: roomsError } = useRooms(Number(gameId));
   const { game, tierOptions, positionOptions, isLoading: gameLoading } = useGameOptions(Number(gameId));
@@ -57,8 +67,68 @@ export function RoomListPage() {
     });
   }, [rooms, selectedTiers, selectedPositions, tierOptions, positionOptions]);
 
+  const doJoin = async (room: Room, password?: string) => {
+    if (!room.publicId) {
+      toast.error('방 정보를 가져올 수 없습니다');
+      return;
+    }
+
+    setIsJoining(true);
+    try {
+      const result = await roomService.joinRoomByPublicId(room.publicId, password);
+      setShowPasswordModal(false);
+      setJoiningRoom(null);
+      navigate(`/chat/${result.chatRoomId}`);
+    } catch (err: unknown) {
+      const errorCode = extractErrorCode(err);
+      if (errorCode === 'ROOM006' || errorCode === 'ROOM012') {
+        // Invalid password or invite code — keep modal open
+        toast.error(
+          errorCode === 'ROOM012' ? '유효하지 않은 초대코드입니다' : '비밀번호가 올바르지 않습니다',
+        );
+      } else if (errorCode === 'ROOM001') {
+        toast.error('방을 찾을 수 없습니다');
+        setShowPasswordModal(false);
+        setJoiningRoom(null);
+        queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
+      } else if (errorCode === 'ROOM002') {
+        toast.error('방이 꽉 찼습니다');
+        setShowPasswordModal(false);
+        setJoiningRoom(null);
+      } else if (errorCode === 'ROOM010') {
+        toast.error('이미 게임이 시작된 방입니다');
+        setShowPasswordModal(false);
+        setJoiningRoom(null);
+      } else if (errorCode === 'ROOM008') {
+        toast.error('이미 다른 대기방에 참가 중입니다');
+        setShowPasswordModal(false);
+        setJoiningRoom(null);
+      } else {
+        toast.error('방 입장에 실패했습니다');
+        setShowPasswordModal(false);
+        setJoiningRoom(null);
+      }
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
   const handleRoomClick = (roomId: number) => {
-    navigate(`/rooms/${roomId}`);
+    const room = filteredRooms.find(r => r.id === roomId);
+    if (!room) return;
+
+    if (room.isPrivate) {
+      setJoiningRoom(room);
+      setShowPasswordModal(true);
+    } else {
+      setJoiningRoom(room);
+      doJoin(room);
+    }
+  };
+
+  const handlePasswordConfirm = (password: string) => {
+    if (!joiningRoom) return;
+    doJoin(joiningRoom, password);
   };
 
   const handleReset = () => {
@@ -135,7 +205,11 @@ export function RoomListPage() {
           </div>
         )}
 
-        <RoomGrid rooms={filteredRooms} isLoading={roomsLoading} onRoomClick={handleRoomClick} />
+        <RoomGrid
+          rooms={filteredRooms}
+          isLoading={roomsLoading || isJoining}
+          onRoomClick={handleRoomClick}
+        />
 
         {/* Inline banner — 방 5개 이상일 때 목록 아래 */}
         {showAds && filteredRooms.length >= 5 && (
@@ -165,6 +239,28 @@ export function RoomListPage() {
           }}
         />
       )}
+
+      {showPasswordModal && joiningRoom && (
+        <PasswordModal
+          onConfirm={handlePasswordConfirm}
+          onCancel={() => {
+            setShowPasswordModal(false);
+            setJoiningRoom(null);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+function extractErrorCode(err: unknown): string | null {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'response' in err
+  ) {
+    const response = (err as { response?: { data?: { code?: string } } }).response;
+    return response?.data?.code ?? null;
+  }
+  return null;
 }

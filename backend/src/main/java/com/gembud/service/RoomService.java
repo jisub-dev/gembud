@@ -92,6 +92,11 @@ public class RoomService {
             .createdBy(user)
             .build();
 
+        // Generate invite code for private rooms (valid 24 hours)
+        if (Boolean.TRUE.equals(request.getIsPrivate())) {
+            room.generateInviteCode(24);
+        }
+
         roomRepository.save(room);
 
         // Add creator as host
@@ -146,9 +151,25 @@ public class RoomService {
      */
     @Transactional(readOnly = true)
     public List<RoomResponse> getRoomsByGame(Long gameId) {
-        return roomRepository.findByGameIdAndStatus(gameId, Room.RoomStatus.OPEN).stream()
+        return roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(gameId, Room.RoomStatus.OPEN).stream()
             .map(this::buildRoomResponse)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Get room by public ID.
+     *
+     * @param publicId public UUID room identifier
+     * @return room response
+     */
+    @Transactional(readOnly = true)
+    public RoomResponse getRoomByPublicId(String publicId) {
+        Room room = roomRepository.findByPublicId(publicId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+        if (room.getDeletedAt() != null) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_FOUND);
+        }
+        return buildRoomResponse(room);
     }
 
     /**
@@ -161,6 +182,9 @@ public class RoomService {
     public RoomResponse getRoomById(Long roomId) {
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+        if (room.getDeletedAt() != null) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_FOUND);
+        }
         return buildRoomResponse(room);
     }
 
@@ -205,10 +229,19 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ALREADY_IN_ROOM);
         }
 
-        // Verify password if private
-        if (Boolean.TRUE.equals(room.getIsPrivate()) && room.getPassword() != null) {
-            if (request.getPassword() == null ||
-                !passwordEncoder.matches(request.getPassword(), room.getPassword())) {
+        // Verify password or invite code if private
+        if (Boolean.TRUE.equals(room.getIsPrivate())) {
+            boolean hasValidInviteCode = request.getInviteCode() != null
+                && room.isInviteCodeValid()
+                && request.getInviteCode().equals(room.getInviteCode());
+            boolean hasValidPassword = request.getPassword() != null
+                && room.getPassword() != null
+                && passwordEncoder.matches(request.getPassword(), room.getPassword());
+
+            if (!hasValidInviteCode && !hasValidPassword) {
+                if (request.getInviteCode() != null) {
+                    throw new BusinessException(ErrorCode.INVALID_INVITE_CODE);
+                }
                 throw new BusinessException(ErrorCode.INVALID_ROOM_PASSWORD);
             }
         }
@@ -265,9 +298,9 @@ public class RoomService {
         Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
         chatService.removeMemberFromChatRoom(chatRoomId, user.getId());
 
-        // If no participants left, close room
+        // If no participants left, soft-delete room
         if (room.getCurrentParticipants() == 0) {
-            room.close();
+            room.softDelete();
             roomRepository.save(room);
             broadcastRoomUpdate(chatRoomId);
             return;
@@ -293,38 +326,6 @@ public class RoomService {
 
         roomRepository.save(room);
         broadcastRoomUpdate(chatRoomId);
-    }
-
-    /**
-     * Close a room (host only).
-     *
-     * @param roomId room ID
-     * @param userEmail current user email
-     */
-    @Transactional
-    public void closeRoom(Long roomId, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
-
-        RoomParticipant participant = participantRepository.findByRoomIdAndUserId(roomId, user.getId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
-
-        if (!participant.getIsHost()) {
-            throw new BusinessException(ErrorCode.NOT_HOST);
-        }
-
-        room.close();
-        roomRepository.save(room);
-
-        try {
-            Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
-            broadcastRoomUpdate(chatRoomId);
-        } catch (BusinessException e) {
-            // No chat room linked — proceed silently
-        }
     }
 
     /**
@@ -451,6 +452,58 @@ public class RoomService {
         roomRepository.save(room);
     }
 
+    /**
+     * Join a room by public ID.
+     *
+     * @param publicId public room UUID
+     * @param request join room request
+     * @param userEmail current user email
+     * @return updated room response with chat room ID
+     */
+    @Transactional
+    public JoinRoomResult joinRoomByPublicId(String publicId, JoinRoomRequest request, String userEmail) {
+        Room room = roomRepository.findByPublicId(publicId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+        if (room.getDeletedAt() != null) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_FOUND);
+        }
+        RoomResponse roomResponse = joinRoom(room.getId(), request, userEmail);
+        Long chatRoomId = chatService.getChatRoomByGameRoomId(room.getId());
+        return new JoinRoomResult(roomResponse, chatRoomId);
+    }
+
+    /**
+     * Regenerate invite code for a private room (host only).
+     *
+     * @param publicId room public ID
+     * @param hostEmail current user email (must be host)
+     * @return updated room response with new invite code
+     */
+    @Transactional
+    public RoomResponse regenerateInviteCode(String publicId, String hostEmail) {
+        User host = userRepository.findByEmail(hostEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Room room = roomRepository.findByPublicId(publicId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        RoomParticipant hostParticipant = participantRepository.findByRoomIdAndUserId(room.getId(), host.getId())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
+
+        if (!hostParticipant.getIsHost()) {
+            throw new BusinessException(ErrorCode.NOT_HOST);
+        }
+
+        room.regenerateInviteCode(24);
+        roomRepository.save(room);
+        return buildRoomResponse(room);
+    }
+
+    /**
+     * Result object for joinRoomByPublicId.
+     */
+    public record JoinRoomResult(RoomResponse room, Long chatRoomId) {}
+
     private void broadcastRoomUpdate(Long chatRoomId) {
         messagingTemplate.convertAndSend(
             "/topic/chat/" + chatRoomId,
@@ -479,6 +532,7 @@ public class RoomService {
         RoomResponse response = RoomResponse.from(room);
         return RoomResponse.builder()
             .id(response.getId())
+            .publicId(response.getPublicId())
             .gameId(response.getGameId())
             .gameName(response.getGameName())
             .title(response.getTitle())
@@ -491,6 +545,7 @@ public class RoomService {
             .createdAt(response.getCreatedAt())
             .participants(participantInfos)
             .filters(filterMap)
+            .inviteCode(room.isInviteCodeValid() ? room.getInviteCode() : null)
             .build();
     }
 }

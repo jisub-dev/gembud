@@ -22,6 +22,7 @@ import lombok.NoArgsConstructor;
 public class RoomResponse {
 
     private Long id;
+    private String publicId;
     private Long gameId;
     private String gameName;
     private String title;
@@ -34,6 +35,7 @@ public class RoomResponse {
     private LocalDateTime createdAt;
     private List<ParticipantInfo> participants;
     private Map<String, String> filters;
+    private String inviteCode;
 
     /**
      * Convert Room entity to RoomResponse.
@@ -44,6 +46,7 @@ public class RoomResponse {
     public static RoomResponse from(Room room) {
         return RoomResponse.builder()
             .id(room.getId())
+            .publicId(room.getPublicId())
             .gameId(room.getGame().getId())
             .gameName(room.getGame().getName())
             .title(room.getTitle())

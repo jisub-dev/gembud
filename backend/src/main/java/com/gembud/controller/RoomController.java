@@ -5,17 +5,18 @@ import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
 import com.gembud.dto.response.RoomResponse;
 import com.gembud.service.RoomService;
+import com.gembud.service.RoomService.JoinRoomResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -97,12 +98,12 @@ public class RoomController {
     }
 
     /**
-     * Get room by ID.
+     * Get room by numeric ID (legacy).
      *
-     * @param roomId room ID
+     * @param roomId room numeric ID
      * @return room details
      */
-    @Operation(summary = "Get room by ID", description = "방 상세 정보 조회")
+    @Operation(summary = "Get room by ID", description = "방 상세 정보 조회 (numeric ID)")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "방 조회 성공"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
@@ -113,9 +114,21 @@ public class RoomController {
     }
 
     /**
-     * Join a room.
+     * Get room by public ID (UUID).
      *
-     * @param roomId room ID
+     * @param publicId room public UUID
+     * @return room details
+     */
+    @Operation(summary = "Get room by public ID", description = "방 상세 정보 조회 (UUID)")
+    @GetMapping("/public/{publicId}")
+    public ResponseEntity<ApiResponse<RoomResponse>> getRoomByPublicId(@PathVariable String publicId) {
+        return ResponseEntity.ok(ApiResponse.success(roomService.getRoomByPublicId(publicId)));
+    }
+
+    /**
+     * Join a room by numeric ID (legacy).
+     *
+     * @param roomId room numeric ID
      * @param request join room request
      * @param userDetails authenticated user
      * @return updated room
@@ -138,9 +151,32 @@ public class RoomController {
     }
 
     /**
-     * Leave a room.
+     * Join a room by public ID (UUID). Returns roomResponse + chatRoomId.
      *
-     * @param roomId room ID
+     * @param publicId room public UUID
+     * @param request join room request
+     * @param userDetails authenticated user
+     * @return room + chatRoomId
+     */
+    @Operation(summary = "Join room by public ID", description = "방 입장 (UUID, chatRoomId 포함 반환)")
+    @PostMapping("/public/{publicId}/join")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> joinRoomByPublicId(
+        @PathVariable String publicId,
+        @RequestBody JoinRoomRequest request,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        JoinRoomResult result = roomService.joinRoomByPublicId(publicId, request, userDetails.getUsername());
+        Map<String, Object> body = Map.of(
+            "room", result.room(),
+            "chatRoomId", result.chatRoomId()
+        );
+        return ResponseEntity.ok(ApiResponse.success(body));
+    }
+
+    /**
+     * Leave a room by numeric ID.
+     *
+     * @param roomId room numeric ID
      * @param userDetails authenticated user
      * @return no content
      */
@@ -156,19 +192,6 @@ public class RoomController {
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         roomService.leaveRoom(roomId, userDetails.getUsername());
-        return ResponseEntity.ok(ApiResponse.noContent());
-    }
-
-    /**
-     * Close a room (host only).
-     */
-    @Operation(summary = "Close room", description = "방 종료 (방장만 가능)")
-    @DeleteMapping("/{roomId}")
-    public ResponseEntity<ApiResponse<Void>> closeRoom(
-        @PathVariable Long roomId,
-        @AuthenticationPrincipal UserDetails userDetails
-    ) {
-        roomService.closeRoom(roomId, userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
@@ -211,5 +234,22 @@ public class RoomController {
     ) {
         roomService.startRoom(roomId, userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    /**
+     * Regenerate invite code for a private room (host only).
+     *
+     * @param publicId room public UUID
+     * @param userDetails authenticated user (must be host)
+     * @return updated room with new invite code
+     */
+    @Operation(summary = "Regenerate invite code", description = "비공개 방 초대코드 재발급 (방장만 가능)")
+    @PostMapping("/public/{publicId}/invite/regenerate")
+    public ResponseEntity<ApiResponse<RoomResponse>> regenerateInviteCode(
+        @PathVariable String publicId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        RoomResponse response = roomService.regenerateInviteCode(publicId, userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

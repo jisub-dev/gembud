@@ -88,12 +88,17 @@ public class UserController {
         User user = userRepository.findByEmail(userDetails.getEmail())
             .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        if (!user.getNickname().equals(request.getNickname())
-                && userRepository.existsByNickname(request.getNickname())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        if (!user.getNickname().equals(request.getNickname())) {
+            if (!user.canChangeNickname()) {
+                throw new BusinessException(ErrorCode.NICKNAME_CHANGE_COOLDOWN);
+            }
+            if (userRepository.existsByNickname(request.getNickname())) {
+                throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+            }
+            user.updateNickname(request.getNickname());
+        } else {
+            user.updateProfile(null, null, null);
         }
-
-        user.updateProfile(request.getNickname(), null, null);
         userRepository.save(user);
 
         Map<String, Object> data = new HashMap<>();

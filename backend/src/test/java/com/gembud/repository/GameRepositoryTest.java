@@ -2,6 +2,7 @@ package com.gembud.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.gembud.config.TestcontainersConfig;
 import com.gembud.entity.Game;
 import java.util.List;
 import java.util.Optional;
@@ -9,20 +10,25 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Tests for GameRepository.
  *
- * Phase 4: Repository layer testing with @DataJpaTest
+ * Phase 4: Repository layer testing with @DataJpaTest + Testcontainers
  *
  * @author Gembud Team
  * @since 2026-02-26
  */
 @DataJpaTest
 @ActiveProfiles("test")
+@Import(TestcontainersConfig.class)
+@AutoConfigureTestDatabase(replace = Replace.NONE)
 class GameRepositoryTest {
 
     @Autowired
@@ -37,22 +43,23 @@ class GameRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        // Use names that don't conflict with Flyway seed data (V4)
         lol = Game.builder()
-            .name("League of Legends")
+            .name("TestGame_MOBA_01")
             .imageUrl("https://example.com/lol.png")
             .genre("MOBA")
             .description("5v5 team strategy game")
             .build();
 
         pubg = Game.builder()
-            .name("PUBG")
+            .name("TestGame_BattleRoyale_01")
             .imageUrl("https://example.com/pubg.png")
             .genre("Battle Royale")
             .description("Battle royale survival shooting game")
             .build();
 
         valorant = Game.builder()
-            .name("Valorant")
+            .name("TestGame_FPS_01")
             .imageUrl("https://example.com/valorant.png")
             .genre("FPS")
             .description("5v5 tactical shooting game")
@@ -68,7 +75,7 @@ class GameRepositoryTest {
 
         // Then
         assertThat(saved.getId()).isNotNull();
-        assertThat(saved.getName()).isEqualTo("League of Legends");
+        assertThat(saved.getName()).isEqualTo("TestGame_MOBA_01");
         assertThat(saved.getGenre()).isEqualTo("MOBA");
     }
 
@@ -84,7 +91,7 @@ class GameRepositoryTest {
 
         // Then
         assertThat(found).isPresent();
-        assertThat(found.get().getName()).isEqualTo("League of Legends");
+        assertThat(found.get().getName()).isEqualTo("TestGame_MOBA_01");
     }
 
     @Test
@@ -98,7 +105,7 @@ class GameRepositoryTest {
     }
 
     @Test
-    @DisplayName("findAll - should return all games")
+    @DisplayName("findAll - should return all games (including Flyway seed)")
     void findAll_ShouldReturnAllGames() {
         // Given
         entityManager.persist(lol);
@@ -109,10 +116,10 @@ class GameRepositoryTest {
         // When
         List<Game> games = gameRepository.findAll();
 
-        // Then
-        assertThat(games).hasSize(3);
+        // Then - at least our 3 test games should be present (Flyway also seeded 3 games)
+        assertThat(games.size()).isGreaterThanOrEqualTo(3);
         assertThat(games).extracting(Game::getName)
-            .containsExactlyInAnyOrder("League of Legends", "PUBG", "Valorant");
+            .contains("TestGame_MOBA_01", "TestGame_BattleRoyale_01", "TestGame_FPS_01");
     }
 
     @Test
@@ -124,48 +131,47 @@ class GameRepositoryTest {
         entityManager.persist(valorant);
         entityManager.flush();
 
-        // When
-        List<Game> fpsGames = gameRepository.findByGenre("FPS");
+        // When - use unique genre name to avoid interference from Flyway seed data
+        List<Game> mobaGames = gameRepository.findByGenre("MOBA");
 
-        // Then
-        assertThat(fpsGames).hasSize(1);
-        assertThat(fpsGames.get(0).getName()).isEqualTo("Valorant");
-        assertThat(fpsGames.get(0).getGenre()).isEqualTo("FPS");
+        // Then - Flyway seeds "League of Legends" as MOBA, plus our TestGame_MOBA_01
+        assertThat(mobaGames).isNotEmpty();
+        assertThat(mobaGames).extracting(Game::getGenre).containsOnly("MOBA");
     }
 
     @Test
     @DisplayName("findByGenre - should return multiple games for same genre")
     void findByGenre_MultipleGames_ShouldReturnAll() {
-        // Given
-        Game csgo = Game.builder()
-            .name("CS:GO")
-            .genre("FPS")
-            .description("Counter-Strike")
+        // Given — use a genre not seeded by Flyway
+        Game game1 = Game.builder()
+            .name("TestGame_Strategy_01")
+            .genre("Strategy")
+            .description("Strategy game 1")
+            .build();
+        Game game2 = Game.builder()
+            .name("TestGame_Strategy_02")
+            .genre("Strategy")
+            .description("Strategy game 2")
             .build();
 
-        entityManager.persist(valorant);
-        entityManager.persist(csgo);
+        entityManager.persist(game1);
+        entityManager.persist(game2);
         entityManager.flush();
 
         // When
-        List<Game> fpsGames = gameRepository.findByGenre("FPS");
+        List<Game> stratGames = gameRepository.findByGenre("Strategy");
 
         // Then
-        assertThat(fpsGames).hasSize(2);
-        assertThat(fpsGames).extracting(Game::getGenre)
-            .containsOnly("FPS");
+        assertThat(stratGames).hasSize(2);
+        assertThat(stratGames).extracting(Game::getGenre)
+            .containsOnly("Strategy");
     }
 
     @Test
     @DisplayName("findByGenre - should return empty list when no games match")
     void findByGenre_NoMatches_ShouldReturnEmptyList() {
-        // Given
-        entityManager.persist(lol);
-        entityManager.persist(pubg);
-        entityManager.flush();
-
-        // When
-        List<Game> rpgGames = gameRepository.findByGenre("RPG");
+        // When — use a genre that doesn't exist in seed data or test data
+        List<Game> rpgGames = gameRepository.findByGenre("RPG_NONEXISTENT_UNIQUE_GENRE");
 
         // Then
         assertThat(rpgGames).isEmpty();
@@ -189,9 +195,10 @@ class GameRepositoryTest {
     }
 
     @Test
-    @DisplayName("count - should return total number of games")
+    @DisplayName("count - should increase by 3 after saving 3 new games")
     void count_ShouldReturnTotalGames() {
         // Given
+        long countBefore = gameRepository.count();
         entityManager.persist(lol);
         entityManager.persist(pubg);
         entityManager.persist(valorant);
@@ -200,8 +207,8 @@ class GameRepositoryTest {
         // When
         long count = gameRepository.count();
 
-        // Then
-        assertThat(count).isEqualTo(3);
+        // Then - 3 new games added
+        assertThat(count).isEqualTo(countBefore + 3);
     }
 
     @Test

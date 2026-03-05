@@ -17,6 +17,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,6 +44,9 @@ public class AuthController {
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
+
+    @Value("${app.cookie.same-site:Lax}")
+    private String cookieSameSite;
 
     /**
      * Registers a new user.
@@ -136,40 +141,39 @@ public class AuthController {
 
         AuthResponse authResponse = authService.refreshToken(request);
 
-        // Set new access token cookie
-        ResponseCookie accessCookie = ResponseCookie.from("accessToken", authResponse.getAccessToken())
-            .httpOnly(true)
-            .secure(cookieSecure)
-            .path("/")
-            .maxAge(jwtConfig.getAccessTokenExpiration() / 1000)
-            .sameSite("Strict")
-            .build();
-
-        response.addHeader("Set-Cookie", accessCookie.toString());
+        // Set new tokens via cookies (rotation: both access and refresh are replaced)
+        setTokenCookies(response, authResponse.getAccessToken(), authResponse.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
-     * Logs out user by clearing authentication cookies.
+     * Logs out user by clearing authentication cookies and invalidating refresh token.
      *
-     * Phase 12: Clears HTTP-only cookies
+     * Phase 12: Clears HTTP-only cookies and removes Redis session
      *
+     * @param userDetails authenticated user (may be null if already expired)
      * @param response HTTP response for clearing cookies
      * @return empty response
      */
-    @Operation(summary = "Logout", description = "로그아웃 (인증 쿠키 제거)")
+    @Operation(summary = "Logout", description = "로그아웃 (인증 쿠키 제거 + Redis 세션 삭제)")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공")
     })
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<Void>> logout(
+        @AuthenticationPrincipal UserDetails userDetails,
+        HttpServletResponse response
+    ) {
+        if (userDetails != null) {
+            authService.invalidateRefreshToken(userDetails.getUsername());
+        }
         // Clear access token cookie
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", "")
             .httpOnly(true)
             .secure(cookieSecure)
             .path("/")
             .maxAge(0)
-            .sameSite("Strict")
+            .sameSite(cookieSameSite)
             .build();
 
         // Clear refresh token cookie
@@ -178,7 +182,7 @@ public class AuthController {
             .secure(cookieSecure)
             .path("/")
             .maxAge(0)
-            .sameSite("Strict")
+            .sameSite(cookieSameSite)
             .build();
 
         response.addHeader("Set-Cookie", accessCookie.toString());
@@ -200,7 +204,7 @@ public class AuthController {
             .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getAccessTokenExpiration() / 1000)
-            .sameSite("Strict")
+            .sameSite(cookieSameSite)
             .build();
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
@@ -208,7 +212,7 @@ public class AuthController {
             .secure(cookieSecure)
             .path("/")
             .maxAge(jwtConfig.getRefreshTokenExpiration() / 1000)
-            .sameSite("Strict")
+            .sameSite(cookieSameSite)
             .build();
 
         response.addHeader("Set-Cookie", accessCookie.toString());

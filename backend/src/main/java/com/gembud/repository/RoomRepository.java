@@ -2,6 +2,7 @@ package com.gembud.repository;
 
 import com.gembud.entity.Room;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -34,6 +35,15 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> findByGameIdAndStatus(Long gameId, Room.RoomStatus status);
 
     /**
+     * Find non-deleted rooms by game ID and status.
+     *
+     * @param gameId game ID
+     * @param status room status
+     * @return list of rooms
+     */
+    List<Room> findByGameIdAndStatusAndDeletedAtIsNull(Long gameId, Room.RoomStatus status);
+
+    /**
      * Find rooms by status.
      *
      * @param status room status
@@ -49,4 +59,12 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
      */
     @Query("SELECT r FROM Room r WHERE r.createdBy.id = :userId")
     List<Room> findByCreatedBy(@Param("userId") Long userId);
+
+    /**
+     * Find room by public ID (UUID string).
+     *
+     * @param publicId public UUID identifier
+     * @return room optional
+     */
+    Optional<Room> findByPublicId(String publicId);
 }

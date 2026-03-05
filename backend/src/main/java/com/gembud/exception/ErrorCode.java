@@ -28,6 +28,7 @@ public enum ErrorCode {
     LOW_TEMPERATURE(HttpStatus.FORBIDDEN, "USER002", "Temperature too low to create room"),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "USER003", "Nickname already exists"),
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "USER004", "User is suspended"),
+    NICKNAME_CHANGE_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "USER005", "Nickname can only be changed once every 30 days"),
 
     // Game
     GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "GAME001", "Game not found"),
@@ -49,6 +50,7 @@ public enum ErrorCode {
     CANNOT_KICK_HOST(HttpStatus.BAD_REQUEST, "ROOM009", "Cannot kick the host"),
     ROOM_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "ROOM010", "Room is already in progress"),
     CANNOT_TRANSFER_TO_SELF(HttpStatus.BAD_REQUEST, "ROOM011", "Cannot transfer host to yourself"),
+    INVALID_INVITE_CODE(HttpStatus.UNAUTHORIZED, "ROOM012", "Invalid or expired invite code"),
 
     // Evaluation
     ROOM_NOT_CLOSED_FOR_EVALUATION(HttpStatus.BAD_REQUEST, "EVAL001", "Can only evaluate after room is closed"),
