@@ -182,7 +182,7 @@ public class ChatController {
         @PathVariable Long chatRoomId,
         @RequestBody AddMemberRequest request
     ) {
-        chatService.addMemberToChatRoom(chatRoomId, request.getUserId());
+        chatService.addMemberToChatRoom(chatRoomId, request.getUserId(), userDetails.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(null));
     }
 

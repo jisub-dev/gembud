@@ -46,6 +46,9 @@ public enum ErrorCode {
     INVALID_ROOM_PASSWORD(HttpStatus.UNAUTHORIZED, "ROOM006", "Invalid room password"),
     NOT_HOST(HttpStatus.FORBIDDEN, "ROOM007", "Only host can perform this action"),
     ALREADY_IN_OTHER_ROOM(HttpStatus.CONFLICT, "ROOM008", "이미 다른 대기방에 참가 중입니다."),
+    CANNOT_KICK_HOST(HttpStatus.BAD_REQUEST, "ROOM009", "Cannot kick the host"),
+    ROOM_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "ROOM010", "Room is already in progress"),
+    CANNOT_TRANSFER_TO_SELF(HttpStatus.BAD_REQUEST, "ROOM011", "Cannot transfer host to yourself"),
 
     // Evaluation
     ROOM_NOT_CLOSED_FOR_EVALUATION(HttpStatus.BAD_REQUEST, "EVAL001", "Can only evaluate after room is closed"),
@@ -80,6 +83,7 @@ public enum ErrorCode {
     NOT_CHAT_MEMBER(HttpStatus.FORBIDDEN, "CHAT002", "Not a member of this chat room"),
     CHAT_MESSAGE_EMPTY(HttpStatus.BAD_REQUEST, "CHAT003", "Message cannot be empty"),
     UNKNOWN_CHAT_ROOM_TYPE(HttpStatus.INTERNAL_SERVER_ERROR, "CHAT004", "Unknown chat room type"),
+    CHAT_ADD_MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "CHAT005", "채팅방에 멤버를 추가할 권한이 없습니다"),
 
     // Validation
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "VAL001", "Invalid input"),

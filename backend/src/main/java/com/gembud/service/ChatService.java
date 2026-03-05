@@ -178,13 +178,42 @@ public class ChatService {
     }
 
     /**
-     * Add a member to a chat room.
+     * Add a member to a chat room (external API, with authorization check).
      *
-     * @param chatRoomId chat room ID
-     * @param userId user ID
+     * @param chatRoomId  chat room ID
+     * @param userId      user ID to add
+     * @param requesterId ID of the user making the request
      */
     @Transactional
-    public void addMemberToChatRoom(Long chatRoomId, Long userId) {
+    public void addMemberToChatRoom(Long chatRoomId, Long userId, Long requesterId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+
+        switch (chatRoom.getType()) {
+            case ROOM_CHAT:
+            case DIRECT_CHAT:
+                throw new BusinessException(ErrorCode.CHAT_ADD_MEMBER_FORBIDDEN);
+            case GROUP_CHAT:
+                if (chatRoom.getCreatedBy() == null ||
+                    !chatRoom.getCreatedBy().getId().equals(requesterId)) {
+                    throw new BusinessException(ErrorCode.CHAT_ADD_MEMBER_FORBIDDEN);
+                }
+                break;
+            default:
+                throw new BusinessException(ErrorCode.UNKNOWN_CHAT_ROOM_TYPE);
+        }
+
+        addMemberToChatRoomInternal(chatRoomId, userId);
+    }
+
+    /**
+     * Add a member to a chat room (internal use, no authorization check).
+     *
+     * @param chatRoomId chat room ID
+     * @param userId     user ID
+     */
+    @Transactional
+    void addMemberToChatRoomInternal(Long chatRoomId, Long userId) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
@@ -278,6 +307,7 @@ public class ChatService {
         ChatRoom chatRoom = ChatRoom.builder()
             .type(ChatRoom.ChatRoomType.GROUP_CHAT)
             .name(name)
+            .createdBy(creator)
             .build();
         chatRoom = chatRoomRepository.save(chatRoom);
 

@@ -2,6 +2,7 @@ package com.gembud.service;
 
 import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
+import com.gembud.dto.response.ChatMessageResponse;
 import com.gembud.dto.response.RoomResponse;
 import com.gembud.entity.Game;
 import com.gembud.entity.Room;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,7 @@ public class RoomService {
     private final PasswordEncoder passwordEncoder;
     private final TemperatureService temperatureService;
     private final ChatService chatService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Create a new room.
@@ -109,8 +112,8 @@ public class RoomService {
 
         // Create chat room for this game room
         Long chatRoomId = chatService.createChatRoomForGameRoom(room.getId());
-        // Add creator as chat room member
-        chatService.addMemberToChatRoom(chatRoomId, user.getId());
+        // Add creator as chat room member (internal, no auth check)
+        chatService.addMemberToChatRoomInternal(chatRoomId, user.getId());
 
         return buildRoomResponse(room);
     }
@@ -221,9 +224,11 @@ public class RoomService {
         room.incrementParticipants();
         roomRepository.save(room);
 
-        // Add user to chat room
+        // Add user to chat room (internal, no auth check)
         Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
-        chatService.addMemberToChatRoom(chatRoomId, user.getId());
+        chatService.addMemberToChatRoomInternal(chatRoomId, user.getId());
+
+        broadcastRoomUpdate(chatRoomId);
 
         return buildRoomResponse(room);
     }
@@ -259,6 +264,7 @@ public class RoomService {
         if (room.getCurrentParticipants() == 0) {
             room.close();
             roomRepository.save(room);
+            broadcastRoomUpdate(chatRoomId);
             return;
         }
 
@@ -281,6 +287,7 @@ public class RoomService {
         }
 
         roomRepository.save(room);
+        broadcastRoomUpdate(chatRoomId);
     }
 
     /**
@@ -306,6 +313,140 @@ public class RoomService {
 
         room.close();
         roomRepository.save(room);
+    }
+
+    /**
+     * Kick a participant from a room (host only).
+     *
+     * @param roomId room ID
+     * @param targetUserId user ID to kick
+     * @param hostEmail current user email (must be host)
+     */
+    @Transactional
+    public void kickParticipant(Long roomId, Long targetUserId, String hostEmail) {
+        User host = userRepository.findByEmail(hostEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        RoomParticipant hostParticipant = participantRepository.findByRoomIdAndUserId(roomId, host.getId())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
+
+        if (!hostParticipant.getIsHost()) {
+            throw new BusinessException(ErrorCode.NOT_HOST);
+        }
+
+        if (host.getId().equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.CANNOT_KICK_HOST);
+        }
+
+        RoomParticipant target = participantRepository.findByRoomIdAndUserId(roomId, targetUserId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
+
+        participantRepository.delete(target);
+        room.decrementParticipants();
+        roomRepository.save(room);
+
+        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        chatService.removeMemberFromChatRoom(chatRoomId, targetUserId);
+        broadcastRoomUpdate(chatRoomId);
+    }
+
+    /**
+     * Transfer host to another participant (current host only).
+     *
+     * @param roomId room ID
+     * @param targetUserId user ID to become new host
+     * @param hostEmail current host email
+     */
+    @Transactional
+    public void transferHost(Long roomId, Long targetUserId, String hostEmail) {
+        User host = userRepository.findByEmail(hostEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        roomRepository.findById(roomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        RoomParticipant hostParticipant = participantRepository.findByRoomIdAndUserId(roomId, host.getId())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
+
+        if (!hostParticipant.getIsHost()) {
+            throw new BusinessException(ErrorCode.NOT_HOST);
+        }
+
+        if (host.getId().equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.CANNOT_TRANSFER_TO_SELF);
+        }
+
+        RoomParticipant target = participantRepository.findByRoomIdAndUserId(roomId, targetUserId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
+
+        // Demote current host
+        participantRepository.delete(hostParticipant);
+        RoomParticipant demotedHost = RoomParticipant.builder()
+            .id(hostParticipant.getId())
+            .room(hostParticipant.getRoom())
+            .user(hostParticipant.getUser())
+            .isHost(false)
+            .joinOrder(hostParticipant.getJoinOrder())
+            .joinedAt(hostParticipant.getJoinedAt())
+            .build();
+        participantRepository.save(demotedHost);
+
+        // Promote target to host
+        participantRepository.delete(target);
+        RoomParticipant newHost = RoomParticipant.builder()
+            .id(target.getId())
+            .room(target.getRoom())
+            .user(target.getUser())
+            .isHost(true)
+            .joinOrder(target.getJoinOrder())
+            .joinedAt(target.getJoinedAt())
+            .build();
+        participantRepository.save(newHost);
+
+        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        broadcastRoomUpdate(chatRoomId);
+    }
+
+    /**
+     * Start a room (host only). Changes status to IN_PROGRESS.
+     *
+     * @param roomId room ID
+     * @param hostEmail current user email (must be host)
+     */
+    @Transactional
+    public void startRoom(Long roomId, String hostEmail) {
+        User host = userRepository.findByEmail(hostEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        RoomParticipant hostParticipant = participantRepository.findByRoomIdAndUserId(roomId, host.getId())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
+
+        if (!hostParticipant.getIsHost()) {
+            throw new BusinessException(ErrorCode.NOT_HOST);
+        }
+
+        if (room.getStatus() == Room.RoomStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.ROOM_ALREADY_IN_PROGRESS);
+        }
+
+        room.start();
+        roomRepository.save(room);
+    }
+
+    private void broadcastRoomUpdate(Long chatRoomId) {
+        messagingTemplate.convertAndSend(
+            "/topic/chat/" + chatRoomId,
+            ChatMessageResponse.builder()
+                .chatRoomId(chatRoomId)
+                .type("ROOM_UPDATE")
+                .build()
+        );
     }
 
     private RoomResponse buildRoomResponse(Room room) {
