@@ -63,8 +63,8 @@ public class Room {
     @Builder.Default
     private Boolean isPrivate = false;
 
-    @Column(length = 255)
-    private String password;
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

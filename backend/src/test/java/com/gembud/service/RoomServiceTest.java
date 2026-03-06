@@ -290,6 +290,92 @@ class RoomServiceTest {
             .isEqualTo(ErrorCode.ROOM_FULL);
     }
 
+    @Test
+    @DisplayName("joinRoom - should join private room when password matches")
+    void joinRoom_PrivateRoomPasswordMatch_ShouldJoin() {
+        // Given
+        Room privateRoom = Room.builder()
+            .game(game)
+            .title("Private Room")
+            .maxParticipants(5)
+            .currentParticipants(1)
+            .isPrivate(true)
+            .passwordHash("$2a$10$hashed")
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(privateRoom, "id", 4L);
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        JoinRoomRequest request = JoinRoomRequest.builder()
+            .password("correct-password")
+            .build();
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findById(4L)).thenReturn(Optional.of(privateRoom));
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(participantRepository.findByRoomIdAndUserId(4L, 2L)).thenReturn(Optional.empty());
+        when(participantRepository.countByRoomId(4L)).thenReturn(1L);
+        when(passwordEncoder.matches("correct-password", "$2a$10$hashed")).thenReturn(true);
+        when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.save(any(Room.class))).thenReturn(privateRoom);
+        when(chatService.getChatRoomByGameRoomId(4L)).thenReturn(10L);
+        when(participantRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
+        when(filterRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
+
+        // When
+        RoomResponse response = roomService.joinRoom(4L, request, "joiner@example.com");
+
+        // Then
+        assertThat(response).isNotNull();
+        verify(passwordEncoder).matches("correct-password", "$2a$10$hashed");
+        verify(participantRepository).save(any(RoomParticipant.class));
+    }
+
+    @Test
+    @DisplayName("joinRoom - should throw when private room password is invalid")
+    void joinRoom_PrivateRoomPasswordMismatch_ShouldThrow() {
+        // Given
+        Room privateRoom = Room.builder()
+            .game(game)
+            .title("Private Room")
+            .maxParticipants(5)
+            .currentParticipants(1)
+            .isPrivate(true)
+            .passwordHash("$2a$10$hashed")
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(privateRoom, "id", 5L);
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        JoinRoomRequest request = JoinRoomRequest.builder()
+            .password("wrong-password")
+            .build();
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findById(5L)).thenReturn(Optional.of(privateRoom));
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(participantRepository.findByRoomIdAndUserId(5L, 2L)).thenReturn(Optional.empty());
+        when(passwordEncoder.matches("wrong-password", "$2a$10$hashed")).thenReturn(false);
+
+        // When / Then
+        assertThatThrownBy(() -> roomService.joinRoom(5L, request, "joiner@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_ROOM_PASSWORD);
+    }
+
     // ──────────────────────────────────────────────
     // leaveRoom
     // ──────────────────────────────────────────────
