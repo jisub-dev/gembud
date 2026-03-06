@@ -33,6 +33,7 @@
 | `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
 | `feat/t2-publicid-url` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 21:58 |
 | `feat/t3-room-policy` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 21:58 |
+| `feat/t3-spec-remaining` | 🟢 PR 준비 완료 | Terminal 3 | — | 2026-03-06 22:08 (RoomServiceTest + backend test --continue 통과) |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 

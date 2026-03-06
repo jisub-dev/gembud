@@ -305,6 +305,121 @@ class RoomServiceTest {
     }
 
     @Test
+    @DisplayName("joinRoom - should throw ROOM_FULL when participant count reached max even if status is OPEN")
+    void joinRoom_MaxCountReached_StatusOpen_ShouldThrowRoomFull() {
+        Room staleOpenRoom = Room.builder()
+            .game(game)
+            .title("Stale Open Room")
+            .maxParticipants(5)
+            .currentParticipants(5)
+            .isPrivate(false)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(staleOpenRoom, "id", 4L);
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findById(4L)).thenReturn(Optional.of(staleOpenRoom));
+
+        assertThatThrownBy(() -> roomService.joinRoom(4L, new JoinRoomRequest(), "joiner@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.ROOM_FULL);
+    }
+
+    @Test
+    @DisplayName("joinRoomByPublicId - should throw INVALID_INVITE_CODE when invite code expired")
+    void joinRoomByPublicId_ExpiredInviteCode_ShouldThrow() {
+        Room privateRoom = Room.builder()
+            .game(game)
+            .title("Private Room")
+            .maxParticipants(5)
+            .currentParticipants(1)
+            .isPrivate(true)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(privateRoom, "id", 5L);
+        ReflectionTestUtils.setField(privateRoom, "publicId", "public-5");
+        ReflectionTestUtils.setField(privateRoom, "inviteCode", "expired-code");
+        ReflectionTestUtils.setField(privateRoom, "inviteCodeExpiresAt", java.time.LocalDateTime.now().minusMinutes(1));
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        JoinRoomRequest request = JoinRoomRequest.builder()
+            .inviteCode("expired-code")
+            .build();
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByPublicId("public-5")).thenReturn(Optional.of(privateRoom));
+        when(roomRepository.findById(5L)).thenReturn(Optional.of(privateRoom));
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(participantRepository.findByRoomIdAndUserId(5L, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> roomService.joinRoomByPublicId("public-5", request, "joiner@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_INVITE_CODE);
+    }
+
+    @Test
+    @DisplayName("joinRoomByPublicId - should join successfully with valid invite code")
+    void joinRoomByPublicId_ValidInviteCode_ShouldJoin() {
+        Room privateRoom = Room.builder()
+            .game(game)
+            .title("Private Room")
+            .maxParticipants(5)
+            .currentParticipants(1)
+            .isPrivate(true)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(privateRoom, "id", 6L);
+        ReflectionTestUtils.setField(privateRoom, "publicId", "public-6");
+        ReflectionTestUtils.setField(privateRoom, "inviteCode", "valid-code");
+        ReflectionTestUtils.setField(privateRoom, "inviteCodeExpiresAt", java.time.LocalDateTime.now().plusMinutes(10));
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        JoinRoomRequest request = JoinRoomRequest.builder()
+            .inviteCode("valid-code")
+            .build();
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByPublicId("public-6")).thenReturn(Optional.of(privateRoom));
+        when(roomRepository.findById(6L)).thenReturn(Optional.of(privateRoom));
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(participantRepository.findByRoomIdAndUserId(6L, 2L)).thenReturn(Optional.empty());
+        when(participantRepository.countByRoomId(6L)).thenReturn(1L);
+        when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.save(any(Room.class))).thenReturn(privateRoom);
+        when(chatService.getChatRoomByGameRoomId(6L)).thenReturn(60L);
+        when(participantRepository.findByRoomId(6L)).thenReturn(Collections.emptyList());
+        when(filterRepository.findByRoomId(6L)).thenReturn(Collections.emptyList());
+
+        RoomService.JoinRoomResult result = roomService.joinRoomByPublicId("public-6", request, "joiner@example.com");
+
+        assertThat(result).isNotNull();
+        assertThat(result.chatRoomId()).isEqualTo(60L);
+        assertThat(result.room().getId()).isEqualTo(6L);
+        verify(chatService).addMemberToChatRoomInternal(60L, 2L);
+    }
+
+    @Test
     @DisplayName("joinRoom - should join private room when password matches")
     void joinRoom_PrivateRoomPasswordMatch_ShouldJoin() {
         // Given
