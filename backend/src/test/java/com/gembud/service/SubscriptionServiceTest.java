@@ -258,4 +258,34 @@ class SubscriptionServiceTest {
         // Then
         verify(userRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("cleanupExpiredPremiumUsers - should deactivate premium flags by premiumExpiresAt")
+    void cleanupExpiredPremiumUsers_ShouldDeactivate() {
+        User expiredFlagUser = User.builder()
+            .email("expired@example.com")
+            .nickname("ExpiredUser")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        expiredFlagUser.activatePremium(LocalDateTime.now().minusHours(1));
+
+        when(userRepository.findByPremiumTrueAndPremiumExpiresAtBefore(any(LocalDateTime.class)))
+            .thenReturn(List.of(expiredFlagUser));
+
+        subscriptionService.cleanupExpiredPremiumUsers();
+
+        assertThat(expiredFlagUser.isPremium()).isFalse();
+        verify(userRepository).save(expiredFlagUser);
+    }
+
+    @Test
+    @DisplayName("cleanupExpiredPremiumUsers - should do nothing when no expired premium flags")
+    void cleanupExpiredPremiumUsers_NoTargets_ShouldDoNothing() {
+        when(userRepository.findByPremiumTrueAndPremiumExpiresAtBefore(any(LocalDateTime.class)))
+            .thenReturn(Collections.emptyList());
+
+        subscriptionService.cleanupExpiredPremiumUsers();
+
+        verify(userRepository, never()).save(any());
+    }
 }

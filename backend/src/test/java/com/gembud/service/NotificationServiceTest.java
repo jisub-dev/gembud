@@ -332,4 +332,14 @@ class NotificationServiceTest {
         assertThat(count).isEqualTo(10);
         verify(notificationRepository).deleteOldReadNotifications();
     }
+
+    @Test
+    @DisplayName("scheduledCleanupOldNotifications - should run cleanup repository call")
+    void scheduledCleanupOldNotifications_ShouldInvokeCleanup() {
+        when(notificationRepository.deleteOldReadNotifications()).thenReturn(3);
+
+        notificationService.scheduledCleanupOldNotifications();
+
+        verify(notificationRepository).deleteOldReadNotifications();
+    }
 }

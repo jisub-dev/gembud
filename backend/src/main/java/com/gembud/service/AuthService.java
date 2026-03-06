@@ -155,7 +155,8 @@ public class AuthService {
                 if (failedUser != null && !failedUser.isLoginLocked()) {
                     failedUser.lock(loginLockDurationMinutes);
                     userRepository.save(failedUser);
-                    log.warn("Account locked for {} after {} failed attempts", request.getEmail(), attemptCount);
+                    log.warn("Account locked for {} after {} failed attempts",
+                        maskEmail(request.getEmail()), attemptCount);
                     securityEventService.record(EventType.LOGIN_LOCKED, failedUserId, ip,
                         null, "/auth/login", "BLOCKED", "HIGH");
                 }
@@ -247,5 +248,16 @@ public class AuthService {
     public void invalidateRefreshToken(String email) {
         refreshTokenStore.delete(email);
         refreshTokenStore.deleteSession(email);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "unknown";
+        }
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***";
+        }
+        return email.charAt(0) + "***" + email.substring(atIndex);
     }
 }
