@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 22:45 KST (by Claude, main terminal) — 5라운드 시작
+> **Last updated:** 2026-03-06 23:00 KST (by Claude, main terminal) — 6라운드 시작
 
 ---
 
@@ -8,28 +8,30 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `4fcd985` 4라운드 완료 (invite code frontend + auth tests + log masking) |
-| Backend tests | ✅ 239+ passed (2026-03-06 22:45 KST) |
-| Frontend tests | ✅ 24 passed / 0 failed (2026-03-06 22:45 KST) |
-| Frontend build | ✅ success |
+| `main` HEAD | `0910912` 5라운드 완료 (sidebar split + joinRoom rate limit) |
+| Backend tests | ✅ 확인 필요 |
+| Frontend tests | ✅ 확인 필요 |
+| Frontend build | ✅ 확인 필요 |
 
 ### Worktree 구조
 
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-sidebar-split` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-admin-test-fix` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-joinroom-ratelimit` | Terminal 3 |
+| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-ci-github-actions` | Terminal 1 |
+| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-ads-daily-cap` | Terminal 2 |
+| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-spec-final-check` | Terminal 3 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 22:45 |
-| `feat/t1-sidebar-split` | 🔵 진행중 | Terminal 1 | — | 2026-03-06 22:45 |
-| `feat/t2-admin-test-fix` | 🔵 진행중 | Terminal 2 | — | 2026-03-06 22:45 |
-| `feat/t3-joinroom-ratelimit` | 🔵 진행중 | Terminal 3 | — | 2026-03-06 22:45 |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 23:00 |
+| `feat/t1-ci-github-actions` | 🔵 진행중 | Terminal 1 | — | 2026-03-06 23:00 |
+| `feat/t2-ads-daily-cap` | 🔵 진행중 | Terminal 2 | — | 2026-03-06 23:00 |
+| `feat/t3-spec-final-check` | 🔵 진행중 | Terminal 3 | — | 2026-03-06 23:00 |
+| `feat/t1-sidebar-split` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 22:55 |
+| `feat/t3-joinroom-ratelimit` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 22:55 |
 | `feat/t1-invite-code-frontend` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 22:30 |
 | `feat/t2-auth-refresh-tests` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 22:30 |
 | `feat/t3-spec-remaining` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 22:30 |
