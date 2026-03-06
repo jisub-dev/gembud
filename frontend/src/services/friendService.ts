@@ -15,9 +15,9 @@ export const friendService = {
     return response.data.data;
   },
 
-  // 친구 요청 발송 (이메일로)
-  async sendFriendRequest(email: string): Promise<void> {
-    await api.post('/friends/requests', { email });
+  // 친구 요청 발송 (friendId 기준)
+  async sendFriendRequest(friendId: number): Promise<void> {
+    await api.post('/friends/requests', { friendId });
   },
 
   // 친구 요청 수락

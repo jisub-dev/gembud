@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { authService, type SignupRequest, type LoginRequest } from '../services/authService';
 import type { User } from '../types/user';
+import { featureFlags, isPremiumActive } from '@/config/features';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isSessionExpired: boolean;
   error: string | null;
 
   signup: (data: SignupRequest) => Promise<void>;
@@ -19,6 +21,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true, // true until session restore attempt completes
+  isSessionExpired: false,
   error: null,
 
   signup: async (data: SignupRequest) => {
@@ -33,8 +36,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           email: user.email,
           nickname: user.nickname,
           temperature: user.temperature,
-          isPremium: user.isPremium,
-          premiumExpiresAt: user.premiumExpiresAt,
+          isPremium: isPremiumActive(user.isPremium),
+          premiumExpiresAt: featureFlags.premium ? user.premiumExpiresAt : null,
         },
         isAuthenticated: true,
         isLoading: false,
@@ -60,8 +63,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           email: user.email,
           nickname: user.nickname,
           temperature: user.temperature,
-          isPremium: user.isPremium,
-          premiumExpiresAt: user.premiumExpiresAt,
+          isPremium: isPremiumActive(user.isPremium),
+          premiumExpiresAt: featureFlags.premium ? user.premiumExpiresAt : null,
         },
         isAuthenticated: true,
         isLoading: false,
@@ -81,6 +84,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({
         user: null,
         isAuthenticated: false,
+        isSessionExpired: false,
         error: null,
       });
     } catch (error: any) {
@@ -88,6 +92,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({
         user: null,
         isAuthenticated: false,
+        isSessionExpired: false,
         error: null,
       });
     }
@@ -107,8 +112,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             email: u.email,
             nickname: u.nickname,
             temperature: u.temperature,
-            isPremium: u.isPremium,
-            premiumExpiresAt: u.premiumExpiresAt,
+            isPremium: isPremiumActive(u.isPremium),
+            premiumExpiresAt: featureFlags.premium ? u.premiumExpiresAt : null,
           },
           isAuthenticated: true,
         });

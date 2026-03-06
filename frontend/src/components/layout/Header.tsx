@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Bell, ChevronDown, User, LogOut, Crown } from 'lucide-react';
 import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
 import PremiumBadge from '@/components/common/PremiumBadge';
+import { featureFlags } from '@/config/features';
 
 function getTemperatureColor(temperature: number): string {
   if (temperature >= 40) return 'text-neon-cyan';
@@ -68,7 +69,7 @@ export default function Header() {
                     <div className="hidden sm:block text-left">
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-medium text-text-primary">{user.nickname}</p>
-                        {user.isPremium && <PremiumBadge />}
+                        {featureFlags.premium && user.isPremium && <PremiumBadge />}
                       </div>
                       <p className={`text-xs font-gaming ${getTemperatureColor(user.temperature)}`}>
                         {user.temperature}°C
@@ -90,7 +91,7 @@ export default function Header() {
                         <User size={16} className="text-gray-400" />
                         내 프로필
                       </Link>
-                      {!user.isPremium && (
+                      {featureFlags.premium && !user.isPremium && (
                         <Link
                           to="/premium"
                           className="flex items-center gap-3 px-4 py-3 hover:bg-dark-tertiary transition-colors text-yellow-400"

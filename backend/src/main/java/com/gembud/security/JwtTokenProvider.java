@@ -12,6 +12,7 @@ import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
 
@@ -43,7 +44,28 @@ public class JwtTokenProvider {
      * @return signed access token
      */
     public String generateAccessToken(String email, String role) {
-        return generateToken(email, role, jwtConfig.getAccessTokenExpiration());
+        return generateAccessToken(email, role, UUID.randomUUID().toString());
+    }
+
+    /**
+     * Generates an access token with a specific sessionId claim.
+     *
+     * @param email     user email
+     * @param role      user role
+     * @param sessionId session UUID for single-session enforcement
+     * @return signed access token
+     */
+    public String generateAccessToken(String email, String role, String sessionId) {
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + jwtConfig.getAccessTokenExpiration());
+        return Jwts.builder()
+            .subject(email)
+            .claim("role", role)
+            .claim("sessionId", sessionId)
+            .issuedAt(now)
+            .expiration(expiration)
+            .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+            .compact();
     }
 
     /**
@@ -105,6 +127,20 @@ public class JwtTokenProvider {
     }
 
     /**
+     * Extracts the sessionId from the access token.
+     *
+     * @param token JWT to parse
+     * @return sessionId, or null if not present (e.g., old tokens without claim)
+     */
+    public String getSessionIdFromToken(String token) {
+        try {
+            return parseClaims(token).get("sessionId", String.class);
+        } catch (JwtException | IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    /**
      * Checks whether the token has expired.
      *
      * @param token JWT to check
@@ -112,10 +148,17 @@ public class JwtTokenProvider {
      */
     public boolean isTokenExpired(String token) {
         try {
-            Date expiration = parseClaims(token).getExpiration();
+            Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+            Date expiration = claims.getExpiration();
             return expiration.before(new Date());
+        } catch (ExpiredJwtException ex) {
+            return true;
         } catch (JwtException | IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Invalid JWT token", ex);
+            return false;
         }
     }
 

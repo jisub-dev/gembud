@@ -8,7 +8,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/subscriptions")
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+    prefix = "app.feature.premium",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
@@ -39,7 +47,8 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.success(status));
     }
 
-    @Operation(summary = "Activate premium", description = "프리미엄 활성화 (관리자/테스트 전용)")
+    @Operation(summary = "Activate premium", description = "프리미엄 활성화 (관리자 전용)")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/activate")
     public ResponseEntity<ApiResponse<SubscriptionStatusResponse>> activate(
         @AuthenticationPrincipal CustomUserDetails userDetails,

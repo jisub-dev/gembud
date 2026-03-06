@@ -1,6 +1,6 @@
 package com.gembud.dto.request;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,6 +21,11 @@ public class FriendRequest {
     /**
      * Friend user ID.
      */
-    @NotNull(message = "Friend ID is required")
     private Long friendId;
+
+    /**
+     * Friend user email (legacy compatibility).
+     */
+    @Email(message = "Invalid email format")
+    private String email;
 }

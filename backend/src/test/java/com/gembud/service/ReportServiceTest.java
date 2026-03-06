@@ -3,6 +3,7 @@ package com.gembud.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import com.gembud.repository.ReportRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +61,8 @@ class ReportServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(reportService, "duplicateBlockDays", 7);
+
         reporter = User.builder()
             .email("reporter@example.com")
             .nickname("Reporter")
@@ -97,9 +101,10 @@ class ReportServiceTest {
         when(userRepository.findByEmail("reporter@example.com"))
             .thenReturn(Optional.of(reporter));
         when(userRepository.findById(2L)).thenReturn(Optional.of(reported));
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
-        when(reportRepository.existsByReporterIdAndReportedIdAndRoomId(1L, 2L, 1L))
+        when(reportRepository.existsByReporterIdAndReportedIdAndCreatedAtAfter(
+                eq(1L), eq(2L), any(LocalDateTime.class)))
             .thenReturn(false);
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
         when(reportRepository.save(any(Report.class))).thenReturn(testReport);
         when(reportRepository.countPendingByReportedId(2L)).thenReturn(0L);
 
@@ -164,14 +169,14 @@ class ReportServiceTest {
     }
 
     @Test
-    @DisplayName("createReport - should throw exception when already reported in room")
+    @DisplayName("createReport - should throw exception when already reported within 7-day window")
     void createReport_AlreadyReported_ShouldThrowException() {
         // Given
         when(userRepository.findByEmail("reporter@example.com"))
             .thenReturn(Optional.of(reporter));
         when(userRepository.findById(2L)).thenReturn(Optional.of(reported));
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
-        when(reportRepository.existsByReporterIdAndReportedIdAndRoomId(1L, 2L, 1L))
+        when(reportRepository.existsByReporterIdAndReportedIdAndCreatedAtAfter(
+                eq(1L), eq(2L), any(LocalDateTime.class)))
             .thenReturn(true);
 
         // When & Then
@@ -187,6 +192,9 @@ class ReportServiceTest {
         when(userRepository.findByEmail("reporter@example.com"))
             .thenReturn(Optional.of(reporter));
         when(userRepository.findById(2L)).thenReturn(Optional.of(reported));
+        when(reportRepository.existsByReporterIdAndReportedIdAndCreatedAtAfter(
+                eq(1L), eq(2L), any(LocalDateTime.class)))
+            .thenReturn(false);
         when(reportRepository.countPendingByReportedId(2L)).thenReturn(0L);
 
         Report reportWithoutRoom = Report.builder()

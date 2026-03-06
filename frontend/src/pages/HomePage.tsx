@@ -8,6 +8,7 @@ import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import AdBanner from '@/components/common/AdBanner';
 import { useAds } from '@/hooks/queries/useAds';
 import { useState, useEffect } from 'react';
+import { isPremiumActive } from '@/config/features';
 
 /**
  * Home page with game grid and recommended rooms section.
@@ -27,7 +28,7 @@ const HomePage = () => {
 
   const { data: recommendedRooms = [], isLoading: recsLoading } = useRecommendedRooms(selectedGameId, 3);
   const { data: ads = [] } = useAds();
-  const showAds = !user?.isPremium;
+  const showAds = !isPremiumActive(user?.isPremium);
 
   const selectedGame = games.find((g) => g.id === selectedGameId);
 

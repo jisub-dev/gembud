@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 public class RefreshTokenStore {
 
     private static final String KEY_PREFIX = "refresh:";
+    private static final String SESSION_KEY_PREFIX = "session:";
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -51,5 +52,35 @@ public class RefreshTokenStore {
      */
     public void delete(String email) {
         stringRedisTemplate.delete(KEY_PREFIX + email);
+    }
+
+    /**
+     * Save sessionId for an active user session.
+     *
+     * @param email      user email
+     * @param sessionId  UUID session identifier embedded in the access token
+     * @param ttlMillis  TTL matching the access token expiry
+     */
+    public void saveSession(String email, String sessionId, long ttlMillis) {
+        stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + email, sessionId, ttlMillis, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Retrieve the current valid sessionId for a user.
+     *
+     * @param email user email
+     * @return stored sessionId, or null if not present
+     */
+    public String getSession(String email) {
+        return stringRedisTemplate.opsForValue().get(SESSION_KEY_PREFIX + email);
+    }
+
+    /**
+     * Delete the session (e.g., on logout).
+     *
+     * @param email user email
+     */
+    public void deleteSession(String email) {
+        stringRedisTemplate.delete(SESSION_KEY_PREFIX + email);
     }
 }

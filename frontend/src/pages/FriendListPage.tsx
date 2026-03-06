@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { UserPlus, UserCheck, UserX, Users, Send, Trash2, Clock } from 'lucide-react';
 import {
   useFriends,
@@ -12,6 +13,8 @@ import {
 import { useToast } from '@/hooks/useToast';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { Friend, FriendRequest } from '@/types/friend';
+import type { UserSearchResult } from '@/types/user';
+import { userService } from '@/services/userService';
 
 /**
  * Friend list page with friend requests
@@ -21,7 +24,8 @@ import type { Friend, FriendRequest } from '@/types/friend';
  */
 export default function FriendListPage() {
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'sent'>('friends');
-  const [newFriendEmail, setNewFriendEmail] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [removingFriend, setRemovingFriend] = useState<{ id: number; nickname: string } | null>(null);
 
   const { data: friends = [], isLoading: friendsLoading } = useFriends();
@@ -34,14 +38,31 @@ export default function FriendListPage() {
   const removeMutation = useRemoveFriend();
   const toast = useToast();
 
+  const { data: searchedUsers = [], isLoading: searchingUsers } = useQuery({
+    queryKey: ['userSearch', searchQuery],
+    queryFn: () => userService.searchUsers(searchQuery),
+    enabled: searchQuery.trim().length >= 2,
+    staleTime: 30_000,
+  });
+
+  const filteredUsers = searchedUsers.filter((u) => {
+    const idSet = new Set<number>([
+      ...friends.map((f) => f.friendId),
+      ...requests.map((r) => r.userId),
+      ...sentRequests.map((r) => r.friendId),
+    ]);
+    return !idSet.has(u.id);
+  });
+
   const handleSendRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFriendEmail.trim()) return;
+    if (!selectedUser) return;
 
-    sendRequestMutation.mutate(newFriendEmail, {
+    sendRequestMutation.mutate(selectedUser.id, {
       onSuccess: () => {
-        toast.success('친구 요청을 보냈습니다');
-        setNewFriendEmail('');
+        toast.success(`${selectedUser.nickname}님에게 친구 요청을 보냈습니다`);
+        setSearchQuery('');
+        setSelectedUser(null);
       },
       onError: (error: any) => {
         toast.error(error.response?.data?.message || '친구 요청 실패');
@@ -107,21 +128,50 @@ export default function FriendListPage() {
           </h2>
           <div className="flex gap-3">
             <input
-              type="email"
-              value={newFriendEmail}
-              onChange={(e) => setNewFriendEmail(e.target.value)}
-              placeholder="친구 이메일 입력"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedUser(null);
+              }}
+              placeholder="닉네임/이메일로 사용자 검색 (2자 이상)"
               className="flex-1 px-4 py-2 bg-[#0e0e10] border border-gray-600 rounded focus:border-purple-500 focus:outline-none"
             />
             <button
               type="submit"
-              disabled={sendRequestMutation.isPending}
+              disabled={sendRequestMutation.isPending || !selectedUser}
               className="flex items-center gap-2 px-6 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-600 rounded font-semibold transition"
             >
               <Send size={15} />
               {sendRequestMutation.isPending ? '전송 중...' : '요청 보내기'}
             </button>
           </div>
+          {selectedUser && (
+            <p className="mt-2 text-sm text-purple-300">
+              선택됨: {selectedUser.nickname} ({selectedUser.email})
+            </p>
+          )}
+          {searchQuery.trim().length >= 2 && !selectedUser && (
+            <div className="mt-3 max-h-48 overflow-y-auto space-y-2">
+              {searchingUsers ? (
+                <p className="text-sm text-gray-400">검색 중...</p>
+              ) : filteredUsers.length === 0 ? (
+                <p className="text-sm text-gray-400">요청 가능한 사용자가 없습니다</p>
+              ) : (
+                filteredUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => setSelectedUser(user)}
+                    className="w-full text-left px-3 py-2 rounded bg-[#0e0e10] hover:bg-[#1a1a1f] border border-gray-700 transition"
+                  >
+                    <p className="text-sm font-semibold">{user.nickname}</p>
+                    <p className="text-xs text-gray-400">{user.email}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </form>
 
         {/* Tabs */}

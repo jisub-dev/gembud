@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,9 @@ public class MatchingController {
     private static final int MAX_LIMIT_FREE = 10;
     private static final int MAX_LIMIT_PREMIUM = 20;
 
+    @Value("${app.feature.premium.enabled:false}")
+    private boolean premiumFeatureEnabled;
+
     /**
      * Get recommended rooms for a game.
      *
@@ -59,7 +63,8 @@ public class MatchingController {
         User user = userRepository.findByEmail(userDetails.getEmail())
             .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        int maxLimit = user.isPremium() ? MAX_LIMIT_PREMIUM : MAX_LIMIT_FREE;
+        boolean premiumActive = premiumFeatureEnabled && user.isPremium();
+        int maxLimit = premiumActive ? MAX_LIMIT_PREMIUM : MAX_LIMIT_FREE;
         int effectiveLimit = Math.min(limit, maxLimit);
 
         List<RecommendedRoomResponse> recommendations = matchingService.getRecommendedRooms(

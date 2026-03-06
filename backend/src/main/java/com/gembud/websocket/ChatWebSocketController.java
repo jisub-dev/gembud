@@ -61,8 +61,8 @@ public class ChatWebSocketController {
                 return;
             }
 
-            log.debug("Received message from user {} to chat room {}: {}",
-                userId, chatRoomId, request.getMessage());
+            log.debug("Received message from user {} to chat room {}, len={}",
+                userId, chatRoomId, request.getMessage().length());
 
             // Process message through ChatService
             ChatMessageResponse response = chatService.sendMessage(userId, request);

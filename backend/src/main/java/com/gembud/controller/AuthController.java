@@ -7,9 +7,11 @@ import com.gembud.dto.request.RefreshTokenRequest;
 import com.gembud.dto.request.SignupRequest;
 import com.gembud.dto.response.AuthResponse;
 import com.gembud.service.AuthService;
+import com.gembud.service.RateLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtConfig jwtConfig;
+    private final RateLimitService rateLimitService;
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
@@ -98,9 +101,11 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
         @Valid @RequestBody LoginRequest request,
+        HttpServletRequest httpRequest,
         HttpServletResponse response
     ) {
-        AuthResponse authResponse = authService.login(request);
+        String ip = getClientIp(httpRequest);
+        AuthResponse authResponse = authService.login(request, ip);
         setTokenCookies(response, authResponse.getAccessToken(), authResponse.getRefreshToken());
 
         // Remove tokens from response body (Phase 12 security)
@@ -129,17 +134,21 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<Void>> refresh(
         @CookieValue(name = "refreshToken", required = false) String refreshToken,
+        HttpServletRequest httpRequest,
         HttpServletResponse response
     ) {
         if (refreshToken == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
+        String ip = getClientIp(httpRequest);
+        rateLimitService.checkRefreshLimit(ip);
+
         RefreshTokenRequest request = RefreshTokenRequest.builder()
             .refreshToken(refreshToken)
             .build();
 
-        AuthResponse authResponse = authService.refreshToken(request);
+        AuthResponse authResponse = authService.refreshToken(request, ip);
 
         // Set new tokens via cookies (rotation: both access and refresh are replaced)
         setTokenCookies(response, authResponse.getAccessToken(), authResponse.getRefreshToken());
@@ -189,6 +198,17 @@ public class AuthController {
         response.addHeader("Set-Cookie", refreshCookie.toString());
 
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /**
+     * Extract client IP from request, checking X-Forwarded-For header.
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     /**

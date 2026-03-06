@@ -1,5 +1,6 @@
 package com.gembud.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Global exception handler for REST controllers.
@@ -64,6 +66,39 @@ public class GlobalExceptionHandler {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
+        });
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+            .code(ErrorCode.INVALID_INPUT.getCode())
+            .message(ErrorCode.INVALID_INPUT.getMessage())
+            .path(request.getDescription(false).replace("uri=", ""))
+            .details(errors)
+            .build();
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(errorResponse);
+    }
+
+    /**
+     * Handle method-level validation exceptions (e.g. @RequestParam @Max).
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolationException(
+        ConstraintViolationException ex,
+        WebRequest request
+    ) {
+        log.warn("Constraint violation: {}", ex.getMessage());
+
+        Map<String, String> errors = new HashMap<>();
+        ex.getConstraintViolations().forEach(violation -> {
+            String key = violation.getPropertyPath() != null
+                ? violation.getPropertyPath().toString()
+                : "invalid";
+            errors.put(key, violation.getMessage());
         });
 
         ErrorResponse errorResponse = ErrorResponse.builder()
@@ -174,6 +209,30 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
             .status(HttpStatus.CONFLICT)
+            .body(errorResponse);
+    }
+
+    /**
+     * Handle all other exceptions.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFoundException(
+        NoResourceFoundException ex,
+        WebRequest request
+    ) {
+        log.warn("Resource not found: {}", ex.getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.NOT_FOUND.value())
+            .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+            .code("HTTP404")
+            .message("Resource not found")
+            .path(request.getDescription(false).replace("uri=", ""))
+            .build();
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
             .body(errorResponse);
     }
 

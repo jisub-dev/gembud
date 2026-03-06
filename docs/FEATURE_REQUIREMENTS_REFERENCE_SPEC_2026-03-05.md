@@ -136,6 +136,13 @@
 - MUST: 채팅 멤버가 아니면 메시지 조회(REST)도 불가
 - MUST: 방 상세 진입 시 자동 참가 정책 적용(명시적 참가 버튼 제거)
 - MUST: 자동참가 실패 시 상황별 UX를 고정 규칙으로 처리
+- MUST: 좌측 사이드바의 `내 대기방`과 `채팅방`은 도메인을 분리한다.
+  - `내 대기방`: 게임 대기방 기반 `ROOM_CHAT` 진입용
+  - `채팅방`: `DIRECT_CHAT`/`GROUP_CHAT`만 노출 (`ROOM_CHAT` 노출 금지)
+- MUST: `내 대기방` 클릭 시 게임방 ID를 채팅방 ID(`ROOM_CHAT`)로 해석한 뒤 `/chat/{chatRoomId}`로 이동한다.
+  - 1순위: `/chat/rooms/my`의 `type=ROOM_CHAT` + `relatedRoomId` 매핑 사용
+  - 2순위(보정): `/chat/rooms/by-game-room/{roomId}` 조회
+- MUST: `내 대기방` 클릭 시 매핑/조회 실패하면 홈으로 보내지 않고 해당 게임의 방 목록(`/games/{gameId}/rooms`)으로 이동한다.
 - SHOULD: 사용자 logout 시 활성 소켓 정리
 - SHOULD: 메시지 크기/빈도 제한 (DoS 완화)
 
@@ -148,6 +155,8 @@
 ### 5-3. 수용 기준
 - 비멤버 send/join/leave는 거부 + 에러 큐 응답
 - `ROOM_UPDATE` 이벤트 수신 시 클라이언트 room detail 재조회
+- 사이드바 `내 대기방` 항목 클릭 시 `/rooms/{id}`(deprecated) 경로로 이동하지 않는다.
+- 사이드바 `채팅방` 섹션에는 `ROOM_CHAT`이 표시되지 않는다.
 
 ### 5-4. 운영 권고
 - SHOULD: `wss://` only (prod)
@@ -403,6 +412,10 @@
 15. 방 상세 페이지 제거, 목록에서 즉시 자동참가
 16. 에러 라우팅: `404/403/500` 공통 에러 페이지, 비밀번호 오류는 토스트 유지
 17. 단일세션 만료 알림은 모달 강제 확인
+18. 사이드바 도메인 분리:
+  - `내 대기방`은 ROOM_CHAT 진입 전용
+  - `채팅방`은 DIRECT/GROUP 전용
+  - `내 대기방` 클릭 실패 fallback은 홈이 아니라 게임 방목록으로 고정
 
 ## 16. 환경변수 표준(초안)
 - `COOKIE_SECURE` (dev: `false`, prod: `true`)

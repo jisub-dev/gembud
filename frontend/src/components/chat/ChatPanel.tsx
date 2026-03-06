@@ -60,6 +60,13 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
         setConnecting(false);
         setError(null);
 
+        // Subscribe to session-expired notifications (new login on another device)
+        client.subscribe('/user/queue/session-expired', () => {
+          if (!active) return;
+          useAuthStore.setState({ isSessionExpired: true, isAuthenticated: false, user: null });
+          client.deactivate();
+        });
+
         client.subscribe(`/topic/chat/${chatRoomId}`, (frame) => {
           if (!active) return;
           try {

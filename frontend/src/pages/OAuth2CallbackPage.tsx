@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
+import { featureFlags, isPremiumActive } from '@/config/features';
 
 function OAuth2CallbackPage() {
   const navigate = useNavigate();
@@ -23,8 +24,8 @@ function OAuth2CallbackPage() {
               email: u.email,
               nickname: u.nickname,
               temperature: u.temperature,
-              isPremium: u.isPremium,
-              premiumExpiresAt: u.premiumExpiresAt,
+              isPremium: isPremiumActive(u.isPremium),
+              premiumExpiresAt: featureFlags.premium ? u.premiumExpiresAt : null,
             },
             isAuthenticated: true,
             isLoading: false,

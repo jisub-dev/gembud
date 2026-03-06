@@ -93,6 +93,15 @@
 | User leaves chat room | System message broadcast |
 | Load message history | Returns last N messages |
 | getChatRoomByGameRoom | Returns correct chat room ID |
+| Sidebar: `내 대기방` 클릭 | Navigates to `/chat/{roomChatId}` (never `/rooms/{id}`) |
+| Sidebar: `채팅방` section rendering | Only `DIRECT_CHAT`/`GROUP_CHAT` visible (`ROOM_CHAT` hidden) |
+| Sidebar: `내 대기방` mapping priority | Uses `/chat/rooms/my` `ROOM_CHAT + relatedRoomId` mapping first |
+| Sidebar: fallback mapping | If mapping missing, calls `getChatRoomByGameRoom` and navigates to `/chat/{chatRoomId}` |
+| Sidebar: mapping lookup failure | Navigates to `/games/{gameId}/rooms` (never home redirect) |
+
+**Suggested test files:**
+- `frontend/src/test/components/layout/Sidebar.test.tsx` (new)
+- `backend/src/test/java/com/gembud/service/ChatServiceTest.java` (existing, mapping coverage)
 
 ---
 

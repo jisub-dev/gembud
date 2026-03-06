@@ -22,6 +22,9 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH005", "Invalid token"),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "AUTH006", "Email already exists"),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH007", "Invalid refresh token"),
+    ACCOUNT_LOCKED(HttpStatus.LOCKED, "AUTH008", "Account is temporarily locked"),
+    RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "AUTH009", "Too many requests"),
+    SESSION_REVOKED(HttpStatus.UNAUTHORIZED, "AUTH010", "Session has been revoked"),
 
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER001", "User not found"),
@@ -68,6 +71,7 @@ public enum ErrorCode {
     NOT_REQUEST_RECEIVER(HttpStatus.FORBIDDEN, "FRIEND004", "Only the receiver can perform this action"),
     FRIEND_REQUEST_ALREADY_ACCEPTED(HttpStatus.CONFLICT, "FRIEND005", "Friend request already accepted"),
     NOT_FRIENDS(HttpStatus.BAD_REQUEST, "FRIEND006", "Not friends with this user"),
+    FRIEND_REQUEST_NOT_PENDING(HttpStatus.CONFLICT, "FRIEND007", "Friend request is not pending"),
 
     // Notification
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIF001", "Notification not found"),
@@ -79,6 +83,7 @@ public enum ErrorCode {
     DUPLICATE_REPORT(HttpStatus.CONFLICT, "REPORT003", "Already reported this user in this room"),
     REPORT_NOT_PENDING(HttpStatus.BAD_REQUEST, "REPORT004", "Report is not in PENDING status"),
     REPORT_ALREADY_RESOLVED(HttpStatus.CONFLICT, "REPORT005", "Report is already resolved"),
+    REPORT_ALREADY_WARNED(HttpStatus.CONFLICT, "REPORT006", "Report is already warned"),
 
     // Chat
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT001", "Chat room not found"),

@@ -1,5 +1,6 @@
 package com.gembud.exception;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -62,6 +63,7 @@ class GlobalExceptionHandlerTest {
 
         // When & Then
         mockMvc.perform(post("/rooms")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(invalidRequest))
             .andExpect(status().isBadRequest())
@@ -81,6 +83,7 @@ class GlobalExceptionHandlerTest {
 
         // When & Then
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginRequest))
             .andExpect(status().isUnauthorized())

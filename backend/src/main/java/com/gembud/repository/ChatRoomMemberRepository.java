@@ -52,6 +52,14 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
     );
 
     /**
+     * Count members in chat room.
+     *
+     * @param chatRoomId chat room ID
+     * @return member count
+     */
+    long countByChatRoomId(Long chatRoomId);
+
+    /**
      * Find all chat rooms a user is a member of.
      *
      * @param userId user ID

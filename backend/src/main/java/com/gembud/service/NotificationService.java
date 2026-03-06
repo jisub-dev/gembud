@@ -207,6 +207,23 @@ public class NotificationService {
     }
 
     /**
+     * Notify user that an admin warning has been issued.
+     *
+     * @param user target user
+     * @param reportId related report ID
+     * @param warningMessage admin warning message
+     */
+    @Transactional
+    public void notifyUserWarned(User user, Long reportId, String warningMessage) {
+        String content = String.format(
+            "운영자 경고가 발송되었습니다: %s",
+            warningMessage
+        );
+        createNotification(user.getId(), NotificationType.REPORT_WARNED, content, reportId);
+        log.info("Warning notification sent to user {}", user.getNickname());
+    }
+
+    /**
      * Clean up old read notifications (scheduled task).
      *
      * @return number of deleted notifications

@@ -12,6 +12,7 @@ import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.security.JwtTokenProvider;
 import com.gembud.service.GameService;
+import com.gembud.service.RefreshTokenStore;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -48,6 +49,9 @@ class GameControllerTest {
 
     @MockBean
     private UserDetailsService userDetailsService;
+
+    @MockBean
+    private RefreshTokenStore refreshTokenStore;
 
     @Test
     @DisplayName("GET /games - should return all games with ApiResponse wrapper")

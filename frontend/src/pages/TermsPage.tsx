@@ -1,3 +1,5 @@
+import { featureFlags } from '@/config/features';
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#0e0e10] text-white">
@@ -32,10 +34,12 @@ export default function TermsPage() {
             </ul>
           </section>
 
-          <section>
-            <h2 className="text-xl font-bold text-white mb-3">제4조 (프리미엄 서비스)</h2>
-            <p>프리미엄 구독 서비스는 테스트 운영 중이며, 구독 취소 시 남은 기간에 대한 환불은 제공되지 않습니다. 향후 유료 결제 도입 시 별도 안내합니다.</p>
-          </section>
+          {featureFlags.premium && (
+            <section>
+              <h2 className="text-xl font-bold text-white mb-3">제4조 (프리미엄 서비스)</h2>
+              <p>프리미엄 구독 서비스는 테스트 운영 중이며, 구독 취소 시 남은 기간에 대한 환불은 제공되지 않습니다. 향후 유료 결제 도입 시 별도 안내합니다.</p>
+            </section>
+          )}
 
           <section>
             <h2 className="text-xl font-bold text-white mb-3">제5조 (서비스 변경 및 중단)</h2>

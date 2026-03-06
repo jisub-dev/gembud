@@ -106,17 +106,17 @@ describe('useSentFriendRequests', () => {
 });
 
 describe('useSendFriendRequest', () => {
-  it('should call sendFriendRequest with email', async () => {
+  it('should call sendFriendRequest with friendId', async () => {
     vi.mocked(friendService.sendFriendRequest).mockResolvedValue(undefined as any);
 
     const { result } = renderHook(() => useSendFriendRequest(), {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate('friend@example.com');
+    result.current.mutate(2);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(friendService.sendFriendRequest).toHaveBeenCalledWith('friend@example.com');
+    expect(friendService.sendFriendRequest).toHaveBeenCalledWith(2);
   });
 });
 

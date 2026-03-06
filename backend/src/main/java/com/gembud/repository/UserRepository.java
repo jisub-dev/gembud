@@ -1,6 +1,8 @@
 package com.gembud.repository;
 
 import com.gembud.entity.User;
+import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -61,5 +63,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByOauthProviderAndOauthId(
             User.OAuthProvider oauthProvider,
             String oauthId
+    );
+
+    /**
+     * Search users by nickname (preferred) or email.
+     *
+     * @param nicknameQuery query for nickname
+     * @param emailQuery query for email
+     * @param currentUserId current user ID (excluded)
+     * @param pageable max rows
+     * @return matched users
+     */
+    List<User> findByIdNotAndNicknameContainingIgnoreCaseOrIdNotAndEmailContainingIgnoreCase(
+        Long currentUserId,
+        String nicknameQuery,
+        Long currentUserIdForEmail,
+        String emailQuery,
+        Pageable pageable
     );
 }

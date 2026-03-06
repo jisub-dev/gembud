@@ -90,6 +90,11 @@ public class ReportResponse {
     private String adminComment;
 
     /**
+     * True only when response is from admin warning action.
+     */
+    private Boolean warningIssued;
+
+    /**
      * User summary DTO.
      *
      * Phase 12: email 제거 (타인 개인정보 노출 차단)
@@ -111,6 +116,10 @@ public class ReportResponse {
      * @return report response
      */
     public static ReportResponse from(Report report) {
+        return from(report, null);
+    }
+
+    public static ReportResponse from(Report report, Boolean warningIssued) {
         return ReportResponse.builder()
             .id(report.getId())
             .reporter(UserSummary.builder()
@@ -134,6 +143,7 @@ public class ReportResponse {
             .reviewedAt(report.getReviewedAt())
             .resolvedAt(report.getResolvedAt())
             .adminComment(report.getAdminComment())
+            .warningIssued(warningIssued)
             .build();
     }
 }

@@ -28,6 +28,9 @@ springdoc:
   show-actuator: false
 
 app:
+  feature:
+    premium:
+      enabled: ${FEATURE_PREMIUM_ENABLED:false}
   oauth2:
     redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth2/callback}
   cookie:
@@ -35,6 +38,17 @@ app:
     same-site: ${COOKIE_SAMESITE:Lax}
   websocket:
     allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173}
+  security:
+    slack-webhook-url: ${SECURITY_ALERT_WEBHOOK_URL:}
+    report-duplicate-block-days: ${REPORT_DUPLICATE_BLOCK_DAYS:7}
+    login-lock-threshold: ${LOGIN_LOCK_THRESHOLD:10}
+    login-lock-window-minutes: ${LOGIN_LOCK_WINDOW_MINUTES:10}
+    login-lock-duration-minutes: ${LOGIN_LOCK_DURATION_MINUTES:10}
+    login-fail-burst-high-threshold: ${LOGIN_FAIL_BURST_HIGH_THRESHOLD:10}
+    login-fail-burst-critical-threshold: ${LOGIN_FAIL_BURST_CRITICAL_THRESHOLD:30}
+    security-event-retention-days: ${SECURITY_EVENT_RETENTION_DAYS:90}
+  admin:
+    email: ${APP_ADMIN_EMAIL:}
 
 logging:
   level:

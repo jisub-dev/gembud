@@ -1,8 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { ToastContainer } from './components/common/ToastContainer';
+import { SessionExpiredModal } from './components/common/SessionExpiredModal';
 import { authService } from './services/authService';
+import { featureFlags, isPremiumActive } from './config/features';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -43,6 +45,18 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
   return <>{children}</>;
 }
 
+function SessionExpiredHandler() {
+  const isSessionExpired = useAuthStore((s) => s.isSessionExpired);
+  const navigate = useNavigate();
+
+  const handleConfirm = () => {
+    useAuthStore.setState({ isSessionExpired: false });
+    navigate('/login', { replace: true });
+  };
+
+  return <SessionExpiredModal isOpen={isSessionExpired} onConfirm={handleConfirm} />;
+}
+
 function App() {
 
   useEffect(() => {
@@ -55,8 +69,8 @@ function App() {
             email: user.email,
             nickname: user.nickname,
             temperature: user.temperature,
-            isPremium: user.isPremium,
-            premiumExpiresAt: user.premiumExpiresAt,
+            isPremium: isPremiumActive(user.isPremium),
+            premiumExpiresAt: featureFlags.premium ? user.premiumExpiresAt : null,
           },
           isAuthenticated: true,
           isLoading: false,
@@ -72,6 +86,7 @@ function App() {
     <>
     <ToastContainer />
     <BrowserRouter>
+      <SessionExpiredHandler />
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
@@ -143,9 +158,13 @@ function App() {
           <Route
             path="premium"
             element={
-              <ProtectedRoute>
-                <PremiumPage />
-              </ProtectedRoute>
+              featureFlags.premium ? (
+                <ProtectedRoute>
+                  <PremiumPage />
+                </ProtectedRoute>
+              ) : (
+                <Navigate to="/error/404" replace />
+              )
             }
           />
 

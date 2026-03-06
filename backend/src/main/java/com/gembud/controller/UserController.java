@@ -12,10 +12,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -38,6 +43,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserRepository userRepository;
+
+    @Value("${app.feature.premium.enabled:false}")
+    private boolean premiumFeatureEnabled;
 
     /**
      * Get current user information.
@@ -60,15 +68,49 @@ public class UserController {
         User user = userRepository.findByEmail(userDetails.getEmail())
             .orElseThrow(() -> new IllegalStateException("User not found"));
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("id", user.getId());
-        data.put("email", user.getEmail() != null ? user.getEmail() : "");
-        data.put("nickname", user.getNickname());
-        data.put("temperature", user.getTemperature());
-        data.put("isPremium", user.isPremium());
-        data.put("premiumExpiresAt", user.getPremiumExpiresAt());
+        return ResponseEntity.ok(ApiResponse.success(buildUserResponse(user)));
+    }
 
-        return ResponseEntity.ok(ApiResponse.success(data));
+    /**
+     * Search users for friend request.
+     *
+     * @param userDetails authenticated user details
+     * @param query nickname/email query
+     * @param limit max result count
+     * @return user summaries
+     */
+    @Operation(summary = "Search users", description = "친구 추가용 사용자 검색")
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> searchUsers(
+        @AuthenticationPrincipal CustomUserDetails userDetails,
+        @RequestParam("q") String query,
+        @RequestParam(defaultValue = "10") int limit
+    ) {
+        String normalized = query == null ? "" : query.trim();
+        if (normalized.length() < 2) {
+            return ResponseEntity.ok(ApiResponse.success(List.of()));
+        }
+
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
+        List<User> users = userRepository
+            .findByIdNotAndNicknameContainingIgnoreCaseOrIdNotAndEmailContainingIgnoreCase(
+                userDetails.getUserId(),
+                normalized,
+                userDetails.getUserId(),
+                normalized,
+                PageRequest.of(0, safeLimit)
+            );
+
+        List<Map<String, Object>> response = new ArrayList<>();
+        for (User user : users) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", user.getId());
+            row.put("nickname", user.getNickname());
+            row.put("email", user.getEmail());
+            response.add(row);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -101,15 +143,18 @@ public class UserController {
         }
         userRepository.save(user);
 
+        return ResponseEntity.ok(ApiResponse.success(buildUserResponse(user)));
+    }
+
+    private Map<String, Object> buildUserResponse(User user) {
         Map<String, Object> data = new HashMap<>();
         data.put("id", user.getId());
         data.put("email", user.getEmail() != null ? user.getEmail() : "");
         data.put("nickname", user.getNickname());
         data.put("temperature", user.getTemperature());
-        data.put("isPremium", user.isPremium());
-        data.put("premiumExpiresAt", user.getPremiumExpiresAt());
-
-        return ResponseEntity.ok(ApiResponse.success(data));
+        data.put("isPremium", premiumFeatureEnabled && user.isPremium());
+        data.put("premiumExpiresAt", premiumFeatureEnabled ? user.getPremiumExpiresAt() : null);
+        return data;
     }
 
     @Data

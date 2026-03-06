@@ -2,6 +2,7 @@ package com.gembud.repository;
 
 import com.gembud.entity.Report;
 import com.gembud.entity.Report.ReportStatus;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -62,19 +63,19 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     long countPendingByReportedId(@Param("reportedId") Long reportedId);
 
     /**
-     * Check if user has already reported another user in a room.
+     * Check if user has already reported another user within a given time window (global, any room).
      *
      * @param reporterId reporter ID
      * @param reportedId reported user ID
-     * @param roomId room ID
-     * @return true if report exists
+     * @param after      start of the time window (exclusive lower bound)
+     * @return true if a report exists within the window
      */
     @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END FROM Report r " +
            "WHERE r.reporter.id = :reporterId AND r.reported.id = :reportedId " +
-           "AND r.room.id = :roomId")
-    boolean existsByReporterIdAndReportedIdAndRoomId(
+           "AND r.createdAt > :after")
+    boolean existsByReporterIdAndReportedIdAndCreatedAtAfter(
         @Param("reporterId") Long reporterId,
         @Param("reportedId") Long reportedId,
-        @Param("roomId") Long roomId
+        @Param("after") LocalDateTime after
     );
 }

@@ -239,8 +239,18 @@ public class ChatService {
      */
     @Transactional
     public void removeMemberFromChatRoom(Long chatRoomId, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+
         chatRoomMemberRepository.findByChatRoomIdAndUserId(chatRoomId, userId)
-            .ifPresent(chatRoomMemberRepository::delete);
+            .ifPresent(member -> {
+                chatRoomMemberRepository.delete(member);
+
+                long remainingMembers = chatRoomMemberRepository.countByChatRoomId(chatRoomId);
+                if (remainingMembers == 0 && shouldDeleteChatRoomWhenEmpty(chatRoom)) {
+                    chatRoomRepository.delete(chatRoom);
+                }
+            });
     }
 
     /**
@@ -325,5 +335,10 @@ public class ChatService {
         chatRoomMemberRepository.save(ChatRoomMember.builder().chatRoom(chatRoom).user(creator).build());
 
         return chatRoom.getId();
+    }
+
+    private boolean shouldDeleteChatRoomWhenEmpty(ChatRoom chatRoom) {
+        return chatRoom.getType() == ChatRoom.ChatRoomType.ROOM_CHAT
+            || chatRoom.getType() == ChatRoom.ChatRoomType.GROUP_CHAT;
     }
 }

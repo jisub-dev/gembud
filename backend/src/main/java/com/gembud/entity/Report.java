@@ -139,4 +139,17 @@ public class Report {
         this.resolvedAt = LocalDateTime.now();
         this.adminComment = adminComment;
     }
+
+    /**
+     * Add admin warning comment and move to REVIEWED.
+     *
+     * @param warningMessage warning message
+     */
+    public void warn(String warningMessage) {
+        this.status = ReportStatus.REVIEWED;
+        if (this.reviewedAt == null) {
+            this.reviewedAt = LocalDateTime.now();
+        }
+        this.adminComment = warningMessage;
+    }
 }

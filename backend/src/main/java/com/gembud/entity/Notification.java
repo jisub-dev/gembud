@@ -41,6 +41,7 @@ public class Notification {
         ROOM_JOIN,              // 방 참가
         EVALUATION_RECEIVED,    // 평가 받음
         REPORT_RESOLVED,        // 신고 처리 완료
+        REPORT_WARNED,          // 신고 경고
         ACCOUNT_SUSPENDED       // 계정 정지
     }
 

@@ -19,6 +19,7 @@ import com.gembud.entity.Room;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.security.JwtTokenProvider;
+import com.gembud.service.RefreshTokenStore;
 import com.gembud.service.RoomService;
 import java.util.Arrays;
 import java.util.Collections;
@@ -60,6 +61,9 @@ class RoomControllerTest {
 
     @MockBean
     private UserDetailsService userDetailsService;
+
+    @MockBean
+    private RefreshTokenStore refreshTokenStore;
 
     @Test
     @DisplayName("POST /rooms - should create room and return 201")

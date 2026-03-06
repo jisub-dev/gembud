@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { roomService } from '@/services/roomService';
 import type { Room } from '@/types/room';
+import { isPremiumActive } from '@/config/features';
 
 export function RoomListPage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -22,7 +23,7 @@ export function RoomListPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { data: ads = [] } = useAds();
-  const showAds = !user?.isPremium;
+  const showAds = !isPremiumActive(user?.isPremium);
   const toast = useToast();
 
   const [selectedTiers, setSelectedTiers] = useState<number[]>([]);

@@ -49,9 +49,9 @@ api.interceptors.response.use(
         );
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh 실패 - store 상태만 업데이트 (window.location 사용 금지 → 무한루프 원인)
+        // Refresh 실패 - 세션 만료 모달 트리거 (window.location 사용 금지 → 무한루프 원인)
         const { useAuthStore } = await import('../store/authStore');
-        useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+        useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, isSessionExpired: true });
         return Promise.reject(refreshError);
       }
     }

@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronLeft, Users, MessageSquare, User } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { roomService } from '@/services/roomService';
@@ -63,10 +63,12 @@ function SectionHeader({
 
 export default function Sidebar() {
   const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [roomsOpen, setRoomsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
   const [gamesOpen, setGamesOpen] = useState(true);
+  const [openingRoomId, setOpeningRoomId] = useState<number | null>(null);
 
   const { data: games = [] } = useGames();
 
@@ -83,6 +85,35 @@ export default function Sidebar() {
     enabled: isAuthenticated,
     refetchInterval: 15000,
   });
+
+  const roomChatIdByGameRoomId = useMemo(() => {
+    const map = new Map<number, number>();
+    myChatRooms.forEach((chat) => {
+      if (chat.type === 'ROOM_CHAT' && chat.relatedRoomId) {
+        map.set(chat.relatedRoomId, chat.id);
+      }
+    });
+    return map;
+  }, [myChatRooms]);
+
+  const handleMyRoomClick = async (roomId: number, gameId: number) => {
+    if (openingRoomId === roomId) return;
+    const knownRoomChatId = roomChatIdByGameRoomId.get(roomId);
+    if (knownRoomChatId) {
+      navigate(`/chat/${knownRoomChatId}`);
+      return;
+    }
+
+    setOpeningRoomId(roomId);
+    try {
+      const chatRoomId = await chatService.getChatRoomByGameRoom(roomId);
+      navigate(`/chat/${chatRoomId}`);
+    } catch {
+      navigate(`/games/${gameId}/rooms`);
+    } finally {
+      setOpeningRoomId(null);
+    }
+  };
 
   return (
     <aside
@@ -120,10 +151,12 @@ export default function Sidebar() {
                   <p className="px-3 py-2 text-xs text-text-muted italic">참여 중인 방 없음</p>
                 ) : (
                   myRooms.map((room) => (
-                    <Link
+                    <button
+                      type="button"
                       key={room.id}
-                      to={`/rooms/${room.id}`}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group"
+                      onClick={() => handleMyRoomClick(room.id, room.gameId)}
+                      disabled={openingRoomId === room.id}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group disabled:opacity-60"
                     >
                       <div className="relative flex-shrink-0">
                         <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center">
@@ -139,7 +172,7 @@ export default function Sidebar() {
                           {room.gameName} · {room.currentParticipants}/{room.maxParticipants}명 · {STATUS_LABELS[room.status]}
                         </p>
                       </div>
-                    </Link>
+                    </button>
                   ))
                 )}
               </div>

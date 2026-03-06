@@ -75,6 +75,14 @@ public class User {
     @Column(name = "suspended_until")
     private LocalDateTime suspendedUntil;
 
+
+    /**
+     * Login lock expiration time (Phase 3: Brute-force protection).
+     * Null if not locked.
+     */
+    @Column(name = "login_locked_until")
+    private LocalDateTime loginLockedUntil;
+
     @Column(name = "nickname_changed_at")
     private LocalDateTime nicknameChangedAt;
 
@@ -212,6 +220,27 @@ public class User {
      */
     public void liftSuspension() {
         this.suspendedUntil = null;
+    }
+
+    /**
+     * Check if login is currently locked (Phase 3: brute-force protection).
+     */
+    public boolean isLoginLocked() {
+        return loginLockedUntil != null && loginLockedUntil.isAfter(LocalDateTime.now());
+    }
+
+    /**
+     * Lock login for the specified number of minutes (Phase 3).
+     */
+    public void lock(int minutes) {
+        this.loginLockedUntil = LocalDateTime.now().plusMinutes(minutes);
+    }
+
+    /**
+     * Unlock login (Phase 3: admin action).
+     */
+    public void unlock() {
+        this.loginLockedUntil = null;
     }
 
     /**

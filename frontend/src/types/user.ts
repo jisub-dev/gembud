@@ -8,3 +8,9 @@ export interface User {
   isPremium?: boolean;
   premiumExpiresAt?: string | null;
 }
+
+export interface UserSearchResult {
+  id: number;
+  email: string;
+  nickname: string;
+}

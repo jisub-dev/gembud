@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subscriptionService } from '@/services/subscriptionService';
 import { useAuthStore } from '@/store/authStore';
 import type { SubscriptionStatusResponse } from '@/types/subscription';
+import { featureFlags, isPremiumActive } from '@/config/features';
 
 export function useSubscriptionStatus() {
   const { isAuthenticated } = useAuthStore();
@@ -27,8 +28,8 @@ export function useActivatePremium() {
         useAuthStore.setState({
           user: {
             ...user,
-            isPremium: data.isPremium,
-            premiumExpiresAt: data.premiumExpiresAt ?? undefined,
+            isPremium: isPremiumActive(data.isPremium),
+            premiumExpiresAt: featureFlags.premium ? data.premiumExpiresAt ?? undefined : null,
           },
         });
       }
@@ -49,8 +50,8 @@ export function useCancelPremium() {
         useAuthStore.setState({
           user: {
             ...user,
-            isPremium: data.isPremium,
-            premiumExpiresAt: data.premiumExpiresAt ?? undefined,
+            isPremium: isPremiumActive(data.isPremium),
+            premiumExpiresAt: featureFlags.premium ? data.premiumExpiresAt ?? undefined : null,
           },
         });
       }

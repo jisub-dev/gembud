@@ -662,6 +662,13 @@ stompClient.connect({}, (frame) => {
 }
 ```
 
+또는 하위호환 입력:
+```json
+{
+  "email": "friend@example.com"
+}
+```
+
 **Response:** `201 Created`
 ```json
 {
@@ -735,6 +742,31 @@ stompClient.connect({}, (frame) => {
 **Endpoint:** `GET /friends/requests/sent`
 
 **Response:** `200 OK`
+
+---
+
+## User Search API (Friend Add)
+
+### Search Users
+친구 추가용 사용자 검색
+
+**Endpoint:** `GET /users/search?q={query}&limit=10`
+
+**Rules:**
+- `q`는 2자 이상
+- 최대 `limit` 20
+- 본인 계정은 결과에서 제외
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 23,
+    "nickname": "gamer23",
+    "email": "gamer23@example.com"
+  }
+]
+```
 
 ---
 

@@ -1,41 +1,20 @@
 package com.gembud.service;
 
 import com.gembud.dto.request.FriendRequest;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.dto.response.FriendResponse;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Friend;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Friend.FriendStatus;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.repository.FriendRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.List;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.stream.Collectors;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 
 /**
  * Service for friend operations.
@@ -63,8 +42,7 @@ public class FriendService {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        User friend = userRepository.findById(request.getFriendId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User friend = resolveTargetUser(request);
 
         // Cannot send request to self
         if (user.getId().equals(friend.getId())) {
@@ -76,14 +54,18 @@ public class FriendService {
             throw new BusinessException(ErrorCode.FRIEND_REQUEST_ALREADY_EXISTS);
         }
 
-        // Create friend request
         Friend friendRelation = Friend.builder()
             .user(user)
             .friend(friend)
             .status(FriendStatus.PENDING)
             .build();
 
-        friendRepository.save(friendRelation);
+        try {
+            friendRepository.save(friendRelation);
+        } catch (DataIntegrityViolationException e) {
+            // Race-safe duplicate handling (bidirectional unique index)
+            throw new BusinessException(ErrorCode.FRIEND_REQUEST_ALREADY_EXISTS);
+        }
 
         return FriendResponse.from(friendRelation);
     }
@@ -108,12 +90,14 @@ public class FriendService {
             throw new BusinessException(ErrorCode.NOT_REQUEST_RECEIVER);
         }
 
-        // Check if already accepted
         if (friendRequest.getStatus() == FriendStatus.ACCEPTED) {
             throw new BusinessException(ErrorCode.FRIEND_REQUEST_ALREADY_ACCEPTED);
         }
 
-        // Accept request
+        if (friendRequest.getStatus() != FriendStatus.PENDING) {
+            throw new BusinessException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+        }
+
         friendRequest.accept();
         friendRepository.save(friendRequest);
 
@@ -140,7 +124,10 @@ public class FriendService {
             throw new BusinessException(ErrorCode.NOT_REQUEST_RECEIVER);
         }
 
-        // Reject request
+        if (friendRequest.getStatus() != FriendStatus.PENDING) {
+            throw new BusinessException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+        }
+
         friendRequest.reject();
         friendRepository.save(friendRequest);
 
@@ -158,12 +145,10 @@ public class FriendService {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        // Check if they are friends
         if (!friendRepository.areFriends(user.getId(), friendId)) {
             throw new BusinessException(ErrorCode.NOT_FRIENDS);
         }
 
-        // Delete friendship (bidirectional)
         friendRepository.deleteByUserIdAndFriendId(user.getId(), friendId);
     }
 
@@ -221,5 +206,19 @@ public class FriendService {
      */
     public boolean areFriends(Long userId, Long friendId) {
         return friendRepository.areFriends(userId, friendId);
+    }
+
+    private User resolveTargetUser(FriendRequest request) {
+        if (request.getFriendId() != null) {
+            return userRepository.findById(request.getFriendId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        }
+
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            return userRepository.findByEmail(request.getEmail().trim())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        }
+
+        throw new BusinessException(ErrorCode.MISSING_REQUIRED_FIELD);
     }
 }

@@ -5,19 +5,21 @@ import com.gembud.entity.Report.ReportCategory;
 import com.gembud.entity.Report.ReportPriority;
 import com.gembud.entity.Report.ReportStatus;
 import com.gembud.entity.Room;
+import com.gembud.entity.SecurityEvent.EventType;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.repository.ReportRepository;
 import com.gembud.repository.RoomRepository;
+import com.gembud.repository.UserWarningRepository;
 import com.gembud.repository.UserRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 
 /**
  * Service for report management.
@@ -34,7 +36,12 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
+    private final UserWarningRepository userWarningRepository;
     private final NotificationService notificationService;
+    private final SecurityEventService securityEventService;
+
+    @Value("${app.security.report-duplicate-block-days:7}")
+    private int duplicateBlockDays;
 
     /**
      * Create a new report with category (Phase 11).
@@ -67,16 +74,17 @@ public class ReportService {
             throw new BusinessException(ErrorCode.CANNOT_REPORT_SELF);
         }
 
+        // Check global duplicate: same reporter → same reported within the time window
+        LocalDateTime windowStart = LocalDateTime.now().minusDays(duplicateBlockDays);
+        if (reportRepository.existsByReporterIdAndReportedIdAndCreatedAtAfter(
+                reporter.getId(), reportedId, windowStart)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_REPORT);
+        }
+
         Room room = null;
         if (roomId != null) {
             room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
-
-            // Check if already reported in this room
-            if (reportRepository.existsByReporterIdAndReportedIdAndRoomId(
-                reporter.getId(), reportedId, roomId)) {
-                throw new BusinessException(ErrorCode.DUPLICATE_REPORT);
-            }
         }
 
         // Phase 11: Determine priority based on category
@@ -228,6 +236,59 @@ public class ReportService {
             reportId, adminComment);
 
         return resolvedReport;
+    }
+
+    /**
+     * Issue an admin warning for a report.
+     *
+     * @param reportId report ID
+     * @param adminUserId admin user ID
+     * @param warningMessage warning message
+     * @return updated report
+     */
+    @Transactional
+    public Report warnReport(Long reportId, Long adminUserId, String warningMessage) {
+        Report report = reportRepository.findById(reportId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
+
+        if (report.getStatus() == ReportStatus.RESOLVED) {
+            throw new BusinessException(ErrorCode.REPORT_ALREADY_RESOLVED);
+        }
+        if (userWarningRepository.existsByReportId(reportId)) {
+            throw new BusinessException(ErrorCode.REPORT_ALREADY_WARNED);
+        }
+
+        User adminUser = userRepository.findById(adminUserId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (report.getStatus() == ReportStatus.PENDING) {
+            report.markAsReviewed();
+        }
+        report.warn(warningMessage);
+        Report savedReport = reportRepository.save(report);
+
+        com.gembud.entity.UserWarning warning = com.gembud.entity.UserWarning.builder()
+            .user(report.getReported())
+            .report(report)
+            .adminUser(adminUser)
+            .message(warningMessage)
+            .build();
+        userWarningRepository.save(warning);
+
+        notificationService.notifyUserWarned(report.getReported(), report.getId(), warningMessage);
+        securityEventService.record(
+            EventType.REPORT_WARNED,
+            report.getReported().getId(),
+            null,
+            null,
+            "/admin/reports/" + reportId + "/warn",
+            "SUCCESS",
+            "LOW"
+        );
+        log.warn("Admin warning issued: reportId={}, targetUserId={}, adminUserId={}",
+            reportId, report.getReported().getId(), adminUserId);
+
+        return savedReport;
     }
 
     /**

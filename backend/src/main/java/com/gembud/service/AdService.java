@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,9 @@ public class AdService {
 
     private static final int MAX_ADS_PER_DAY = 3;
 
+    @Value("${app.feature.premium.enabled:false}")
+    private boolean premiumFeatureEnabled;
+
     /**
      * Get ads for user (Phase 11: 1-day 3x limit, premium excluded).
      *
@@ -44,7 +48,7 @@ public class AdService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        if (user.isPremium()) {
+        if (premiumFeatureEnabled && user.isPremium()) {
             return Collections.emptyList();
         }
 

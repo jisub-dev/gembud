@@ -1,5 +1,6 @@
 package com.gembud.security;
 
+import com.gembud.service.RefreshTokenStore;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -29,6 +30,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
+    private final RefreshTokenStore refreshTokenStore;
 
     /**
      * Filters incoming requests to validate JWT tokens.
@@ -48,21 +50,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = extractJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
-                String email = jwtTokenProvider.getEmailFromToken(jwt);
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            if (StringUtils.hasText(jwt)) {
+                if (jwtTokenProvider.validateToken(jwt)) {
+                    String email = jwtTokenProvider.getEmailFromToken(jwt);
 
-                UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
+                    // Validate sessionId — reject tokens from previous sessions
+                    String tokenSessionId = jwtTokenProvider.getSessionIdFromToken(jwt);
+                    if (tokenSessionId != null) {
+                        String storedSessionId = refreshTokenStore.getSession(email);
+                        if (!tokenSessionId.equals(storedSessionId)) {
+                            // Token was issued by a previous session — reject silently (no auth set)
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
+                    }
+
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+
+                    UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                        );
+                    authentication.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
                     );
-                authentication.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request)
-                );
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else if (jwtTokenProvider.isTokenExpired(jwt)) {
+                    request.setAttribute("AUTH_ERROR_CODE", "AUTH004");
+                }
             }
         } catch (Exception ex) {
             logger.error("Could not set user authentication in security context", ex);
