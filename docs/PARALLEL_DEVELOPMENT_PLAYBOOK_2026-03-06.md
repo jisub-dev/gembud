@@ -28,6 +28,7 @@
 | `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
 | `feat/t2-publicid-url` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 21:58 |
 | `feat/t3-room-policy` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 21:58 |
+| `feat/t3-spec-remaining` | 🟢 PR 준비 완료 | Terminal 3 | — | 2026-03-06 22:08 (RoomServiceTest + backend test --continue 통과) |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
@@ -36,6 +37,7 @@
 | 현재 없음 | — | — | 충돌 없음 |
 | `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t2-publicid-url` | 해제 | Terminal 2 시작/완료 상태 업데이트 반영 완료 |
 | `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t1-password-bcrypt` | 해제 | Terminal 1 시작/완료 상태 업데이트 반영 |
+| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t3-spec-remaining` | 해제 | Terminal 3 시작/완료 상태 업데이트 반영 |
 
 ---
 

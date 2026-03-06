@@ -209,8 +209,9 @@ public class RoomService {
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
-        // Check if room is full
-        if (room.getStatus() == Room.RoomStatus.FULL) {
+        // Guard by both status and count to prevent over-capacity joins on stale status.
+        if (room.getStatus() == Room.RoomStatus.FULL
+            || room.getCurrentParticipants() >= room.getMaxParticipants()) {
             throw new BusinessException(ErrorCode.ROOM_FULL);
         }
 
