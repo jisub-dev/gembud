@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 23:00 KST (by Claude, main terminal) — 6라운드 시작
+> **Last updated:** 2026-03-06 23:20 KST (by Claude, main terminal) — 6라운드 완료
 
 ---
 
@@ -8,10 +8,10 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `0910912` 5라운드 완료 (sidebar split + joinRoom rate limit) |
-| Backend tests | ✅ 확인 필요 |
-| Frontend tests | ✅ 확인 필요 |
-| Frontend build | ✅ 확인 필요 |
+| `main` HEAD | `6fc75c1` 6라운드 완료 (CI + ads cap + premium scheduler + notification cleanup) |
+| Backend tests | ✅ 확인 필요 (터미널 보고 기준 통과) |
+| Frontend tests | ✅ 27 passed (2026-03-06 23:20 KST) |
+| Frontend build | ✅ success |
 
 ### Worktree 구조
 
@@ -26,10 +26,10 @@
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 23:00 |
-| `feat/t1-ci-github-actions` | 🔵 진행중 | Terminal 1 | — | 2026-03-06 23:00 |
-| `feat/t2-ads-daily-cap` | 🔵 진행중 | Terminal 2 | — | 2026-03-06 23:00 |
-| `feat/t3-spec-final-check` | 🔵 진행중 | Terminal 3 | — | 2026-03-06 23:00 |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 23:20 |
+| `feat/t1-ci-github-actions` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 23:20 |
+| `feat/t2-ads-daily-cap` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 23:20 |
+| `feat/t3-spec-final-check` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 23:20 |
 | `feat/t1-sidebar-split` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 22:55 |
 | `feat/t3-joinroom-ratelimit` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 22:55 |
 | `feat/t1-invite-code-frontend` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 22:30 |
