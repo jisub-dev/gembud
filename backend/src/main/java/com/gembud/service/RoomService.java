@@ -43,6 +43,7 @@ public class RoomService {
     private final PasswordEncoder passwordEncoder;
     private final TemperatureService temperatureService;
     private final ChatService chatService;
+    private final RateLimitService rateLimitService;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -462,13 +463,30 @@ public class RoomService {
      * @return updated room response with chat room ID
      */
     @Transactional
-    public JoinRoomResult joinRoomByPublicId(String publicId, JoinRoomRequest request, String userEmail) {
+    public JoinRoomResult joinRoomByPublicId(
+        String publicId,
+        JoinRoomRequest request,
+        String userEmail,
+        String ip
+    ) {
         Room room = roomRepository.findByPublicId(publicId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
         if (room.getDeletedAt() != null) {
             throw new BusinessException(ErrorCode.ROOM_NOT_FOUND);
         }
-        RoomResponse roomResponse = joinRoom(room.getId(), request, userEmail);
+
+        RoomResponse roomResponse;
+        try {
+            roomResponse = joinRoom(room.getId(), request, userEmail);
+        } catch (BusinessException e) {
+            if (e.getErrorCode() == ErrorCode.INVALID_ROOM_PASSWORD
+                || e.getErrorCode() == ErrorCode.INVALID_INVITE_CODE) {
+                rateLimitService.checkJoinLimit(ip, publicId);
+            }
+            throw e;
+        }
+
+        rateLimitService.resetJoinLimit(ip, publicId);
         Long chatRoomId = chatService.getChatRoomByGameRoomId(room.getId());
         return new JoinRoomResult(roomResponse, chatRoomId);
     }

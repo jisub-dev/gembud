@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -73,6 +75,9 @@ class RoomServiceTest {
 
     @Mock
     private ChatService chatService;
+
+    @Mock
+    private RateLimitService rateLimitService;
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
@@ -366,10 +371,13 @@ class RoomServiceTest {
         when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
         when(participantRepository.findByRoomIdAndUserId(5L, 2L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> roomService.joinRoomByPublicId("public-5", request, "joiner@example.com"))
+        assertThatThrownBy(
+            () -> roomService.joinRoomByPublicId("public-5", request, "joiner@example.com", "127.0.0.1")
+        )
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.INVALID_INVITE_CODE);
+        verify(rateLimitService).checkJoinLimit("127.0.0.1", "public-5");
     }
 
     @Test
@@ -411,12 +419,102 @@ class RoomServiceTest {
         when(participantRepository.findByRoomId(6L)).thenReturn(Collections.emptyList());
         when(filterRepository.findByRoomId(6L)).thenReturn(Collections.emptyList());
 
-        RoomService.JoinRoomResult result = roomService.joinRoomByPublicId("public-6", request, "joiner@example.com");
+        RoomService.JoinRoomResult result = roomService.joinRoomByPublicId(
+            "public-6", request, "joiner@example.com", "127.0.0.1"
+        );
 
         assertThat(result).isNotNull();
         assertThat(result.chatRoomId()).isEqualTo(60L);
         assertThat(result.room().getId()).isEqualTo(6L);
         verify(chatService).addMemberToChatRoomInternal(60L, 2L);
+        verify(rateLimitService).resetJoinLimit("127.0.0.1", "public-6");
+    }
+
+    @Test
+    @DisplayName("joinRoomByPublicId - should throw RATE_LIMIT_EXCEEDED when invalid attempts exceed threshold")
+    void joinRoomByPublicId_InvalidPassword_RateLimitExceeded_ShouldThrow() {
+        Room privateRoom = Room.builder()
+            .game(game)
+            .title("Private Room")
+            .maxParticipants(5)
+            .currentParticipants(1)
+            .isPrivate(true)
+            .passwordHash("$2a$10$hashed")
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(privateRoom, "id", 7L);
+        ReflectionTestUtils.setField(privateRoom, "publicId", "public-7");
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        JoinRoomRequest request = JoinRoomRequest.builder()
+            .password("wrong")
+            .build();
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByPublicId("public-7")).thenReturn(Optional.of(privateRoom));
+        when(roomRepository.findById(7L)).thenReturn(Optional.of(privateRoom));
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(participantRepository.findByRoomIdAndUserId(7L, 2L)).thenReturn(Optional.empty());
+        when(passwordEncoder.matches("wrong", "$2a$10$hashed")).thenReturn(false);
+        doThrow(new BusinessException(ErrorCode.RATE_LIMIT_EXCEEDED))
+            .when(rateLimitService).checkJoinLimit("127.0.0.1", "public-7");
+
+        assertThatThrownBy(
+            () -> roomService.joinRoomByPublicId("public-7", request, "joiner@example.com", "127.0.0.1")
+        )
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.RATE_LIMIT_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("joinRoomByPublicId - should increase failure count on invalid password")
+    void joinRoomByPublicId_InvalidPassword_ShouldIncreaseFailureCount() {
+        Room privateRoom = Room.builder()
+            .game(game)
+            .title("Private Room")
+            .maxParticipants(5)
+            .currentParticipants(1)
+            .isPrivate(true)
+            .passwordHash("$2a$10$hashed")
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(privateRoom, "id", 8L);
+        ReflectionTestUtils.setField(privateRoom, "publicId", "public-8");
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        JoinRoomRequest request = JoinRoomRequest.builder()
+            .password("wrong")
+            .build();
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByPublicId("public-8")).thenReturn(Optional.of(privateRoom));
+        when(roomRepository.findById(8L)).thenReturn(Optional.of(privateRoom));
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(participantRepository.findByRoomIdAndUserId(8L, 2L)).thenReturn(Optional.empty());
+        when(passwordEncoder.matches("wrong", "$2a$10$hashed")).thenReturn(false);
+
+        assertThatThrownBy(
+            () -> roomService.joinRoomByPublicId("public-8", request, "joiner@example.com", "127.0.0.1")
+        )
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_ROOM_PASSWORD);
+
+        verify(rateLimitService).checkJoinLimit("127.0.0.1", "public-8");
+        verify(rateLimitService, never()).resetJoinLimit(eq("127.0.0.1"), eq("public-8"));
     }
 
     @Test

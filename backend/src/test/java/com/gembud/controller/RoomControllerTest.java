@@ -294,10 +294,12 @@ class RoomControllerTest {
         when(roomService.joinRoomByPublicId(
             eq("123e4567-e89b-12d3-a456-426614174000"),
             any(JoinRoomRequest.class),
-            eq("test@example.com")
+            eq("test@example.com"),
+            eq("203.0.113.10")
         )).thenReturn(new RoomService.JoinRoomResult(response, 777L));
 
         mockMvc.perform(post("/rooms/123e4567-e89b-12d3-a456-426614174000/join")
+                .header("X-Forwarded-For", "203.0.113.10")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())

@@ -9,6 +9,7 @@ import com.gembud.service.RoomService.JoinRoomResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -163,9 +164,13 @@ public class RoomController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> joinRoomByPublicId(
         @PathVariable String publicId,
         @RequestBody JoinRoomRequest request,
-        @AuthenticationPrincipal UserDetails userDetails
+        @AuthenticationPrincipal UserDetails userDetails,
+        HttpServletRequest httpRequest
     ) {
-        JoinRoomResult result = roomService.joinRoomByPublicId(publicId, request, userDetails.getUsername());
+        String ip = extractClientIp(httpRequest);
+        JoinRoomResult result = roomService.joinRoomByPublicId(
+            publicId, request, userDetails.getUsername(), ip
+        );
         Map<String, Object> body = Map.of(
             "room", result.room(),
             "chatRoomId", result.chatRoomId()
@@ -251,5 +256,13 @@ public class RoomController {
     ) {
         RoomResponse response = roomService.regenerateInviteCode(publicId, userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

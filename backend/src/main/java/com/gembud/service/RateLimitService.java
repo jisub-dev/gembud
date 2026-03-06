@@ -28,6 +28,12 @@ public class RateLimitService {
     @Value("${app.security.login-lock-window-minutes:10}")
     private int loginLockWindowMinutes;
 
+    @Value("${app.security.join-limit-threshold:10}")
+    private int joinLimitThreshold;
+
+    @Value("${app.security.join-limit-window-minutes:10}")
+    private int joinLimitWindowMinutes;
+
     /**
      * Check login rate limit by IP and account.
      * Returns the current attempt count (used by caller to decide lockout).
@@ -80,6 +86,32 @@ public class RateLimitService {
             log.warn("WebSocket connect rate limit exceeded for IP {}", ip);
             throw new BusinessException(ErrorCode.RATE_LIMIT_EXCEEDED);
         }
+    }
+
+    /**
+     * Increase failed join attempt count per IP + room(publicId) and enforce threshold.
+     *
+     * @param ip       client IP
+     * @param publicId room public ID
+     * @throws BusinessException RATE_LIMIT_EXCEEDED when threshold exceeded
+     */
+    public void checkJoinLimit(String ip, String publicId) {
+        String key = "join_attempt:" + ip + ":" + publicId;
+        long count = increment(key, joinLimitWindowMinutes, TimeUnit.MINUTES);
+        if (count > joinLimitThreshold) {
+            log.warn("Join room rate limit exceeded for IP {} and room {}", ip, publicId);
+            throw new BusinessException(ErrorCode.RATE_LIMIT_EXCEEDED);
+        }
+    }
+
+    /**
+     * Reset failed join attempt counter after successful join.
+     *
+     * @param ip       client IP
+     * @param publicId room public ID
+     */
+    public void resetJoinLimit(String ip, String publicId) {
+        redisTemplate.delete("join_attempt:" + ip + ":" + publicId);
     }
 
     /**
