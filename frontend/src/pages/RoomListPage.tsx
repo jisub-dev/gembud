@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Plus } from 'lucide-react';
 import { useRooms } from '@/hooks/queries/useRooms';
@@ -20,6 +20,7 @@ import { isPremiumActive } from '@/config/features';
 export function RoomListPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { data: ads = [] } = useAds();
@@ -32,8 +33,10 @@ export function RoomListPage() {
 
   // Auto-join state
   const [joiningRoom, setJoiningRoom] = useState<Room | null>(null);
+  const [joiningInviteCode, setJoiningInviteCode] = useState<string | undefined>(undefined);
   const [isJoining, setIsJoining] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const inviteHandledRef = useRef<string | null>(null);
 
   const { data: rooms, isLoading: roomsLoading, error: roomsError } = useRooms(Number(gameId));
   const { game, tierOptions, positionOptions, isLoading: gameLoading } = useGameOptions(Number(gameId));
@@ -68,42 +71,50 @@ export function RoomListPage() {
     });
   }, [rooms, selectedTiers, selectedPositions, tierOptions, positionOptions]);
 
-  const doJoin = async (room: Room, password?: string) => {
+  const doJoin = async (room: Room, password?: string, inviteCode?: string) => {
     setIsJoining(true);
     try {
-      const result = await roomService.joinRoom(room.publicId, password);
+      const result = await roomService.joinRoom(room.publicId, password, inviteCode);
       setShowPasswordModal(false);
       setJoiningRoom(null);
+      setJoiningInviteCode(undefined);
       navigate(`/chat/${result.chatRoomId}`);
     } catch (err: unknown) {
       const errorCode = extractErrorCode(err);
       if (errorCode === 'ROOM006' || errorCode === 'ROOM012') {
         // Invalid password or invite code — keep modal open
-        toast.error(
-          errorCode === 'ROOM012' ? '유효하지 않은 초대코드입니다' : '비밀번호가 올바르지 않습니다',
-        );
+        if (errorCode === 'ROOM012') {
+          toast.error('초대 코드가 유효하지 않거나 만료되었습니다');
+        } else {
+          toast.error('비밀번호가 올바르지 않습니다');
+        }
       } else if (errorCode === 'ROOM001') {
         toast.error('방을 찾을 수 없습니다');
         setShowPasswordModal(false);
         setJoiningRoom(null);
+        setJoiningInviteCode(undefined);
         queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
         navigate(`/games/${gameId}/rooms`);
       } else if (errorCode === 'ROOM002') {
         toast.error('방이 꽉 찼습니다');
         setShowPasswordModal(false);
         setJoiningRoom(null);
+        setJoiningInviteCode(undefined);
       } else if (errorCode === 'ROOM010') {
         toast.error('이미 게임이 시작된 방입니다');
         setShowPasswordModal(false);
         setJoiningRoom(null);
+        setJoiningInviteCode(undefined);
       } else if (errorCode === 'ROOM008') {
         toast.error('이미 다른 대기방에 참가 중입니다');
         setShowPasswordModal(false);
         setJoiningRoom(null);
+        setJoiningInviteCode(undefined);
       } else {
         toast.error('방 입장에 실패했습니다');
         setShowPasswordModal(false);
         setJoiningRoom(null);
+        setJoiningInviteCode(undefined);
       }
     } finally {
       setIsJoining(false);
@@ -116,6 +127,7 @@ export function RoomListPage() {
 
     if (room.isPrivate) {
       setJoiningRoom(room);
+      setJoiningInviteCode(undefined);
       setShowPasswordModal(true);
     } else {
       setJoiningRoom(room);
@@ -123,10 +135,72 @@ export function RoomListPage() {
     }
   };
 
-  const handlePasswordConfirm = (password: string) => {
+  const handlePasswordConfirm = (password?: string) => {
     if (!joiningRoom) return;
-    doJoin(joiningRoom, password);
+    doJoin(joiningRoom, password, joiningInviteCode);
   };
+
+  useEffect(() => {
+    const inviteCode = searchParams.get('invite')?.trim();
+    const roomPublicId = searchParams.get('room')?.trim();
+    if (!inviteCode || roomsLoading) {
+      return;
+    }
+
+    const inviteKey = `${roomPublicId ?? 'none'}:${inviteCode}`;
+    if (inviteHandledRef.current === inviteKey) {
+      return;
+    }
+    inviteHandledRef.current = inviteKey;
+
+    const openInviteModal = async () => {
+      let targetRoom: Room | undefined;
+      if (roomPublicId) {
+        targetRoom = rooms?.find(r => r.publicId === roomPublicId);
+        if (!targetRoom) {
+          try {
+            targetRoom = await roomService.getRoom(roomPublicId);
+          } catch {
+            targetRoom = undefined;
+          }
+        }
+      } else {
+        targetRoom = rooms?.find(r => r.inviteCode === inviteCode);
+      }
+
+      if (!targetRoom) {
+        toast.error('목록에 없는 방입니다');
+        setSearchParams({}, { replace: true });
+        return;
+      }
+
+      setJoiningRoom(targetRoom);
+      setJoiningInviteCode(inviteCode);
+      setShowPasswordModal(true);
+    };
+
+    openInviteModal();
+  }, [rooms, roomsLoading, searchParams, setSearchParams, toast]);
+
+  const handleRegenerateInviteCode = async (roomPublicId: string) => {
+    try {
+      const updatedRoom = await roomService.regenerateInviteCode(roomPublicId);
+      if (!updatedRoom.inviteCode) {
+        toast.error('초대코드 생성에 실패했습니다');
+        return;
+      }
+
+      const inviteUrl = `${window.location.origin}/games/${gameId}/rooms?room=${updatedRoom.publicId}&invite=${encodeURIComponent(updatedRoom.inviteCode)}`;
+      await copyToClipboard(inviteUrl);
+      toast.success('초대 링크가 클립보드에 복사되었습니다');
+      queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
+    } catch {
+      toast.error('초대코드 재발급에 실패했습니다');
+    }
+  };
+
+  const shouldShowRegenerateInviteButton = (room: Room) =>
+    Boolean(room.isPrivate && user?.nickname && room.createdBy === user.nickname);
 
   const handleReset = () => {
     setSelectedTiers([]);
@@ -206,6 +280,8 @@ export function RoomListPage() {
           rooms={filteredRooms}
           isLoading={roomsLoading || isJoining}
           onRoomClick={handleRoomClick}
+          shouldShowRegenerateInviteButton={shouldShowRegenerateInviteButton}
+          onRegenerateInviteCode={handleRegenerateInviteCode}
         />
 
         {/* Inline banner — 방 5개 이상일 때 목록 아래 */}
@@ -240,14 +316,32 @@ export function RoomListPage() {
       {showPasswordModal && joiningRoom && (
         <PasswordModal
           onConfirm={handlePasswordConfirm}
+          inviteCode={joiningInviteCode}
           onCancel={() => {
             setShowPasswordModal(false);
             setJoiningRoom(null);
+            setJoiningInviteCode(undefined);
           }}
         />
       )}
     </div>
   );
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
 }
 
 function extractErrorCode(err: unknown): string | null {

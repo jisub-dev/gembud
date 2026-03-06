@@ -27,7 +27,7 @@
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
 | `main` | 🟢 최신 | Claude | — | 2026-03-06 22:30 |
-| `feat/t1-invite-code-frontend` | 🔵 진행중 | Terminal 1 | — | 2026-03-06 22:30 |
+| `feat/t1-invite-code-frontend` | 🟢 squash merged | Terminal 1 | merged | 2026-03-06 22:30 |
 | `feat/t2-auth-refresh-tests` | 🔵 진행중 | Terminal 2 | — | 2026-03-06 22:30 |
 | `feat/t3-spec-remaining` | 🔵 진행중 | Terminal 3 | — | 2026-03-06 22:30 |
 | `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
@@ -38,7 +38,7 @@
 
 | 파일 | 잠금 브랜치 | 상태 | 이유 |
 |------|------------|------|------|
-| 현재 없음 | — | — | 4라운드 시작 전 |
+| 현재 없음 | — | — | 충돌 없음 |
 
 ---
 

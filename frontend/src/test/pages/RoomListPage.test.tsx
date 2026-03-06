@@ -13,9 +13,11 @@ import { useToast } from '@/hooks/useToast';
 import { roomService } from '@/services/roomService';
 import type { Room } from '@/types/room';
 
-const { mockNavigate, toastError } = vi.hoisted(() => ({
+const { mockNavigate, toastError, toastSuccess, clipboardWriteText } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  clipboardWriteText: vi.fn(),
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -50,6 +52,8 @@ vi.mock('@/hooks/useToast', () => ({
 vi.mock('@/services/roomService', () => ({
   roomService: {
     joinRoom: vi.fn(),
+    getRoom: vi.fn(),
+    regenerateInviteCode: vi.fn(),
   },
 }));
 
@@ -66,18 +70,33 @@ vi.mock('@/components/common/AdBanner', () => ({
 }));
 
 vi.mock('@/components/room/RoomGrid', () => ({
-  RoomGrid: ({ rooms, onRoomClick }: { rooms: Room[]; onRoomClick: (publicId: string) => void }) => (
+  RoomGrid: ({
+    rooms,
+    onRoomClick,
+    shouldShowRegenerateInviteButton,
+    onRegenerateInviteCode,
+  }: {
+    rooms: Room[];
+    onRoomClick: (publicId: string) => void;
+    shouldShowRegenerateInviteButton?: (room: Room) => boolean;
+    onRegenerateInviteCode?: (publicId: string) => void;
+  }) => (
     <div>
       {rooms.map((room) => (
-        <button key={room.id} onClick={() => onRoomClick(room.publicId)}>
-          {room.title}
-        </button>
+        <div key={room.id}>
+          <button onClick={() => onRoomClick(room.publicId)}>{room.title}</button>
+          {shouldShowRegenerateInviteButton?.(room) && (
+            <button onClick={() => onRegenerateInviteCode?.(room.publicId)}>
+              {room.title} 재발급
+            </button>
+          )}
+        </div>
       ))}
     </div>
   ),
 }));
 
-function createWrapper() {
+function createWrapper(initialPath = '/') {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -89,7 +108,7 @@ function createWrapper() {
     createElement(QueryClientProvider, { client: queryClient },
       createElement(
         MemoryRouter,
-        { future: { v7_startTransition: true, v7_relativeSplatPath: true } },
+        { initialEntries: [initialPath], future: { v7_startTransition: true, v7_relativeSplatPath: true } },
         children,
       ),
     );
@@ -147,9 +166,16 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(useAuthStore).mockReturnValue({ user: null } as any);
     vi.mocked(useToast).mockReturnValue({
       error: toastError,
-      success: vi.fn(),
+      success: toastSuccess,
       info: vi.fn(),
     } as any);
+
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: clipboardWriteText.mockResolvedValue(undefined),
+      },
+      configurable: true,
+    });
   });
 
   it('auto-joins public room and navigates to chat on success', async () => {
@@ -163,7 +189,7 @@ describe('RoomListPage auto-join UX', () => {
     await user.click(screen.getByRole('button', { name: '공개 방' }));
 
     await waitFor(() => {
-      expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-1', undefined);
+      expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-1', undefined, undefined);
       expect(mockNavigate).toHaveBeenCalledWith('/chat/555');
     });
   });
@@ -215,6 +241,60 @@ describe('RoomListPage auto-join UX', () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('방을 찾을 수 없습니다');
       expect(mockNavigate).toHaveBeenCalledWith('/games/1/rooms');
+    });
+  });
+
+  it('opens invite mode modal from URL params and joins with inviteCode', async () => {
+    vi.mocked(roomService.joinRoom).mockResolvedValue({
+      room: privateRoom,
+      chatRoomId: 777,
+    } as any);
+    const user = userEvent.setup();
+
+    render(<RoomListPage />, {
+      wrapper: createWrapper('/games/1/rooms?room=private-room-2&invite=INVITE123'),
+    });
+
+    await user.click(await screen.findByRole('button', { name: '초대코드로 입장' }));
+
+    await waitFor(() => {
+      expect(roomService.joinRoom).toHaveBeenCalledWith('private-room-2', undefined, 'INVITE123');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/777');
+    });
+  });
+
+  it('shows invite-code-expired message when invite code is invalid', async () => {
+    vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM012'));
+    const user = userEvent.setup();
+
+    render(<RoomListPage />, {
+      wrapper: createWrapper('/games/1/rooms?room=private-room-2&invite=INVITE123'),
+    });
+
+    await user.click(await screen.findByRole('button', { name: '초대코드로 입장' }));
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith('초대 코드가 유효하지 않거나 만료되었습니다');
+    });
+    expect(screen.getByRole('button', { name: '초대코드로 입장' })).toBeInTheDocument();
+  });
+
+  it('regenerates invite code for host private room and copies invite URL', async () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { nickname: 'host' },
+    } as any);
+    vi.mocked(roomService.regenerateInviteCode).mockResolvedValue({
+      ...privateRoom,
+      inviteCode: 'NEWCODE123',
+    } as any);
+    const user = userEvent.setup();
+
+    render(<RoomListPage />, { wrapper: createWrapper() });
+    await user.click(screen.getByRole('button', { name: '비공개 방 재발급' }));
+
+    await waitFor(() => {
+      expect(roomService.regenerateInviteCode).toHaveBeenCalledWith('private-room-2');
+      expect(toastSuccess).toHaveBeenCalledWith('초대 링크가 클립보드에 복사되었습니다');
     });
   });
 });

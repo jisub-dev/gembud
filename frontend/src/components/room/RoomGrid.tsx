@@ -6,9 +6,17 @@ interface RoomGridProps {
   rooms: Room[];
   isLoading?: boolean;
   onRoomClick?: (roomPublicId: string) => void;
+  shouldShowRegenerateInviteButton?: (room: Room) => boolean;
+  onRegenerateInviteCode?: (roomPublicId: string) => void;
 }
 
-export function RoomGrid({ rooms, isLoading, onRoomClick }: RoomGridProps) {
+export function RoomGrid({
+  rooms,
+  isLoading,
+  onRoomClick,
+  shouldShowRegenerateInviteButton,
+  onRegenerateInviteCode,
+}: RoomGridProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -43,7 +51,13 @@ export function RoomGrid({ rooms, isLoading, onRoomClick }: RoomGridProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {rooms.map((room) => (
-        <RoomCard key={room.id} room={room} onClick={onRoomClick} />
+        <RoomCard
+          key={room.id}
+          room={room}
+          onClick={onRoomClick}
+          showRegenerateInviteButton={shouldShowRegenerateInviteButton?.(room) ?? false}
+          onRegenerateInviteCode={onRegenerateInviteCode}
+        />
       ))}
     </div>
   );
