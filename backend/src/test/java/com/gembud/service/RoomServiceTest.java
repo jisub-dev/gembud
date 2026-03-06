@@ -174,6 +174,20 @@ class RoomServiceTest {
     }
 
     @Test
+    @DisplayName("createRoom - should throw when user already in active room")
+    void createRoom_AlreadyInOtherRoom_ShouldThrow() {
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(temperatureService.canCreateRoom(1L)).thenReturn(true);
+        when(participantRepository.existsActiveParticipationByUserId(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> roomService.createRoom(
+            CreateRoomRequest.builder().gameId(1L).title("T").build(), "user@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.ALREADY_IN_OTHER_ROOM);
+    }
+
+    @Test
     @DisplayName("createRoom - should throw when game not found")
     void createRoom_GameNotFound_ShouldThrow() {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
@@ -418,6 +432,88 @@ class RoomServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.NOT_IN_ROOM);
+    }
+
+    // ──────────────────────────────────────────────
+    // host-only actions
+    // ──────────────────────────────────────────────
+
+    @Test
+    @DisplayName("kickParticipant - should throw when requester is not host")
+    void kickParticipant_NotHost_ShouldThrow() {
+        User member = User.builder()
+            .email("member@example.com")
+            .nickname("Member")
+            .build();
+        ReflectionTestUtils.setField(member, "id", 2L);
+
+        RoomParticipant memberParticipant = RoomParticipant.builder()
+            .room(room)
+            .user(member)
+            .isHost(false)
+            .joinOrder(2)
+            .build();
+
+        when(userRepository.findByEmail("member@example.com")).thenReturn(Optional.of(member));
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(participantRepository.findByRoomIdAndUserId(1L, 2L)).thenReturn(Optional.of(memberParticipant));
+
+        assertThatThrownBy(() -> roomService.kickParticipant(1L, 3L, "member@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_HOST);
+    }
+
+    @Test
+    @DisplayName("transferHost - should throw when requester is not host")
+    void transferHost_NotHost_ShouldThrow() {
+        User member = User.builder()
+            .email("member@example.com")
+            .nickname("Member")
+            .build();
+        ReflectionTestUtils.setField(member, "id", 2L);
+
+        RoomParticipant memberParticipant = RoomParticipant.builder()
+            .room(room)
+            .user(member)
+            .isHost(false)
+            .joinOrder(2)
+            .build();
+
+        when(userRepository.findByEmail("member@example.com")).thenReturn(Optional.of(member));
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(participantRepository.findByRoomIdAndUserId(1L, 2L)).thenReturn(Optional.of(memberParticipant));
+
+        assertThatThrownBy(() -> roomService.transferHost(1L, 3L, "member@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_HOST);
+    }
+
+    @Test
+    @DisplayName("startRoom - should throw when requester is not host")
+    void startRoom_NotHost_ShouldThrow() {
+        User member = User.builder()
+            .email("member@example.com")
+            .nickname("Member")
+            .build();
+        ReflectionTestUtils.setField(member, "id", 2L);
+
+        RoomParticipant memberParticipant = RoomParticipant.builder()
+            .room(room)
+            .user(member)
+            .isHost(false)
+            .joinOrder(2)
+            .build();
+
+        when(userRepository.findByEmail("member@example.com")).thenReturn(Optional.of(member));
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(participantRepository.findByRoomIdAndUserId(1L, 2L)).thenReturn(Optional.of(memberParticipant));
+
+        assertThatThrownBy(() -> roomService.startRoom(1L, "member@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_HOST);
     }
 
     // ──────────────────────────────────────────────
