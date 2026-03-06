@@ -31,7 +31,7 @@ public enum ErrorCode {
     LOW_TEMPERATURE(HttpStatus.FORBIDDEN, "USER002", "Temperature too low to create room"),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "USER003", "Nickname already exists"),
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "USER004", "User is suspended"),
-    NICKNAME_CHANGE_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "USER005", "Nickname can only be changed once every 30 days"),
+    NICKNAME_CHANGE_TOO_SOON(HttpStatus.CONFLICT, "USER005", "Nickname can only be changed once every 30 days"),
 
     // Game
     GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "GAME001", "Game not found"),

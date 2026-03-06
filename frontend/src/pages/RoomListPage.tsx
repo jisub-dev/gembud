@@ -92,6 +92,7 @@ export function RoomListPage() {
         setShowPasswordModal(false);
         setJoiningRoom(null);
         queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
+        navigate(`/games/${gameId}/rooms`);
       } else if (errorCode === 'ROOM002') {
         toast.error('방이 꽉 찼습니다');
         setShowPasswordModal(false);

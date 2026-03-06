@@ -2,10 +2,9 @@ package com.gembud.controller;
 
 import com.gembud.dto.ApiResponse;
 import com.gembud.entity.User;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
 import com.gembud.security.CustomUserDetails;
+import com.gembud.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final UserService userService;
 
     @Value("${app.feature.premium.enabled:false}")
     private boolean premiumFeatureEnabled;
@@ -127,21 +127,7 @@ public class UserController {
         @AuthenticationPrincipal CustomUserDetails userDetails,
         @Valid @RequestBody UpdateProfileRequest request
     ) {
-        User user = userRepository.findByEmail(userDetails.getEmail())
-            .orElseThrow(() -> new IllegalStateException("User not found"));
-
-        if (!user.getNickname().equals(request.getNickname())) {
-            if (!user.canChangeNickname()) {
-                throw new BusinessException(ErrorCode.NICKNAME_CHANGE_COOLDOWN);
-            }
-            if (userRepository.existsByNickname(request.getNickname())) {
-                throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
-            }
-            user.updateNickname(request.getNickname());
-        } else {
-            user.updateProfile(null, null, null);
-        }
-        userRepository.save(user);
+        User user = userService.updateNickname(userDetails.getUserId(), request.getNickname());
 
         return ResponseEntity.ok(ApiResponse.success(buildUserResponse(user)));
     }
