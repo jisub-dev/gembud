@@ -1,5 +1,35 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
+> **Last updated:** 2026-03-06 13:56 KST (by Claude, main terminal)
+
+---
+
+## STATUS BOARD
+
+| 항목 | 값 |
+|------|-----|
+| `main` HEAD | `4673daf` feat: security hardening |
+| Backend tests | ✅ 218 passed / 0 failed (2026-03-06 13:55 KST) |
+| Frontend tests | ✅ 19 passed / 0 failed (2026-03-06 13:55 KST) |
+| Frontend build | ✅ success (dist 454.75kB gzip 142.18kB) |
+
+### 브랜치 현황
+
+| 브랜치 | 상태 | 담당 | 마지막 업데이트 |
+|--------|------|------|----------------|
+| `main` | 🟢 최신 (push 완료) | Claude | 2026-03-06 13:56 |
+| `feat/admin-security-core` | 🟡 대기 (미시작) | Terminal 1 | — |
+| `feat/friend-search-flow` | 🟡 대기 (미시작) | Terminal 2 | — |
+| `feat/chat-room-lifecycle` | 🟡 대기 (미시작) | Terminal 3 | — |
+
+### 공통 파일 잠금 현황 (동시 수정 금지)
+
+| 파일 | 잠금 브랜치 | 이유 |
+|------|------------|------|
+| 현재 없음 | — | 충돌 없음 |
+
+---
+
 ## 1. 목적
 - 여러 터미널/여러 Codex 세션에서 기능을 병렬로 개발한다.
 - 충돌(동일 파일 동시 수정), 누락(테스트/문서), 병합 리스크를 줄인다.
@@ -18,6 +48,60 @@
 - `backend/src/main/java/com/gembud/exception/GlobalExceptionHandler.java`
 - `frontend/src/App.tsx`
 - `docs/FEATURE_REQUIREMENTS_REFERENCE_SPEC_2026-03-05.md`
+
+---
+
+## 2A. 문서 업데이트 프로토콜 ⭐ (필독)
+
+이 파일(`PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md`)은 **살아있는 공유 문서**다.
+모든 터미널은 작업 상태가 바뀔 때마다 이 파일의 **STATUS BOARD**를 직접 수정해야 한다.
+
+### 지휘 구조
+```
+Claude (main terminal) — 지휘/조율/병합 결정
+  ├── Terminal 1 (feat/admin-security-core)
+  ├── Terminal 2 (feat/friend-search-flow)
+  └── Terminal 3 (feat/chat-room-lifecycle)
+```
+
+- **Claude(이 터미널)**가 STATUS BOARD를 최종 관리하고 병합 순서를 결정한다.
+- **각 터미널**은 자신의 작업 단계가 바뀔 때 아래 규칙에 따라 STATUS BOARD를 업데이트하고,
+  Claude 터미널에 완료 보고를 남긴다.
+
+### 각 터미널이 업데이트해야 할 시점
+
+| 시점 | 업데이트 항목 |
+|------|-------------|
+| 작업 시작 | 브랜치 현황 → `🔵 작업중` |
+| 공통 파일 건드릴 때 | 공통 파일 잠금 현황에 행 추가 |
+| 공통 파일 수정 완료 | 잠금 현황 → 잠금 해제로 변경 |
+| 테스트/빌드 완료 | 브랜치 현황 → `🟠 PR 대기` + 테스트 결과 기록 |
+| PR 생성 | 브랜치 현황 → PR 번호 기재 |
+
+### 상태 이모지 규칙
+| 이모지 | 의미 |
+|--------|------|
+| 🟡 | 대기 (미시작) |
+| 🔵 | 작업중 |
+| 🟠 | PR 대기 (테스트 통과, 병합 승인 기다리는 중) |
+| 🟢 | 병합 완료 |
+| 🔴 | 블록됨 (이유 명시) |
+
+### STATUS BOARD 수정 방법
+터미널에서 직접 Edit 도구로 이 파일의 STATUS BOARD 테이블 해당 행만 수정한다.
+커밋은 불필요 — 로컬 수정으로 충분 (Claude가 병합 전 최신 상태 확인).
+
+### 완료 보고 양식 (Claude에게 전달)
+작업 완료 시 아래 양식을 메시지로 Claude에게 전달한다:
+```
+[완료 보고] Terminal N — feat/브랜치명
+1) 변경 파일: (목록)
+2) 핵심 변경: (요약)
+3) 테스트 결과: (통과/실패 수)
+4) 남은 리스크: (있으면 기재)
+5) 공통 파일 수정 여부: (있으면 파일명)
+6) PR: (번호 또는 링크)
+```
 
 ---
 
@@ -177,46 +261,103 @@ PR 본문 최소 포함:
 ---
 
 ## 10. 즉시 실행 프롬프트 템플릿
-아래 문구를 각 터미널에서 Codex/Claude에게 그대로 전달하면 된다.
 
-### Terminal 0 (Claude - 설계/리뷰)
-```text
-문서 /Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md 기준으로
-너는 Terminal 0(Claude) 역할이야.
-코드 수정은 하지 말고, 요구사항/수용기준/리스크 리뷰만 수행해.
-다른 터미널(Codex)에게 줄 작업 지시문과 검증 체크리스트를 작성해줘.
-```
+> **중요**: 아래 프롬프트를 각 터미널에 그대로 전달한다.
+> 각 터미널은 STATUS BOARD를 직접 수정할 의무가 있다.
+> 모든 결정(병합 순서, 공통 파일 소유권, PR 승인)은 **Claude(main terminal)**가 내린다.
 
-### Terminal 1 (Codex - 관리자+보안 코어)
-```text
-문서 /Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md 기준으로
-너는 Terminal 1, 브랜치 feat/admin-security-core 역할이야.
-관리자+보안 코어 범위만 작업하고, 범위 밖 파일 수정 전에는 먼저 보고해.
-구현 -> 테스트 -> 결과 요약(변경파일/검증명령/리스크) 순서로 마무리해.
-```
+---
 
-### Terminal 2 (Codex - 친구)
-```text
-문서 /Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md 기준으로
-너는 Terminal 2, 브랜치 feat/friend-search-flow 역할이야.
-친구 기능 범위만 작업하고, 공통 파일 수정이 필요하면 먼저 보고해.
-구현 -> 테스트 -> 결과 요약(변경파일/검증명령/리스크) 순서로 마무리해.
-```
+### Terminal 1 (feat/admin-security-core)
 
-### Terminal 3 (Codex - 채팅/대기방)
 ```text
-문서 /Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md 기준으로
-너는 Terminal 3, 브랜치 feat/chat-room-lifecycle 역할이야.
-채팅/대기방 정합 범위만 작업하고, 범위 밖 파일 수정 전에는 먼저 보고해.
-구현 -> 테스트 -> 결과 요약(변경파일/검증명령/리스크) 순서로 마무리해.
-```
+너는 Terminal 1이야. 브랜치: feat/admin-security-core
 
-### 공통 종료 보고 템플릿
-```text
-[완료 보고]
+## 살아있는 공유 문서
+이 파일을 반드시 읽어라:
+/Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
+
+## 문서 업데이트 의무
+작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 직접 Edit 도구로 수정해야 한다:
+- 시작 시: feat/admin-security-core 행 → 🔵 작업중
+- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가
+- 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
+
+## 작업 범위
+관리자 컨트롤러 테스트 NPE 픽스 + RateLimitService 통합 테스트 보완
+(섹션 5. A 참조)
+
+## 완료 후
+아래 양식을 Claude(main terminal)에 전달:
+[완료 보고] Terminal 1 — feat/admin-security-core
 1) 변경 파일:
 2) 핵심 변경:
-3) 실행한 테스트/빌드:
+3) 테스트 결과:
 4) 남은 리스크:
-5) 다음 터미널에 넘길 인수인계:
+5) 공통 파일 수정 여부:
+6) PR:
+```
+
+---
+
+### Terminal 2 (feat/friend-search-flow)
+
+```text
+너는 Terminal 2야. 브랜치: feat/friend-search-flow
+
+## 살아있는 공유 문서
+이 파일을 반드시 읽어라:
+/Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
+
+## 문서 업데이트 의무
+작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 직접 Edit 도구로 수정해야 한다:
+- 시작 시: feat/friend-search-flow 행 → 🔵 작업중
+- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 + Claude에게 먼저 보고
+- 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
+
+## 작업 범위
+친구 검색/요청/수락/거절 UX + FriendListPage 탭 분리
+(섹션 5. B 참조)
+
+## 완료 후
+아래 양식을 Claude(main terminal)에 전달:
+[완료 보고] Terminal 2 — feat/friend-search-flow
+1) 변경 파일:
+2) 핵심 변경:
+3) 테스트 결과:
+4) 남은 리스크:
+5) 공통 파일 수정 여부:
+6) PR:
+```
+
+---
+
+### Terminal 3 (feat/chat-room-lifecycle)
+
+```text
+너는 Terminal 3이야. 브랜치: feat/chat-room-lifecycle
+
+## 살아있는 공유 문서
+이 파일을 반드시 읽어라:
+/Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
+
+## 문서 업데이트 의무
+작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 직접 Edit 도구로 수정해야 한다:
+- 시작 시: feat/chat-room-lifecycle 행 → 🔵 작업중
+- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 + Claude에게 먼저 보고
+- 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
+
+## 작업 범위
+채팅방 라이프사이클(참여자 0명 정리) + Sidebar 회귀 테스트
+(섹션 5. C 참조)
+
+## 완료 후
+아래 양식을 Claude(main terminal)에 전달:
+[완료 보고] Terminal 3 — feat/chat-room-lifecycle
+1) 변경 파일:
+2) 핵심 변경:
+3) 테스트 결과:
+4) 남은 리스크:
+5) 공통 파일 수정 여부:
+6) PR:
 ```
