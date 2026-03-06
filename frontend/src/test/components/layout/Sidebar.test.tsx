@@ -31,7 +31,6 @@ vi.mock('@/services/roomService', () => ({
 vi.mock('@/services/chatService', () => ({
   chatService: {
     getMyChatRooms: vi.fn(),
-    getChatRoomByGameRoom: vi.fn(),
   },
 }));
 
@@ -76,26 +75,33 @@ const mockRoom = {
 };
 
 describe('Sidebar', () => {
+  let roomChatsLookup: any[];
+  let generalChats: any[];
+
   beforeEach(() => {
     vi.clearAllMocks();
-
-    vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as any);
-    vi.mocked(useGames).mockReturnValue({ data: [] } as any);
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([mockRoom] as any);
-    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([] as any);
-  });
-
-  it('navigates using ROOM_CHAT mapping first for 내 대기방 click', async () => {
-    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([
+    roomChatsLookup = [
       {
         id: 101,
         type: 'ROOM_CHAT',
         relatedRoomId: 1,
         relatedRoomTitle: '내 대기방 A',
       },
-    ] as any);
-    vi.mocked(chatService.getChatRoomByGameRoom).mockResolvedValue(999);
+    ];
+    generalChats = [{ id: 201, type: 'DIRECT_CHAT', name: 'DM Visible' }];
 
+    vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as any);
+    vi.mocked(useGames).mockReturnValue({ data: [] } as any);
+    vi.mocked(roomService.getMyRooms).mockResolvedValue([mockRoom] as any);
+    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
+      if (type === 'ROOM_CHAT') {
+        return Promise.resolve(roomChatsLookup as any);
+      }
+      return Promise.resolve(generalChats as any);
+    });
+  });
+
+  it('opens ROOM_CHAT via /chat/rooms/my?type=ROOM_CHAT and navigates to /chat/{id}', async () => {
     const user = userEvent.setup();
     render(<Sidebar />, { wrapper: createWrapper() });
 
@@ -103,39 +109,17 @@ describe('Sidebar', () => {
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/chat/101');
+      expect(chatService.getMyChatRooms).toHaveBeenCalledWith('ROOM_CHAT');
     });
-    expect(chatService.getChatRoomByGameRoom).not.toHaveBeenCalled();
   });
 
-  it('falls back to getChatRoomByGameRoom when ROOM_CHAT mapping is missing', async () => {
-    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([
-      { id: 301, type: 'DIRECT_CHAT', name: 'DM A' },
-    ] as any);
-    vi.mocked(chatService.getChatRoomByGameRoom).mockResolvedValue(555);
-
+  it('falls back to /games/{gameId}/rooms when ROOM_CHAT lookup result is empty', async () => {
     const user = userEvent.setup();
     render(<Sidebar />, { wrapper: createWrapper() });
 
     const roomButton = await screen.findByRole('button', { name: /내 대기방 A/i });
-    await act(async () => {
-      await user.click(roomButton);
-    });
+    roomChatsLookup = [];
 
-    await waitFor(() => {
-      expect(chatService.getChatRoomByGameRoom).toHaveBeenCalledWith(1);
-      expect(mockNavigate).toHaveBeenCalledWith('/chat/555');
-    });
-    await waitFor(() => expect(roomButton).not.toBeDisabled());
-  });
-
-  it('navigates to game room list when mapping lookup fails', async () => {
-    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([] as any);
-    vi.mocked(chatService.getChatRoomByGameRoom).mockRejectedValue(new Error('not found'));
-
-    const user = userEvent.setup();
-    render(<Sidebar />, { wrapper: createWrapper() });
-
-    const roomButton = await screen.findByRole('button', { name: /내 대기방 A/i });
     await act(async () => {
       await user.click(roomButton);
     });
@@ -146,33 +130,36 @@ describe('Sidebar', () => {
     await waitFor(() => expect(roomButton).not.toBeDisabled());
   });
 
-  it('prevents duplicate lookup while opening room chat', async () => {
-    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([] as any);
-    vi.mocked(chatService.getChatRoomByGameRoom).mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(777), 20))
-    );
+  it('falls back to / when gameId is missing', async () => {
+    vi.mocked(roomService.getMyRooms).mockResolvedValue([] as any);
 
     const user = userEvent.setup();
     render(<Sidebar />, { wrapper: createWrapper() });
 
     const roomButton = await screen.findByRole('button', { name: /내 대기방 A/i });
+    roomChatsLookup = [];
     await act(async () => {
-      await Promise.all([user.click(roomButton), user.click(roomButton)]);
+      await user.click(roomButton);
     });
 
     await waitFor(() => {
-      expect(chatService.getChatRoomByGameRoom).toHaveBeenCalledTimes(1);
-      expect(mockNavigate).toHaveBeenCalledWith('/chat/777');
+      expect(mockNavigate).toHaveBeenCalledWith('/');
     });
+    await waitFor(() => expect(roomButton).not.toBeDisabled());
+  });
+
+  it('renders "대기방 없음" when there is no ROOM_CHAT', async () => {
+    roomChatsLookup = [];
+    render(<Sidebar />, { wrapper: createWrapper() });
+    expect(await screen.findByText('대기방 없음')).toBeInTheDocument();
   });
 
   it('shows only DIRECT_CHAT/GROUP_CHAT in 채팅방 section', async () => {
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([] as any);
-    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([
-      { id: 101, type: 'ROOM_CHAT', name: 'ROOM SHOULD HIDE', relatedRoomId: 1 },
+    generalChats = [
       { id: 201, type: 'DIRECT_CHAT', name: 'DM Visible' },
       { id: 301, type: 'GROUP_CHAT', name: 'GROUP Visible' },
-    ] as any);
+      { id: 401, type: 'ROOM_CHAT', name: 'ROOM SHOULD HIDE', relatedRoomId: 1 },
+    ];
 
     render(<Sidebar />, { wrapper: createWrapper() });
 
