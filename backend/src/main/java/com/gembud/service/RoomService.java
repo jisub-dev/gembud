@@ -88,7 +88,7 @@ public class RoomService {
             .maxParticipants(request.getMaxParticipants() != null ? request.getMaxParticipants() : 5)
             .currentParticipants(1)
             .isPrivate(request.getIsPrivate() != null ? request.getIsPrivate() : false)
-            .password(encodedPassword)
+            .passwordHash(encodedPassword)
             .createdBy(user)
             .build();
 
@@ -235,8 +235,8 @@ public class RoomService {
                 && room.isInviteCodeValid()
                 && request.getInviteCode().equals(room.getInviteCode());
             boolean hasValidPassword = request.getPassword() != null
-                && room.getPassword() != null
-                && passwordEncoder.matches(request.getPassword(), room.getPassword());
+                && room.getPasswordHash() != null
+                && passwordEncoder.matches(request.getPassword(), room.getPasswordHash());
 
             if (!hasValidInviteCode && !hasValidPassword) {
                 if (request.getInviteCode() != null) {
