@@ -44,8 +44,10 @@ export const chatService = {
   },
 
   // 내가 참여 중인 채팅방 목록
-  async getMyChatRooms(): Promise<ChatRoomInfo[]> {
-    const response = await api.get<ApiResponse<ChatRoomInfo[]>>('/chat/rooms/my');
+  async getMyChatRooms(type?: 'ROOM_CHAT' | 'DIRECT_CHAT' | 'GROUP_CHAT'): Promise<ChatRoomInfo[]> {
+    const response = await api.get<ApiResponse<ChatRoomInfo[]>>('/chat/rooms/my', {
+      params: type ? { type } : undefined,
+    });
     return response.data.data;
   },
 };

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useMemo, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronLeft, Users, MessageSquare, User } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { roomService } from '@/services/roomService';
@@ -14,13 +14,6 @@ const STATUS_COLORS: Record<string, string> = {
   FULL: 'bg-yellow-500',
   IN_PROGRESS: 'bg-neon-cyan',
   CLOSED: 'bg-gray-500',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  OPEN: '대기중',
-  FULL: '가득참',
-  IN_PROGRESS: '진행중',
-  CLOSED: '종료',
 };
 
 const CHAT_TYPE_LABELS: Record<string, string> = {
@@ -68,8 +61,7 @@ export default function Sidebar() {
   const [roomsOpen, setRoomsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
   const [gamesOpen, setGamesOpen] = useState(true);
-  const [openingRoomId, setOpeningRoomId] = useState<number | null>(null);
-  const openingRoomIdsRef = useRef<Set<number>>(new Set());
+  const [isOpeningRoomChat, setIsOpeningRoomChat] = useState(false);
 
   const { data: games = [] } = useGames();
 
@@ -80,41 +72,40 @@ export default function Sidebar() {
     refetchInterval: 15000,
   });
 
-  const { data: myChatRooms = [] } = useQuery<ChatRoomInfo[]>({
-    queryKey: ['myChatRooms'],
-    queryFn: chatService.getMyChatRooms,
+  const { data: myRoomChatRooms = [] } = useQuery<ChatRoomInfo[]>({
+    queryKey: ['myRoomChatRooms'],
+    queryFn: () => chatService.getMyChatRooms('ROOM_CHAT'),
     enabled: isAuthenticated,
     refetchInterval: 15000,
   });
 
-  const roomChatIdByGameRoomId = useMemo(() => {
-    const map = new Map<number, number>();
-    myChatRooms.forEach((chat) => {
-      if (chat.type === 'ROOM_CHAT' && chat.relatedRoomId) {
-        map.set(chat.relatedRoomId, chat.id);
-      }
-    });
-    return map;
-  }, [myChatRooms]);
+  const { data: myChatRooms = [] } = useQuery<ChatRoomInfo[]>({
+    queryKey: ['myChatRooms'],
+    queryFn: () => chatService.getMyChatRooms(),
+    enabled: isAuthenticated,
+    refetchInterval: 15000,
+  });
 
-  const handleMyRoomClick = async (roomId: number, gameId: number) => {
-    if (openingRoomIdsRef.current.has(roomId)) return;
-    const knownRoomChatId = roomChatIdByGameRoomId.get(roomId);
-    if (knownRoomChatId) {
-      navigate(`/chat/${knownRoomChatId}`);
-      return;
-    }
+  const myWaitingRoomChat = myRoomChatRooms[0] ?? null;
 
-    openingRoomIdsRef.current.add(roomId);
-    setOpeningRoomId(roomId);
+  const handleMyWaitingRoomClick = async () => {
+    if (isOpeningRoomChat) return;
+    setIsOpeningRoomChat(true);
     try {
-      const chatRoomId = await chatService.getChatRoomByGameRoom(roomId);
-      navigate(`/chat/${chatRoomId}`);
+      const roomChats = await chatService.getMyChatRooms('ROOM_CHAT');
+      const roomChat = roomChats[0];
+      if (roomChat) {
+        navigate(`/chat/${roomChat.id}`);
+        return;
+      }
+
+      const fallbackGameId = myRooms.find((room) => room.id === myWaitingRoomChat?.relatedRoomId)?.gameId;
+      navigate(fallbackGameId ? `/games/${fallbackGameId}/rooms` : '/');
     } catch {
-      navigate(`/games/${gameId}/rooms`);
+      const fallbackGameId = myRooms.find((room) => room.id === myWaitingRoomChat?.relatedRoomId)?.gameId;
+      navigate(fallbackGameId ? `/games/${fallbackGameId}/rooms` : '/');
     } finally {
-      openingRoomIdsRef.current.delete(roomId);
-      setOpeningRoomId(null);
+      setIsOpeningRoomChat(false);
     }
   };
 
@@ -146,37 +137,32 @@ export default function Sidebar() {
               title="내 대기방"
               isOpen={roomsOpen}
               onToggle={() => setRoomsOpen(!roomsOpen)}
-              count={myRooms.length}
+              count={myWaitingRoomChat ? 1 : 0}
             />
             {roomsOpen && (
               <div className="px-2 pb-1 space-y-0.5">
-                {myRooms.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-text-muted italic">참여 중인 방 없음</p>
+                {!myWaitingRoomChat ? (
+                  <p className="px-3 py-2 text-xs text-text-muted italic">대기방 없음</p>
                 ) : (
-                  myRooms.map((room) => (
-                    <button
-                      type="button"
-                      key={room.id}
-                      onClick={() => handleMyRoomClick(room.id, room.gameId)}
-                      disabled={openingRoomId === room.id}
-                      className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group disabled:opacity-60"
-                    >
-                      <div className="relative flex-shrink-0">
-                        <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center">
-                          <Users size={16} className="text-neon-purple" />
-                        </div>
-                        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-dark-secondary ${STATUS_COLORS[room.status] ?? 'bg-gray-500'}`} />
+                  <button
+                    type="button"
+                    onClick={handleMyWaitingRoomClick}
+                    disabled={isOpeningRoomChat}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group disabled:opacity-60"
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center">
+                        <Users size={16} className="text-neon-purple" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-purple transition-colors">
-                          {room.title}
-                        </p>
-                        <p className="text-xs text-text-muted">
-                          {room.gameName} · {room.currentParticipants}/{room.maxParticipants}명 · {STATUS_LABELS[room.status]}
-                        </p>
-                      </div>
-                    </button>
-                  ))
+                      <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-dark-secondary ${STATUS_COLORS.OPEN}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-purple transition-colors">
+                        {myWaitingRoomChat.relatedRoomTitle ?? myWaitingRoomChat.name ?? '내 대기방'}
+                      </p>
+                      <p className="text-xs text-text-muted">ROOM_CHAT</p>
+                    </div>
+                  </button>
                 )}
               </div>
             )}
