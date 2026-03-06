@@ -211,4 +211,93 @@ class AuthServiceTest {
         verify(securityEventService).record(eq(EventType.REFRESH_REUSE_DETECTED), any(),
             anyString(), any(), anyString(), anyString(), anyString());
     }
+
+    @Test
+    @DisplayName("refreshToken_RotationSuccess: 새 access/refresh/session 발급 및 저장")
+    void refreshToken_RotationSuccess() {
+        String oldToken = "old-refresh-token";
+        RefreshTokenRequest req = new RefreshTokenRequest(oldToken);
+
+        when(jwtTokenProvider.validateToken(oldToken)).thenReturn(true);
+        when(jwtTokenProvider.getEmailFromToken(oldToken)).thenReturn("test@example.com");
+        when(refreshTokenStore.get("test@example.com")).thenReturn(oldToken);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(jwtTokenProvider.generateAccessToken(eq("test@example.com"), anyString(), anyString()))
+            .thenReturn("rotated-access-token");
+        when(jwtTokenProvider.generateRefreshToken(eq("test@example.com"), anyString()))
+            .thenReturn("rotated-refresh-token");
+
+        AuthResponse result = authService.refreshToken(req, "127.0.0.1");
+
+        assertThat(result.getAccessToken()).isEqualTo("rotated-access-token");
+        assertThat(result.getRefreshToken()).isEqualTo("rotated-refresh-token");
+        verify(refreshTokenStore).save(eq("test@example.com"), eq("rotated-refresh-token"), anyLong());
+        verify(refreshTokenStore).saveSession(eq("test@example.com"), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("refreshToken_ReusedOldTokenAfterRotation: old 토큰 재사용 시 INVALID_REFRESH_TOKEN")
+    void refreshToken_ReusedOldTokenAfterRotation() {
+        String oldToken = "old-refresh-token";
+        RefreshTokenRequest req = new RefreshTokenRequest(oldToken);
+
+        when(jwtTokenProvider.validateToken(oldToken)).thenReturn(true);
+        when(jwtTokenProvider.getEmailFromToken(oldToken)).thenReturn("test@example.com");
+        // 이미 회전된 뒤 저장소에는 다른 토큰이 남아있는 상황
+        when(refreshTokenStore.get("test@example.com")).thenReturn("rotated-refresh-token");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+        assertThatThrownBy(() -> authService.refreshToken(req, "127.0.0.1"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    @Test
+    @DisplayName("refreshToken_NotFoundInStore: 저장소에 없는 토큰은 INVALID_REFRESH_TOKEN")
+    void refreshToken_NotFoundInStore() {
+        String token = "valid-but-not-stored";
+        RefreshTokenRequest req = new RefreshTokenRequest(token);
+
+        when(jwtTokenProvider.validateToken(token)).thenReturn(true);
+        when(jwtTokenProvider.getEmailFromToken(token)).thenReturn("test@example.com");
+        when(refreshTokenStore.get("test@example.com")).thenReturn(null);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+        assertThatThrownBy(() -> authService.refreshToken(req, "127.0.0.1"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    @Test
+    @DisplayName("refreshToken_ExpiredToken: validateToken=false 이면 INVALID_REFRESH_TOKEN")
+    void refreshToken_ExpiredToken() {
+        String expiredToken = "expired-refresh-token";
+        RefreshTokenRequest req = new RefreshTokenRequest(expiredToken);
+
+        when(jwtTokenProvider.validateToken(expiredToken)).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.refreshToken(req, "127.0.0.1"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    @Test
+    @DisplayName("login_SingleSessionEnforcement: 로그인 성공 시 기존 WS 세션 종료 및 세션 갱신")
+    void login_SingleSessionEnforcement() {
+        LoginRequest req = new LoginRequest("test@example.com", "password");
+        when(rateLimitService.checkLoginLimit(anyString(), anyString())).thenReturn(1L);
+        when(authenticationManager.authenticate(any()))
+            .thenReturn(new UsernamePasswordAuthenticationToken("test@example.com", null));
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+        AuthResponse result = authService.login(req, "127.0.0.1");
+
+        assertThat(result.getAccessToken()).isEqualTo("access-token");
+        verify(webSocketSessionRegistry).closeUserSessions("test@example.com");
+        verify(refreshTokenStore).saveSession(eq("test@example.com"), anyString(), anyLong());
+        verify(refreshTokenStore, never()).deleteSession(anyString());
+    }
 }
