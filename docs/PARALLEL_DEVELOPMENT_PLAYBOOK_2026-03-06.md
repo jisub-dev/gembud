@@ -25,7 +25,7 @@
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
 | `main` | 🟢 최신 | Claude | — | 2026-03-06 21:58 |
-| `feat/t1-invite-code-frontend` | 🟢 PR 준비 완료 (vitest/build 통과) | Terminal 1 | — | 2026-03-06 22:11 |
+| `feat/t1-invite-code-frontend` | 🟢 PR 준비 완료 (vitest/build 통과) | Terminal 1 | [생성 링크](https://github.com/jisub-dev/gembud/pull/new/feat/t1-invite-code-frontend) | 2026-03-06 22:12 |
 | `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
 | `feat/t2-publicid-url` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 21:58 |
 | `feat/t3-room-policy` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 21:58 |
