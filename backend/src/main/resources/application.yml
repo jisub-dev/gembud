@@ -56,3 +56,6 @@ logging:
     com.gembud: DEBUG
     org.springframework.security: DEBUG
     org.springframework.security.web.csrf: TRACE
+
+ads:
+  daily-view-limit: ${ADS_DAILY_VIEW_LIMIT:5}

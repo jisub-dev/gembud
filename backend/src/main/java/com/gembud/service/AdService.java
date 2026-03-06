@@ -8,12 +8,15 @@ import com.gembud.exception.ErrorCode;
 import com.gembud.repository.AdViewRepository;
 import com.gembud.repository.AdvertisementRepository;
 import com.gembud.repository.UserRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,11 +35,13 @@ public class AdService {
     private final AdvertisementRepository advertisementRepository;
     private final AdViewRepository adViewRepository;
     private final UserRepository userRepository;
-
-    private static final int MAX_ADS_PER_DAY = 3;
+    private final StringRedisTemplate redisTemplate;
 
     @Value("${app.feature.premium.enabled:false}")
     private boolean premiumFeatureEnabled;
+
+    @Value("${ads.daily-view-limit:5}")
+    private int dailyViewLimit;
 
     /**
      * Get ads for user (Phase 11: 1-day 3x limit, premium excluded).
@@ -56,9 +61,9 @@ public class AdService {
         LocalDateTime oneDayAgo = LocalDateTime.now().minusDays(1);
         long viewCount = adViewRepository.countByUserIdSince(userId, oneDayAgo);
 
-        if (viewCount >= MAX_ADS_PER_DAY) {
+        if (viewCount >= dailyViewLimit) {
             log.debug("User {} has reached daily ad limit ({}/{})",
-                user.getNickname(), viewCount, MAX_ADS_PER_DAY);
+                user.getNickname(), viewCount, dailyViewLimit);
             return Collections.emptyList();
         }
 
@@ -85,12 +90,22 @@ public class AdService {
             throw new BusinessException(ErrorCode.AD_NOT_ACTIVE);
         }
 
-        // Check daily limit
-        LocalDateTime oneDayAgo = LocalDateTime.now().minusDays(1);
-        long viewCount = adViewRepository.countByUserIdSince(userId, oneDayAgo);
-
-        if (viewCount >= MAX_ADS_PER_DAY) {
-            throw new BusinessException(ErrorCode.AD_VIEW_LIMIT_EXCEEDED);
+        long todayCount;
+        if (user.isPremium()) {
+            todayCount = -1;
+        } else {
+            String key = String.format("ad_view:%d:%s", userId, LocalDate.now());
+            Long currentCount = redisTemplate.opsForValue().increment(key);
+            if (currentCount == null) {
+                currentCount = 0L;
+            }
+            if (currentCount == 1L) {
+                redisTemplate.expire(key, 2, TimeUnit.DAYS);
+            }
+            if (currentCount > dailyViewLimit) {
+                throw new BusinessException(ErrorCode.AD_VIEW_LIMIT_EXCEEDED);
+            }
+            todayCount = currentCount;
         }
 
         // Record view
@@ -101,7 +116,7 @@ public class AdService {
         adViewRepository.save(adView);
 
         log.info("Ad view recorded: user={}, ad={}, dailyCount={}",
-            user.getNickname(), ad.getId(), viewCount + 1);
+            user.getNickname(), ad.getId(), user.isPremium() ? "premium-unlimited" : todayCount);
     }
 
     /**
@@ -113,6 +128,6 @@ public class AdService {
     public int getRemainingAdViews(Long userId) {
         LocalDateTime oneDayAgo = LocalDateTime.now().minusDays(1);
         long viewCount = adViewRepository.countByUserIdSince(userId, oneDayAgo);
-        return Math.max(0, MAX_ADS_PER_DAY - (int) viewCount);
+        return Math.max(0, dailyViewLimit - (int) viewCount);
     }
 }
