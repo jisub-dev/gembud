@@ -3,6 +3,7 @@ package com.gembud.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Disabled;
@@ -126,6 +127,27 @@ class RoomControllerTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER002"))
             .andExpect(jsonPath("$.message").value("Temperature too low to create room"));
+    }
+
+    @Test
+    @DisplayName("POST /rooms - should return 409 when already in another active room")
+    @WithMockUser(username = "test@example.com")
+    void createRoom_AlreadyInOtherRoom() throws Exception {
+        CreateRoomRequest request = CreateRoomRequest.builder()
+            .gameId(1L)
+            .title("중복 생성 시도")
+            .maxParticipants(5)
+            .build();
+
+        when(roomService.createRoom(any(CreateRoomRequest.class), eq("test@example.com")))
+            .thenThrow(new BusinessException(ErrorCode.ALREADY_IN_OTHER_ROOM));
+
+        mockMvc.perform(post("/rooms")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("ROOM008"))
+            .andExpect(jsonPath("$.message").value("이미 다른 대기방에 참가 중입니다."));
     }
 
     @Test
@@ -302,6 +324,19 @@ class RoomControllerTest {
         mockMvc.perform(post("/rooms/1/leave"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value(204));
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{roomId}/kick/{userId} - should return 403 when requester is not host")
+    @WithMockUser(username = "member@example.com")
+    void kickParticipant_NotHost() throws Exception {
+        doThrow(new BusinessException(ErrorCode.NOT_HOST))
+            .when(roomService).kickParticipant(1L, 2L, "member@example.com");
+
+        mockMvc.perform(post("/rooms/1/kick/2"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("ROOM007"))
+            .andExpect(jsonPath("$.message").value("Only host can perform this action"));
     }
 
     @Test
