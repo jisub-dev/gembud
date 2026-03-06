@@ -59,7 +59,7 @@ public class MatchingService {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        List<Room> openRooms = roomRepository.findByGameIdAndStatus(
+        List<Room> openRooms = roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(
             gameId,
             Room.RoomStatus.OPEN
         );

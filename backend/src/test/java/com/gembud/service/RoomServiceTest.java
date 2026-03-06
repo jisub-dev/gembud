@@ -318,6 +318,7 @@ class RoomServiceTest {
         // Then: room should be saved (closed)
         verify(roomRepository).save(singleRoom);
         assertThat(singleRoom.getStatus()).isEqualTo(Room.RoomStatus.CLOSED);
+        assertThat(singleRoom.getDeletedAt()).isNotNull();
     }
 
     @Test

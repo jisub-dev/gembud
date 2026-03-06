@@ -89,21 +89,6 @@ export function useLeaveRoom() {
 }
 
 /**
- * Hook to close a room (host only).
- */
-export function useCloseRoom() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (roomId: number) => roomService.closeRoom(roomId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
-    },
-  });
-}
-
-/**
  * Hook to kick a participant (host only).
  */
 export function useKickParticipant() {
