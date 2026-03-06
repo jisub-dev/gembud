@@ -25,6 +25,7 @@
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
 | `main` | 🟢 최신 | Claude | — | 2026-03-06 21:58 |
+| `feat/t1-invite-code-frontend` | 🟢 PR 준비 완료 (vitest/build 통과) | Terminal 1 | — | 2026-03-06 22:11 |
 | `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
 | `feat/t2-publicid-url` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 21:58 |
 | `feat/t3-room-policy` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 21:58 |
@@ -36,6 +37,7 @@
 | 현재 없음 | — | — | 충돌 없음 |
 | `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t2-publicid-url` | 해제 | Terminal 2 시작/완료 상태 업데이트 반영 완료 |
 | `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t1-password-bcrypt` | 해제 | Terminal 1 시작/완료 상태 업데이트 반영 |
+| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t1-invite-code-frontend` | 해제 | Terminal 1 시작/완료 상태 업데이트 반영 |
 
 ---
 

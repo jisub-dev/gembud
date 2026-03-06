@@ -1,12 +1,20 @@
 import { Lock, Users, Gamepad2 } from 'lucide-react';
+import type { MouseEvent } from 'react';
 import type { Room } from '@/types/room';
 
 interface RoomCardProps {
   room: Room;
   onClick?: (roomPublicId: string) => void;
+  showRegenerateInviteButton?: boolean;
+  onRegenerateInviteCode?: (roomPublicId: string) => void;
 }
 
-export function RoomCard({ room, onClick }: RoomCardProps) {
+export function RoomCard({
+  room,
+  onClick,
+  showRegenerateInviteButton,
+  onRegenerateInviteCode,
+}: RoomCardProps) {
   const statusStyles = {
     OPEN: 'border-green-500 hover:shadow-green-500/50',
     FULL: 'border-orange-500 opacity-75 cursor-not-allowed',
@@ -24,6 +32,13 @@ export function RoomCard({ room, onClick }: RoomCardProps) {
   const handleClick = () => {
     if (room.status === 'OPEN' && onClick) {
       onClick(room.publicId);
+    }
+  };
+
+  const handleRegenerateClick = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (onRegenerateInviteCode) {
+      onRegenerateInviteCode(room.publicId);
     }
   };
 
@@ -72,10 +87,21 @@ export function RoomCard({ room, onClick }: RoomCardProps) {
 
       {/* Private Badge */}
       {room.isPrivate && (
-        <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs mt-2">
-          <Lock size={11} />
-          비공개
-        </span>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">
+            <Lock size={11} />
+            비공개
+          </span>
+          {showRegenerateInviteButton && (
+            <button
+              type="button"
+              onClick={handleRegenerateClick}
+              className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition"
+            >
+              초대코드 재발급
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
