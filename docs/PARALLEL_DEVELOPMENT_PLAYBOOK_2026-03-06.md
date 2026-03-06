@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 13:56 KST (by Claude, main terminal)
+> **Last updated:** 2026-03-06 14:10 KST (by Claude, main terminal)
 
 ---
 
@@ -8,287 +8,327 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `4673daf` feat: security hardening |
+| `main` HEAD | `a4e95fb` docs: add living document protocol |
 | Backend tests | ✅ 218 passed / 0 failed (2026-03-06 13:55 KST) |
 | Frontend tests | ✅ 19 passed / 0 failed (2026-03-06 13:55 KST) |
 | Frontend build | ✅ success (dist 454.75kB gzip 142.18kB) |
 
 ### 브랜치 현황
 
-| 브랜치 | 상태 | 담당 | 마지막 업데이트 |
-|--------|------|------|----------------|
-| `main` | 🟢 최신 (push 완료) | Claude | 2026-03-06 13:56 |
-| `feat/admin-security-core` | 🟡 대기 (미시작) | Terminal 1 | — |
-| `feat/friend-search-flow` | 🟡 대기 (미시작) | Terminal 2 | — |
-| `feat/chat-room-lifecycle` | 🟡 대기 (미시작) | Terminal 3 | — |
+| 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
+|--------|------|------|----|----------------|
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 14:10 |
+| `feat/admin-security-core` | 🟡 대기 (미시작) | Terminal 1 | — | — |
+| `feat/friend-search-flow` | 🟡 대기 (미시작) | Terminal 2 | — | — |
+| `feat/chat-room-lifecycle` | 🟡 대기 (미시작) | Terminal 3 | — | — |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
-| 파일 | 잠금 브랜치 | 이유 |
-|------|------------|------|
-| 현재 없음 | — | 충돌 없음 |
+| 파일 | 잠금 브랜치 | 상태 | 이유 |
+|------|------------|------|------|
+| 현재 없음 | — | — | 충돌 없음 |
 
 ---
 
 ## 1. 목적
-- 여러 터미널/여러 Codex 세션에서 기능을 병렬로 개발한다.
+
+- 여러 터미널/에이전트에서 기능을 병렬로 개발한다.
 - 충돌(동일 파일 동시 수정), 누락(테스트/문서), 병합 리스크를 줄인다.
+- Claude(main terminal)가 지휘 센터 역할을 하며 모든 병합 결정을 내린다.
 
 ---
 
-## 2. 운영 원칙
-1. `main` 직접 커밋 금지
-2. 기능 단위 브랜치 1개 = 목적 1개
-3. 동일 파일 동시 수정 금지
-4. 공통 파일 수정 시 즉시 공유
-5. 브랜치마다 테스트 통과 후 PR 생성
+## 2. 지휘 구조
 
-공통 파일(충돌 고위험) 예시:
+```
+Claude (main terminal) — 지휘 / 조율 / 병합 결정 / 문서 최종 관리
+  ├── Terminal 1 — feat/admin-security-core
+  ├── Terminal 2 — feat/friend-search-flow
+  └── Terminal 3 — feat/chat-room-lifecycle
+```
+
+- **Claude**만 main에 직접 커밋/push할 수 있다.
+- **각 터미널**은 자신의 브랜치에서만 커밋/push하고, PR을 올리면 Claude가 승인 후 병합한다.
+- 병합 순서, 공통 파일 소유권, 충돌 해결 방향은 모두 Claude가 결정한다.
+
+---
+
+## 3. 운영 원칙
+
+1. `main` 직접 커밋 금지 (Claude 예외)
+2. 기능 단위 브랜치 1개 = 목적 1개
+3. 동일 파일 동시 수정 금지 → 공통 파일 잠금 현황 확인 필수
+4. 공통 파일 수정 필요 시 → Claude에게 먼저 보고 후 승인받고 수정
+5. 브랜치마다 테스트 + 빌드 통과 후 PR 생성
+
+### 공통 파일 (충돌 고위험 — 수정 전 Claude 승인 필수)
 - `backend/src/main/java/com/gembud/exception/ErrorCode.java`
 - `backend/src/main/java/com/gembud/exception/GlobalExceptionHandler.java`
 - `frontend/src/App.tsx`
-- `docs/FEATURE_REQUIREMENTS_REFERENCE_SPEC_2026-03-05.md`
+- `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` (이 파일)
 
 ---
 
-## 2A. 문서 업데이트 프로토콜 ⭐ (필독)
+## 4. 살아있는 문서 프로토콜 ⭐ (필독)
 
-이 파일(`PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md`)은 **살아있는 공유 문서**다.
-모든 터미널은 작업 상태가 바뀔 때마다 이 파일의 **STATUS BOARD**를 직접 수정해야 한다.
+이 파일은 **모든 터미널이 공유하는 실시간 상태판**이다.
 
-### 지휘 구조
-```
-Claude (main terminal) — 지휘/조율/병합 결정
-  ├── Terminal 1 (feat/admin-security-core)
-  ├── Terminal 2 (feat/friend-search-flow)
-  └── Terminal 3 (feat/chat-room-lifecycle)
-```
+### 각 터미널의 업데이트 의무
 
-- **Claude(이 터미널)**가 STATUS BOARD를 최종 관리하고 병합 순서를 결정한다.
-- **각 터미널**은 자신의 작업 단계가 바뀔 때 아래 규칙에 따라 STATUS BOARD를 업데이트하고,
-  Claude 터미널에 완료 보고를 남긴다.
-
-### 각 터미널이 업데이트해야 할 시점
+작업 단계가 바뀔 때마다 이 파일의 STATUS BOARD를 **직접 Edit 도구로** 수정한다.
 
 | 시점 | 업데이트 항목 |
 |------|-------------|
-| 작업 시작 | 브랜치 현황 → `🔵 작업중` |
-| 공통 파일 건드릴 때 | 공통 파일 잠금 현황에 행 추가 |
-| 공통 파일 수정 완료 | 잠금 현황 → 잠금 해제로 변경 |
-| 테스트/빌드 완료 | 브랜치 현황 → `🟠 PR 대기` + 테스트 결과 기록 |
-| PR 생성 | 브랜치 현황 → PR 번호 기재 |
+| 작업 시작 | 브랜치 현황 → `🔵 작업중` + 날짜 기재 |
+| 공통 파일 수정 시작 | 잠금 현황 테이블에 행 추가 |
+| 공통 파일 수정 완료 | 잠금 현황 → `해제` 로 변경 |
+| 테스트/빌드 완료 | 브랜치 현황 → `🟠 PR 대기` + 테스트 결과 기재 |
+| PR 생성 | PR 열 → PR 번호 기재 |
+| 병합 완료 (Claude) | `🟢 병합 완료` + main HEAD 업데이트 |
 
 ### 상태 이모지 규칙
+
 | 이모지 | 의미 |
 |--------|------|
 | 🟡 | 대기 (미시작) |
 | 🔵 | 작업중 |
-| 🟠 | PR 대기 (테스트 통과, 병합 승인 기다리는 중) |
-| 🟢 | 병합 완료 |
+| 🟠 | PR 대기 (테스트 통과, Claude 승인 기다리는 중) |
+| 🟢 | 병합 완료 / 최신 |
 | 🔴 | 블록됨 (이유 명시) |
 
-### STATUS BOARD 수정 방법
-터미널에서 직접 Edit 도구로 이 파일의 STATUS BOARD 테이블 해당 행만 수정한다.
-커밋은 불필요 — 로컬 수정으로 충분 (Claude가 병합 전 최신 상태 확인).
-
 ### 완료 보고 양식 (Claude에게 전달)
-작업 완료 시 아래 양식을 메시지로 Claude에게 전달한다:
+
 ```
 [완료 보고] Terminal N — feat/브랜치명
-1) 변경 파일: (목록)
-2) 핵심 변경: (요약)
-3) 테스트 결과: (통과/실패 수)
-4) 남은 리스크: (있으면 기재)
-5) 공통 파일 수정 여부: (있으면 파일명)
+1) 변경 파일:
+2) 핵심 변경:
+3) 테스트 결과: (통과 N / 실패 N)
+4) 남은 리스크:
+5) 공통 파일 수정 여부: (없음 or 파일명 목록)
 6) PR: (번호 또는 링크)
 ```
 
 ---
 
-## 3. 브랜치 네이밍
-- 관리자: `feat/admin-*`
-- 친구: `feat/friend-*`
-- 보안/세션: `feat/security-*`
-- 채팅/대기방: `feat/chat-*`
+## 5. 커밋 / 푸시 / 머지 타이밍 전략 ⭐
 
-예시:
-- `feat/admin-security-core`
-- `feat/friend-search-flow`
-- `feat/chat-room-lifecycle`
+### 기본 흐름
+
+```
+브랜치 내부 커밋 (자유)
+  → push origin feat/브랜치명
+    → PR 생성 → Claude 리뷰 → 병합 승인
+      → Squash merge into main
+        → 다른 터미널: git fetch && git rebase origin/main
+```
+
+### 각 단계별 규칙
+
+#### 브랜치 내부 커밋
+- 작업 단위로 자유롭게 커밋한다 (WIP 커밋 허용).
+- `main`에는 절대 직접 push하지 않는다.
+
+#### push 타이밍
+- 하루 1회 이상 `git push origin feat/브랜치명` — 작업 내용 백업 및 Claude 모니터링 목적.
+- PR 올릴 준비가 됐을 때 최종 push.
+
+#### PR 생성 조건 (모두 충족 시)
+```
+✅ 테스트 통과 (backend ./gradlew test, frontend npx vitest run)
+✅ 빌드 성공 (frontend npm run build)
+✅ 공통 파일 수정 없음 or Claude 승인 완료
+✅ STATUS BOARD → 🟠 PR 대기로 업데이트
+```
+
+#### 병합 순서 (Claude가 집행)
+
+| 순서 | 브랜치 | 이유 |
+|------|--------|------|
+| 1st | `feat/admin-security-core` | ErrorCode 등 공통 인프라 변경 가능성 → 먼저 확정해야 후속 충돌 감소 |
+| 2nd | `feat/chat-room-lifecycle` | 비교적 독립적, 백엔드 서비스 레이어만 건드림 |
+| 3rd | `feat/friend-search-flow` | ErrorCode/GlobalExceptionHandler 충돌 가능성 → 마지막에 rebase해서 깨끗하게 정리 |
+
+#### main이 앞서갈 때 (다른 브랜치가 먼저 병합됐을 때)
+
+각 터미널이 스스로 실행:
+```bash
+git fetch origin
+git rebase origin/main
+# 충돌 발생 시 → 해결 후 git rebase --continue
+# 해결 불가 시 → Claude에 보고, Claude가 소유권 결정
+```
+
+rebase 완료 후 STATUS BOARD의 "마지막 업데이트" 날짜만 갱신.
+
+#### 병합 전략
+- **Squash and merge** 고정 (커밋 히스토리 깔끔하게 유지).
+- 병합 후 Claude가 STATUS BOARD `main` HEAD 업데이트 + 해당 브랜치 → `🟢 병합 완료`.
+
+### 긴급 충돌 처리 절차
+
+1. 터미널이 충돌 발생 시 즉시 Claude에 보고
+2. Claude가 소유 브랜치 결정 (어느 쪽 변경을 살릴지)
+3. Claude가 결정 내용을 STATUS BOARD 잠금 현황에 기재
+4. 소유 브랜치 터미널이 변경 적용, 다른 브랜치는 cherry-pick 또는 rebase
 
 ---
 
-## 4. 터미널 병렬 시작 템플릿
-권장: Claude는 설계/리뷰 전담, Codex는 구현/테스트 전담으로 분리
+## 6. 브랜치 시작 명령
 
-### Terminal 0 - Claude (설계/리뷰 전담)
 ```bash
-git switch main && git pull
-# 코드 수정 없이 문서/요구사항/리뷰 코멘트 정리 중심
-```
-
-### Terminal 1 - 관리자+보안 코어
-```bash
+# Terminal 1
 git switch main && git pull
 git switch -c feat/admin-security-core
-```
 
-### Terminal 2 - 친구
-```bash
+# Terminal 2
 git switch main && git pull
 git switch -c feat/friend-search-flow
-```
 
-### Terminal 3 - 채팅/대기방
-```bash
+# Terminal 3
 git switch main && git pull
 git switch -c feat/chat-room-lifecycle
 ```
 
 ---
 
-## 4A. 에이전트 역할 분리 (Claude vs Codex)
-## Claude에 맡길 작업
-- 요구사항 정리/정책 확정
-- 설계 옵션 비교, 트레이드오프 문서화
-- PR 리뷰(리스크/회귀 가능성 점검)
-- 릴리즈 체크리스트/운영 문서 작성
+## 7. 현재 작업 범위
 
-## Codex에 맡길 작업
-- 실제 코드 구현(백엔드/프론트)
-- 테스트 추가/수정 + 실행
-- 빌드/타입 오류 복구
-- 리뷰 반영 패치
+### A. Terminal 1 — `feat/admin-security-core`
+**목표**: 관리자 컨트롤러 테스트 NPE 픽스 + RateLimitService 통합 테스트 보완
 
-## 권장 운영 루프
-1. Claude: 스펙/수용기준 확정
-2. Codex: 구현 + 테스트 + 빌드
-3. Claude: 변경 리뷰/피드백
-4. Codex: 피드백 반영 후 PR 마무리
+- Admin 컨트롤러(`@PreAuthorize("hasRole('ADMIN')")`) 테스트에서 `CustomUserDetails` NPE → `@WithMockUser` 대신 `CustomUserDetails` 직접 생성 방식으로 픽스
+- `RateLimitService` WS CONNECT 레이트리밋 통합 테스트 보완
+- `SecurityEventService` `@Async` 동작 검증
 
----
+핵심 파일:
+```
+backend/src/main/java/com/gembud/controller/Admin*Controller.java
+backend/src/test/java/com/gembud/controller/Admin*ControllerTest.java
+backend/src/main/java/com/gembud/service/RateLimitService.java
+backend/src/main/java/com/gembud/config/SecurityConfig.java
+```
 
-## 5. 현재 권장 병렬 작업 분할
-## A. 관리자+보안 코어 (`feat/admin-security-core`)
-- admin/rate-limit 관련 컴파일 이슈 해결
-- 관리자 API 권한 체크 정리
-- 보안/세션 정책(단일세션/락/레이트리밋) 정합
-- 관리자 화면/엔드포인트 스모크 테스트
-
-핵심 대상 파일(예시):
-- `backend/src/main/java/com/gembud/controller/Admin*`
-- `backend/src/main/java/com/gembud/service/Admin*`
-- `backend/src/main/java/com/gembud/security/*`
-- `backend/src/main/java/com/gembud/service/RateLimitService.java`
-- `backend/src/test/java/com/gembud/controller/Admin*Test.java`
-
-## B. 친구 기능 (`feat/friend-search-flow`)
-- 사용자 검색 기반 친구 요청 UX 고도화
-- 요청/수락/거절 E2E 시나리오 추가
-- 친구 요청 상태 배지/정렬 회귀 테스트
-
-핵심 대상 파일(예시):
-- `frontend/src/pages/FriendListPage.tsx`
-- `frontend/src/hooks/queries/useFriends.ts`
-- `frontend/src/test/hooks/useFriends.test.ts`
-- `backend/src/main/java/com/gembud/service/FriendService.java`
-
-## C. 채팅/대기방 정합 (`feat/chat-room-lifecycle`)
-- ROOM_CHAT 라이프사이클(참여자 0명 시 정리) 검증
-- 사이드바 이동/도메인 분리 회귀 테스트 강화
-
-핵심 대상 파일(예시):
-- `frontend/src/components/layout/Sidebar.tsx`
-- `frontend/src/test/components/layout/Sidebar.test.tsx`
-- `backend/src/main/java/com/gembud/service/ChatService.java`
-- `backend/src/main/java/com/gembud/service/RoomService.java`
-
----
-
-## 6. 작업중 체크리스트 (브랜치 공통)
-1. 기능 요구사항 문서 반영 여부 확인
-2. 테스트 추가/수정
-3. 로컬 검증 실행
-4. 변경 파일 범위 점검
-5. PR 템플릿 작성
-
-권장 검증 명령:
+검증:
 ```bash
-# frontend
-cd frontend && npx vitest run
-cd frontend && npm run build
+cd backend && ./gradlew test --tests "com.gembud.controller.Admin*" --continue
+cd backend && ./gradlew test --tests "com.gembud.service.RateLimitServiceTest"
+```
 
-# backend
-cd backend && ./gradlew test
+### B. Terminal 2 — `feat/friend-search-flow`
+**목표**: 친구 검색 기반 요청/수락/거절 UX + FriendListPage 탭 분리
+
+- 닉네임 검색 → 친구 요청 전송 UI
+- 친구 요청 상태 배지 (PENDING/ACCEPTED/REJECTED) 정렬/표시
+- `FriendListPage.tsx` 탭 분리 (받은 요청 / 보낸 요청)
+- E2E 시나리오 테스트 추가
+
+핵심 파일:
+```
+frontend/src/pages/FriendListPage.tsx
+frontend/src/hooks/queries/useFriends.ts
+frontend/src/test/hooks/useFriends.test.ts
+backend/src/main/java/com/gembud/service/FriendService.java
+```
+
+검증:
+```bash
+cd frontend && npx vitest run --reporter=verbose
+cd frontend && npm run build
+cd backend && ./gradlew test --tests "com.gembud.service.FriendServiceTest"
+```
+
+### C. Terminal 3 — `feat/chat-room-lifecycle`
+**목표**: 채팅방 라이프사이클 정합 + Sidebar 회귀 테스트
+
+- 참여자 0명 시 chat room 자동 정리 로직 검증
+- `ChatWebSocketController` join/leave 이벤트 처리 정합
+- `Sidebar.tsx` 채팅방 링크 이동 회귀 테스트
+
+핵심 파일:
+```
+frontend/src/components/layout/Sidebar.tsx
+frontend/src/test/components/layout/Sidebar.test.tsx
+backend/src/main/java/com/gembud/service/ChatService.java
+backend/src/main/java/com/gembud/websocket/ChatWebSocketController.java
+```
+
+검증:
+```bash
+cd frontend && npx vitest run --reporter=verbose
+cd frontend && npm run build
+cd backend && ./gradlew test --tests "com.gembud.service.ChatServiceTest"
 ```
 
 ---
 
-## 7. PR 규칙
-PR 제목 예시:
-- `[friend] 검색 기반 친구요청 + 상태배지`
-- `[admin] rate-limit 컴파일 이슈 수정`
+## 8. 작업중 체크리스트 (브랜치 공통)
 
-PR 본문 최소 포함:
+```
+[ ] STATUS BOARD → 🔵 작업중으로 업데이트
+[ ] 공통 파일 수정 필요 여부 확인 → 필요 시 Claude에 먼저 보고
+[ ] 기능 구현
+[ ] 테스트 추가/수정
+[ ] 로컬 검증 실행 (테스트 + 빌드)
+[ ] STATUS BOARD → 🟠 PR 대기로 업데이트 + 테스트 결과 기재
+[ ] git push origin feat/브랜치명
+[ ] PR 생성
+[ ] Claude에 완료 보고 전달
+```
+
+---
+
+## 9. PR 규칙
+
+제목 형식: `[범위] 핵심 변경 요약`
+```
+[admin] 관리자 컨트롤러 테스트 NPE 픽스 + RateLimitService 통합 테스트
+[friend] 검색 기반 친구 요청 + FriendListPage 탭 분리
+[chat] 채팅방 라이프사이클 정합 + Sidebar 회귀 테스트
+```
+
+PR 본문 필수 포함:
 1. 변경 목적
-2. 변경 파일
-3. 테스트 결과
-4. 리스크/롤백 포인트
+2. 변경 파일 목록
+3. 테스트 결과 (통과 N / 실패 N)
+4. 리스크 / 롤백 포인트
+5. 공통 파일 수정 여부
 
-머지 전략:
-- `Squash and merge`
-- 머지 전 `main` rebase 또는 최신화 후 충돌 해결
-
----
-
-## 8. 병합 순서 권장
-1. 관리자+보안 코어 (`feat/admin-security-core`)
-2. 채팅/대기방 (`feat/chat-*`)
-3. 친구 (`feat/friend-*`)
-
-이유:
-- 공통 인프라/보안/에러코드 변경을 먼저 확정하면 이후 기능 브랜치 충돌이 줄어든다.
-
----
-
-## 9. 운영 팁
-- 긴 작업은 하루 1회 `main` 기준으로 재정렬(rebase 또는 merge)한다.
-- 같은 파일을 건드려야 하면 "소유 브랜치"를 먼저 정하고 후속 브랜치는 해당 커밋을 cherry-pick 한다.
-- 브랜치가 커지면 리뷰가 느려지므로 1 PR 300~500 LOC 내를 권장한다.
-- Claude 터미널은 기본적으로 `main` 읽기 전용처럼 운영하고, 코드 커밋은 Codex 브랜치에서만 수행한다.
-- 공통 파일 수정이 필요하면 먼저 Claude가 변경 우선순위를 정하고, Codex는 소유 브랜치에서 선반영 후 다른 브랜치가 따라간다.
+병합 전략: **Squash and merge** 고정
 
 ---
 
 ## 10. 즉시 실행 프롬프트 템플릿
 
-> **중요**: 아래 프롬프트를 각 터미널에 그대로 전달한다.
-> 각 터미널은 STATUS BOARD를 직접 수정할 의무가 있다.
-> 모든 결정(병합 순서, 공통 파일 소유권, PR 승인)은 **Claude(main terminal)**가 내린다.
+> 아래 텍스트를 각 터미널에 그대로 붙여넣는다.
 
 ---
 
-### Terminal 1 (feat/admin-security-core)
+### Terminal 1
 
 ```text
 너는 Terminal 1이야. 브랜치: feat/admin-security-core
 
-## 살아있는 공유 문서
-이 파일을 반드시 읽어라:
+## 필수: 살아있는 공유 문서 확인
+작업 시작 전 이 파일을 Read 도구로 반드시 읽어라:
 /Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
 
+STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업을 시작한다.
+
 ## 문서 업데이트 의무
-작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 직접 Edit 도구로 수정해야 한다:
-- 시작 시: feat/admin-security-core 행 → 🔵 작업중
-- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가
+작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 Edit 도구로 직접 수정한다:
+- 시작 시: feat/admin-security-core 행 → 🔵 작업중 + 날짜
+- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 (수정 전 Claude에 보고)
 - 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
 
-## 작업 범위
-관리자 컨트롤러 테스트 NPE 픽스 + RateLimitService 통합 테스트 보완
-(섹션 5. A 참조)
+## 커밋/푸시 규칙
+- 브랜치 내부에서만 커밋한다. main push 금지.
+- 완료 시: git push origin feat/admin-security-core → PR 생성
+- main이 앞서간 경우: git fetch && git rebase origin/main 후 계속
 
-## 완료 후
-아래 양식을 Claude(main terminal)에 전달:
+## 작업 범위 (섹션 7. A 참조)
+관리자 컨트롤러 테스트 NPE 픽스 + RateLimitService 통합 테스트 보완
+
+## 완료 후 Claude에 전달
 [완료 보고] Terminal 1 — feat/admin-security-core
 1) 변경 파일:
 2) 핵심 변경:
@@ -300,27 +340,32 @@ PR 본문 최소 포함:
 
 ---
 
-### Terminal 2 (feat/friend-search-flow)
+### Terminal 2
 
 ```text
 너는 Terminal 2야. 브랜치: feat/friend-search-flow
 
-## 살아있는 공유 문서
-이 파일을 반드시 읽어라:
+## 필수: 살아있는 공유 문서 확인
+작업 시작 전 이 파일을 Read 도구로 반드시 읽어라:
 /Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
 
+STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업을 시작한다.
+
 ## 문서 업데이트 의무
-작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 직접 Edit 도구로 수정해야 한다:
-- 시작 시: feat/friend-search-flow 행 → 🔵 작업중
-- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 + Claude에게 먼저 보고
+작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 Edit 도구로 직접 수정한다:
+- 시작 시: feat/friend-search-flow 행 → 🔵 작업중 + 날짜
+- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 (수정 전 Claude에 보고)
 - 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
 
-## 작업 범위
-친구 검색/요청/수락/거절 UX + FriendListPage 탭 분리
-(섹션 5. B 참조)
+## 커밋/푸시 규칙
+- 브랜치 내부에서만 커밋한다. main push 금지.
+- 완료 시: git push origin feat/friend-search-flow → PR 생성
+- main이 앞서간 경우: git fetch && git rebase origin/main 후 계속
 
-## 완료 후
-아래 양식을 Claude(main terminal)에 전달:
+## 작업 범위 (섹션 7. B 참조)
+친구 검색/요청/수락/거절 UX + FriendListPage 탭 분리
+
+## 완료 후 Claude에 전달
 [완료 보고] Terminal 2 — feat/friend-search-flow
 1) 변경 파일:
 2) 핵심 변경:
@@ -332,27 +377,32 @@ PR 본문 최소 포함:
 
 ---
 
-### Terminal 3 (feat/chat-room-lifecycle)
+### Terminal 3
 
 ```text
 너는 Terminal 3이야. 브랜치: feat/chat-room-lifecycle
 
-## 살아있는 공유 문서
-이 파일을 반드시 읽어라:
+## 필수: 살아있는 공유 문서 확인
+작업 시작 전 이 파일을 Read 도구로 반드시 읽어라:
 /Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
 
+STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업을 시작한다.
+
 ## 문서 업데이트 의무
-작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 직접 Edit 도구로 수정해야 한다:
-- 시작 시: feat/chat-room-lifecycle 행 → 🔵 작업중
-- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 + Claude에게 먼저 보고
+작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 Edit 도구로 직접 수정한다:
+- 시작 시: feat/chat-room-lifecycle 행 → 🔵 작업중 + 날짜
+- 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 (수정 전 Claude에 보고)
 - 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
 
-## 작업 범위
-채팅방 라이프사이클(참여자 0명 정리) + Sidebar 회귀 테스트
-(섹션 5. C 참조)
+## 커밋/푸시 규칙
+- 브랜치 내부에서만 커밋한다. main push 금지.
+- 완료 시: git push origin feat/chat-room-lifecycle → PR 생성
+- main이 앞서간 경우: git fetch && git rebase origin/main 후 계속
 
-## 완료 후
-아래 양식을 Claude(main terminal)에 전달:
+## 작업 범위 (섹션 7. C 참조)
+채팅방 라이프사이클(참여자 0명 정리) + Sidebar 회귀 테스트
+
+## 완료 후 Claude에 전달
 [완료 보고] Terminal 3 — feat/chat-room-lifecycle
 1) 변경 파일:
 2) 핵심 변경:
@@ -361,3 +411,12 @@ PR 본문 최소 포함:
 5) 공통 파일 수정 여부:
 6) PR:
 ```
+
+---
+
+## 11. 운영 팁
+
+- 같은 파일을 건드려야 하면 "소유 브랜치"를 먼저 정하고, 후속 브랜치는 병합 후 rebase해서 따라간다.
+- 브랜치가 커지면 리뷰가 느려지므로 1 PR 300~500 LOC 내를 권장한다.
+- 긴 작업은 하루 1회 `main` 기준으로 rebase해서 드리프트를 줄인다.
+- WIP 커밋은 허용. PR 올리기 전 `git rebase -i`로 스쿼시해서 정리하면 더 좋다.
