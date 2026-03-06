@@ -18,15 +18,16 @@
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
 | `main` | 🟢 최신 | Claude | — | 2026-03-06 14:10 |
-| `feat/admin-security-core` | 🟡 대기 (미시작) | Terminal 1 | — | — |
-| `feat/friend-search-flow` | 🟡 대기 (미시작) | Terminal 2 | — | — |
-| `feat/chat-room-lifecycle` | 🟡 대기 (미시작) | Terminal 3 | — | — |
+| `feat/admin-security-core` | 🟠 PR 대기 | Terminal 1 | — | 2026-03-06 14:08 (Admin* / RateLimitServiceTest 통과) |
+| `feat/friend-search-flow` | 🟠 PR 대기 (FE test/build, BE FriendServiceTest ✅) | Terminal 2 | — | 2026-03-06 14:10 |
+| `feat/chat-room-lifecycle` | 🟠 PR 대기 (FE vitest/build + BE ChatServiceTest/gradlew --continue 통과) | Terminal 3 | — | 2026-03-06 14:08 |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
 | 파일 | 잠금 브랜치 | 상태 | 이유 |
 |------|------------|------|------|
-| 현재 없음 | — | — | 충돌 없음 |
+| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/chat-room-lifecycle` | 해제 | Terminal 3 상태 업데이트 완료 |
+| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/admin-security-core` | 해제 | Terminal 1 시작/완료 상태 업데이트 반영 완료 |
 
 ---
 

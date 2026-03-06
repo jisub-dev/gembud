@@ -177,7 +177,7 @@ public class FriendService {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        return friendRepository.findByFriendIdAndStatus(user.getId(), FriendStatus.PENDING).stream()
+        return friendRepository.findAllReceivedRequests(user.getId()).stream()
             .map(FriendResponse::from)
             .collect(Collectors.toList());
     }
@@ -192,7 +192,7 @@ public class FriendService {
         User user = userRepository.findByEmail(userEmail)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        return friendRepository.findByUserIdAndStatus(user.getId(), FriendStatus.PENDING).stream()
+        return friendRepository.findAllSentRequests(user.getId()).stream()
             .map(FriendResponse::from)
             .collect(Collectors.toList());
     }

@@ -105,6 +105,38 @@ class RateLimitServiceTest {
     }
 
     @Test
+    @DisplayName("checkWsLimit_BelowOrEqualLimit: 카운트 30 이하면 통과")
+    void checkWsLimit_BelowOrEqualLimit() {
+        when(valueOperations.increment(anyString())).thenReturn(30L);
+
+        rateLimitService.checkWsLimit("1.2.3.4");
+    }
+
+    @Test
+    @DisplayName("checkWsLimit_FirstIncrement: 첫 증가 시 60초 TTL 설정")
+    void checkWsLimit_FirstIncrement_SetsTtl() {
+        when(valueOperations.increment(anyString())).thenReturn(1L);
+
+        rateLimitService.checkWsLimit("1.2.3.4");
+
+        verify(redisTemplate).expire("ratelimit:ws:ip:1.2.3.4", 60, TimeUnit.SECONDS);
+    }
+
+    @Test
+    @DisplayName("checkLoginLimit_FirstIncrement: IP/계정 키 TTL 설정")
+    void checkLoginLimit_FirstIncrement_SetsTtl() {
+        when(valueOperations.increment(anyString()))
+            .thenReturn(1L) // IP
+            .thenReturn(1L); // account
+
+        long result = rateLimitService.checkLoginLimit("1.2.3.4", "user@example.com");
+
+        assertThat(result).isEqualTo(1L);
+        verify(redisTemplate).expire("ratelimit:login:ip:1.2.3.4", 60, TimeUnit.SECONDS);
+        verify(redisTemplate).expire("ratelimit:login:account:user@example.com", 10, TimeUnit.MINUTES);
+    }
+
+    @Test
     @DisplayName("resetLoginCount: Redis delete 호출 검증")
     void resetLoginCount() {
         rateLimitService.resetLoginCount("user@example.com");

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, Users, MessageSquare, User } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { roomService } from '@/services/roomService';
@@ -69,6 +69,7 @@ export default function Sidebar() {
   const [chatsOpen, setChatsOpen] = useState(true);
   const [gamesOpen, setGamesOpen] = useState(true);
   const [openingRoomId, setOpeningRoomId] = useState<number | null>(null);
+  const openingRoomIdsRef = useRef<Set<number>>(new Set());
 
   const { data: games = [] } = useGames();
 
@@ -97,13 +98,14 @@ export default function Sidebar() {
   }, [myChatRooms]);
 
   const handleMyRoomClick = async (roomId: number, gameId: number) => {
-    if (openingRoomId === roomId) return;
+    if (openingRoomIdsRef.current.has(roomId)) return;
     const knownRoomChatId = roomChatIdByGameRoomId.get(roomId);
     if (knownRoomChatId) {
       navigate(`/chat/${knownRoomChatId}`);
       return;
     }
 
+    openingRoomIdsRef.current.add(roomId);
     setOpeningRoomId(roomId);
     try {
       const chatRoomId = await chatService.getChatRoomByGameRoom(roomId);
@@ -111,6 +113,7 @@ export default function Sidebar() {
     } catch {
       navigate(`/games/${gameId}/rooms`);
     } finally {
+      openingRoomIdsRef.current.delete(roomId);
       setOpeningRoomId(null);
     }
   };
