@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 15:45 KST (by Claude, main terminal) — 2라운드 시작
+> **Last updated:** 2026-03-06 16:32 KST (by Claude, main terminal) — 2라운드 완료
 
 ---
 
@@ -8,28 +8,26 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `125262a` 1라운드 완료 |
-| Backend tests | ✅ 222 passed / 0 failed (2026-03-06 14:24 KST) |
-| Frontend tests | ✅ 20 passed / 0 failed (2026-03-06 14:24 KST) |
-| Frontend build | ✅ success (dist 455.59kB gzip 142.48kB) |
+| `main` HEAD | `7e9ad00` 2라운드 완료 (Testcontainers + 방 라이프사이클 + 닉네임 쿨다운) |
+| Backend tests | ✅ 229 passed / 0 failed (2026-03-06 16:30 KST) |
+| Frontend tests | ✅ 24 passed / 0 failed (2026-03-06 16:30 KST) |
+| Frontend build | ✅ success (dist 455.56kB gzip 142.48kB) |
 
-### Worktree 구조 (2라운드)
+### Worktree 구조
 
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-testcontainers` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-room-lifecycle` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-nickname-cooldown-room-ux` | Terminal 3 |
+| `gembud-t1/t2/t3` | — | 제거 완료 (3라운드에 재생성) |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 15:45 |
-| `feat/t1-testcontainers` | 🟡 대기 (미시작) | Terminal 1 | — | — |
-| `feat/t2-room-lifecycle` | 🟡 대기 (미시작) | Terminal 2 | — | — |
-| `feat/t3-nickname-cooldown-room-ux` | 🟡 대기 (미시작) | Terminal 3 | — | — |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 16:32 |
+| `feat/t1-testcontainers` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 16:32 |
+| `feat/t2-room-lifecycle` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 16:32 |
+| `feat/t3-nickname-cooldown-room-ux` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 16:32 |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
