@@ -108,7 +108,7 @@ public class RoomController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "방 조회 성공"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
     })
-    @GetMapping("/{roomId}")
+    @GetMapping("/id/{roomId}")
     public ResponseEntity<ApiResponse<RoomResponse>> getRoomById(@PathVariable Long roomId) {
         return ResponseEntity.ok(ApiResponse.success(roomService.getRoomById(roomId)));
     }
@@ -120,7 +120,7 @@ public class RoomController {
      * @return room details
      */
     @Operation(summary = "Get room by public ID", description = "방 상세 정보 조회 (UUID)")
-    @GetMapping("/public/{publicId}")
+    @GetMapping("/{publicId}")
     public ResponseEntity<ApiResponse<RoomResponse>> getRoomByPublicId(@PathVariable String publicId) {
         return ResponseEntity.ok(ApiResponse.success(roomService.getRoomByPublicId(publicId)));
     }
@@ -140,7 +140,7 @@ public class RoomController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "방을 찾을 수 없음")
     })
-    @PostMapping("/{roomId}/join")
+    @PostMapping("/id/{roomId}/join")
     public ResponseEntity<ApiResponse<RoomResponse>> joinRoom(
         @PathVariable Long roomId,
         @RequestBody JoinRoomRequest request,
@@ -159,7 +159,7 @@ public class RoomController {
      * @return room + chatRoomId
      */
     @Operation(summary = "Join room by public ID", description = "방 입장 (UUID, chatRoomId 포함 반환)")
-    @PostMapping("/public/{publicId}/join")
+    @PostMapping("/{publicId}/join")
     public ResponseEntity<ApiResponse<Map<String, Object>>> joinRoomByPublicId(
         @PathVariable String publicId,
         @RequestBody JoinRoomRequest request,
@@ -244,7 +244,7 @@ public class RoomController {
      * @return updated room with new invite code
      */
     @Operation(summary = "Regenerate invite code", description = "비공개 방 초대코드 재발급 (방장만 가능)")
-    @PostMapping("/public/{publicId}/invite/regenerate")
+    @PostMapping("/{publicId}/invite/regenerate")
     public ResponseEntity<ApiResponse<RoomResponse>> regenerateInviteCode(
         @PathVariable String publicId,
         @AuthenticationPrincipal UserDetails userDetails

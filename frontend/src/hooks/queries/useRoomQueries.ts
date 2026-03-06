@@ -10,6 +10,6 @@ export const roomKeys = {
   lists: () => [...roomKeys.all, 'list'] as const,
   list: (gameId: number) => [...roomKeys.lists(), gameId] as const,
   details: () => [...roomKeys.all, 'detail'] as const,
-  detail: (roomId: number) => [...roomKeys.details(), roomId] as const,
+  detail: (roomIdentifier: string | number) => [...roomKeys.details(), roomIdentifier] as const,
   recommended: (gameId: number) => [...roomKeys.all, 'recommended', gameId] as const,
 };

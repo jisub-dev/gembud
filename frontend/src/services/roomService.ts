@@ -15,9 +15,9 @@ export const roomService = {
     return response.data.data;
   },
 
-  // 방 상세 조회
-  async getRoomById(roomId: number): Promise<Room> {
-    const response = await api.get<ApiResponse<Room>>(`/rooms/${roomId}`);
+  // 방 상세 조회 (publicId 기반)
+  async getRoom(publicId: string): Promise<Room> {
+    const response = await api.get<ApiResponse<Room>>(`/rooms/${publicId}`);
     return response.data.data;
   },
 
@@ -27,29 +27,18 @@ export const roomService = {
     return response.data.data;
   },
 
-  // 방 입장 (numeric ID, legacy)
-  async joinRoom(roomId: number, password?: string): Promise<void> {
-    await api.post(`/rooms/${roomId}/join`, { password });
-  },
-
   // 방 입장 (publicId 기반, chatRoomId 반환)
-  async joinRoomByPublicId(publicId: string, password?: string, inviteCode?: string): Promise<JoinRoomResult> {
+  async joinRoom(publicId: string, password?: string, inviteCode?: string): Promise<JoinRoomResult> {
     const response = await api.post<ApiResponse<JoinRoomResult>>(
-      `/rooms/public/${publicId}/join`,
+      `/rooms/${publicId}/join`,
       { password, inviteCode },
     );
     return response.data.data;
   },
 
-  // 방 상세 조회 (publicId)
-  async getRoomByPublicId(publicId: string): Promise<Room> {
-    const response = await api.get<ApiResponse<Room>>(`/rooms/public/${publicId}`);
-    return response.data.data;
-  },
-
   // 초대코드 재발급 (방장만, publicId 기반)
   async regenerateInviteCode(publicId: string): Promise<Room> {
-    const response = await api.post<ApiResponse<Room>>(`/rooms/public/${publicId}/invite/regenerate`);
+    const response = await api.post<ApiResponse<Room>>(`/rooms/${publicId}/invite/regenerate`);
     return response.data.data;
   },
 

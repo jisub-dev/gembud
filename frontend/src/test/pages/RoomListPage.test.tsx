@@ -49,7 +49,7 @@ vi.mock('@/hooks/useToast', () => ({
 
 vi.mock('@/services/roomService', () => ({
   roomService: {
-    joinRoomByPublicId: vi.fn(),
+    joinRoom: vi.fn(),
   },
 }));
 
@@ -66,10 +66,10 @@ vi.mock('@/components/common/AdBanner', () => ({
 }));
 
 vi.mock('@/components/room/RoomGrid', () => ({
-  RoomGrid: ({ rooms, onRoomClick }: { rooms: Room[]; onRoomClick: (id: number) => void }) => (
+  RoomGrid: ({ rooms, onRoomClick }: { rooms: Room[]; onRoomClick: (publicId: string) => void }) => (
     <div>
       {rooms.map((room) => (
-        <button key={room.id} onClick={() => onRoomClick(room.id)}>
+        <button key={room.id} onClick={() => onRoomClick(room.publicId)}>
           {room.title}
         </button>
       ))}
@@ -153,7 +153,7 @@ describe('RoomListPage auto-join UX', () => {
   });
 
   it('auto-joins public room and navigates to chat on success', async () => {
-    vi.mocked(roomService.joinRoomByPublicId).mockResolvedValue({
+    vi.mocked(roomService.joinRoom).mockResolvedValue({
       room: publicRoom,
       chatRoomId: 555,
     } as any);
@@ -163,13 +163,13 @@ describe('RoomListPage auto-join UX', () => {
     await user.click(screen.getByRole('button', { name: '공개 방' }));
 
     await waitFor(() => {
-      expect(roomService.joinRoomByPublicId).toHaveBeenCalledWith('public-room-1', undefined);
+      expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-1', undefined);
       expect(mockNavigate).toHaveBeenCalledWith('/chat/555');
     });
   });
 
   it('keeps password input when password is invalid (401)', async () => {
-    vi.mocked(roomService.joinRoomByPublicId).mockRejectedValue(createApiError('ROOM006'));
+    vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM006'));
     const user = userEvent.setup();
 
     render(<RoomListPage />, { wrapper: createWrapper() });
@@ -187,7 +187,7 @@ describe('RoomListPage auto-join UX', () => {
   });
 
   it('shows toast and keeps user on room list when room is full (409)', async () => {
-    vi.mocked(roomService.joinRoomByPublicId).mockRejectedValue(createApiError('ROOM002'));
+    vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM002'));
     const user = userEvent.setup();
 
     render(<RoomListPage />, { wrapper: createWrapper() });
@@ -206,7 +206,7 @@ describe('RoomListPage auto-join UX', () => {
   });
 
   it('shows 404 toast and routes to room list path', async () => {
-    vi.mocked(roomService.joinRoomByPublicId).mockRejectedValue(createApiError('ROOM001'));
+    vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM001'));
     const user = userEvent.setup();
 
     render(<RoomListPage />, { wrapper: createWrapper() });

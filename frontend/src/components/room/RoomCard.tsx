@@ -3,7 +3,7 @@ import type { Room } from '@/types/room';
 
 interface RoomCardProps {
   room: Room;
-  onClick?: (roomId: number) => void;
+  onClick?: (roomPublicId: string) => void;
 }
 
 export function RoomCard({ room, onClick }: RoomCardProps) {
@@ -23,7 +23,7 @@ export function RoomCard({ room, onClick }: RoomCardProps) {
 
   const handleClick = () => {
     if (room.status === 'OPEN' && onClick) {
-      onClick(room.id);
+      onClick(room.publicId);
     }
   };
 

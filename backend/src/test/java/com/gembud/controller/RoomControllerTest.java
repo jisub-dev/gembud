@@ -180,7 +180,7 @@ class RoomControllerTest {
         when(roomService.getRoomById(1L)).thenReturn(response);
 
         // When & Then
-        mockMvc.perform(get("/rooms/1"))
+        mockMvc.perform(get("/rooms/id/1"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.id").value(1))
             .andExpect(jsonPath("$.data.title").value("LOL 랭크 방"))
@@ -197,10 +197,33 @@ class RoomControllerTest {
             .thenThrow(new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
         // When & Then
-        mockMvc.perform(get("/rooms/999"))
+        mockMvc.perform(get("/rooms/id/999"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("ROOM001"))
             .andExpect(jsonPath("$.message").value("Room not found"));
+    }
+
+    @Test
+    @DisplayName("GET /rooms/{publicId} - should return room details")
+    @WithMockUser
+    void getRoomByPublicId_Success() throws Exception {
+        RoomResponse response = RoomResponse.builder()
+            .id(1L)
+            .publicId("123e4567-e89b-12d3-a456-426614174000")
+            .gameId(1L)
+            .title("Public Room")
+            .createdBy("호스트")
+            .currentParticipants(2)
+            .maxParticipants(5)
+            .status("OPEN")
+            .build();
+
+        when(roomService.getRoomByPublicId("123e4567-e89b-12d3-a456-426614174000")).thenReturn(response);
+
+        mockMvc.perform(get("/rooms/123e4567-e89b-12d3-a456-426614174000"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.publicId").value("123e4567-e89b-12d3-a456-426614174000"))
+            .andExpect(jsonPath("$.data.title").value("Public Room"));
     }
 
     @Test
@@ -224,12 +247,40 @@ class RoomControllerTest {
             .thenReturn(response);
 
         // When & Then
-        mockMvc.perform(post("/rooms/1/join")
+        mockMvc.perform(post("/rooms/id/1/join")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value(200))
             .andExpect(jsonPath("$.data.currentParticipants").value(2));
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{publicId}/join - should join room by publicId successfully")
+    @WithMockUser(username = "test@example.com")
+    void joinRoomByPublicId_Success() throws Exception {
+        JoinRoomRequest request = JoinRoomRequest.builder().password(null).build();
+        RoomResponse response = RoomResponse.builder()
+            .id(1L)
+            .publicId("123e4567-e89b-12d3-a456-426614174000")
+            .gameId(1L)
+            .title("Public Room")
+            .currentParticipants(2)
+            .maxParticipants(5)
+            .build();
+
+        when(roomService.joinRoomByPublicId(
+            eq("123e4567-e89b-12d3-a456-426614174000"),
+            any(JoinRoomRequest.class),
+            eq("test@example.com")
+        )).thenReturn(new RoomService.JoinRoomResult(response, 777L));
+
+        mockMvc.perform(post("/rooms/123e4567-e89b-12d3-a456-426614174000/join")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.room.publicId").value("123e4567-e89b-12d3-a456-426614174000"))
+            .andExpect(jsonPath("$.data.chatRoomId").value(777));
     }
 
     @Test
@@ -243,7 +294,7 @@ class RoomControllerTest {
             .thenThrow(new BusinessException(ErrorCode.ROOM_FULL));
 
         // When & Then
-        mockMvc.perform(post("/rooms/1/join")
+        mockMvc.perform(post("/rooms/id/1/join")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isConflict())
@@ -262,7 +313,7 @@ class RoomControllerTest {
             .thenThrow(new BusinessException(ErrorCode.ALREADY_IN_OTHER_ROOM));
 
         // When & Then
-        mockMvc.perform(post("/rooms/1/join")
+        mockMvc.perform(post("/rooms/id/1/join")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isConflict())
@@ -283,7 +334,7 @@ class RoomControllerTest {
             .thenThrow(new BusinessException(ErrorCode.INVALID_ROOM_PASSWORD));
 
         // When & Then
-        mockMvc.perform(post("/rooms/1/join")
+        mockMvc.perform(post("/rooms/id/1/join")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isUnauthorized())

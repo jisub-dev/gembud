@@ -5,7 +5,7 @@ import { RoomCard } from './RoomCard';
 interface RoomGridProps {
   rooms: Room[];
   isLoading?: boolean;
-  onRoomClick?: (roomId: number) => void;
+  onRoomClick?: (roomPublicId: string) => void;
 }
 
 export function RoomGrid({ rooms, isLoading, onRoomClick }: RoomGridProps) {
