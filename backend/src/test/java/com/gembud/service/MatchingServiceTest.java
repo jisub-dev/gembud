@@ -140,7 +140,7 @@ class MatchingServiceTest {
         // Given
         when(userRepository.findByEmail("test@example.com"))
             .thenReturn(Optional.of(testUser));
-        when(roomRepository.findByGameIdAndStatus(1L, Room.RoomStatus.OPEN))
+        when(roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(1L, Room.RoomStatus.OPEN))
             .thenReturn(Arrays.asList(highTempRoom, lowTempRoom, normalRoom));
 
         // Mock filters (no filters for simplicity)
@@ -203,7 +203,7 @@ class MatchingServiceTest {
         // Given
         when(userRepository.findByEmail("test@example.com"))
             .thenReturn(Optional.of(testUser));
-        when(roomRepository.findByGameIdAndStatus(1L, Room.RoomStatus.OPEN))
+        when(roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(1L, Room.RoomStatus.OPEN))
             .thenReturn(Arrays.asList(highTempRoom, lowTempRoom, normalRoom));
 
         // User is already in highTempRoom
@@ -237,7 +237,7 @@ class MatchingServiceTest {
         // Given
         when(userRepository.findByEmail("test@example.com"))
             .thenReturn(Optional.of(testUser));
-        when(roomRepository.findByGameIdAndStatus(1L, Room.RoomStatus.OPEN))
+        when(roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(1L, Room.RoomStatus.OPEN))
             .thenReturn(Arrays.asList(highTempRoom, lowTempRoom, normalRoom));
 
         // Mock dependencies
@@ -277,7 +277,7 @@ class MatchingServiceTest {
         // Given
         when(userRepository.findByEmail("test@example.com"))
             .thenReturn(Optional.of(testUser));
-        when(roomRepository.findByGameIdAndStatus(1L, Room.RoomStatus.OPEN))
+        when(roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(1L, Room.RoomStatus.OPEN))
             .thenReturn(Collections.emptyList());
 
         // When
@@ -297,7 +297,7 @@ class MatchingServiceTest {
         // Given
         when(userRepository.findByEmail("test@example.com"))
             .thenReturn(Optional.of(testUser));
-        when(roomRepository.findByGameIdAndStatus(1L, Room.RoomStatus.OPEN))
+        when(roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(1L, Room.RoomStatus.OPEN))
             .thenReturn(Collections.singletonList(highTempRoom));
 
         when(filterRepository.findByRoomId(1L)).thenReturn(Collections.emptyList());

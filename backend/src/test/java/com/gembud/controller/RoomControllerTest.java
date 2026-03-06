@@ -252,6 +252,25 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("POST /rooms/{roomId}/join - should return 409 when already in another room")
+    @WithMockUser(username = "test@example.com")
+    void joinRoom_AlreadyInOtherRoom() throws Exception {
+        // Given
+        JoinRoomRequest request = new JoinRoomRequest();
+
+        when(roomService.joinRoom(eq(1L), any(JoinRoomRequest.class), eq("test@example.com")))
+            .thenThrow(new BusinessException(ErrorCode.ALREADY_IN_OTHER_ROOM));
+
+        // When & Then
+        mockMvc.perform(post("/rooms/1/join")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("ROOM008"))
+            .andExpect(jsonPath("$.message").value("이미 다른 대기방에 참가 중입니다."));
+    }
+
+    @Test
     @DisplayName("POST /rooms/{roomId}/join - should return 401 when invalid password")
     @WithMockUser(username = "test@example.com")
     void joinRoom_InvalidPassword() throws Exception {
