@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 15:25 KST (by Claude, main terminal)
+> **Last updated:** 2026-03-06 15:35 KST (by Claude, main terminal)
 
 ---
 
@@ -8,28 +8,26 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `67be07b` merge: Terminal 1/2/3 work into main |
+| `main` HEAD | `d26f573` PR #1 merged (SecurityEventServiceTest) |
 | Backend tests | ✅ 222 passed / 0 failed (2026-03-06 14:24 KST) |
 | Frontend tests | ✅ 20 passed / 0 failed (2026-03-06 14:24 KST) |
 | Frontend build | ✅ success (dist 455.59kB gzip 142.48kB) |
 
-### Worktree 구조 (2026-03-06 14:26 확정)
+### Worktree 구조
 
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-admin-security-core` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-friend-search-flow` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-chat-room-lifecycle` | Terminal 3 |
+| `gembud-t1/t2/t3` | — | 제거 완료 (다음 라운드에 재생성) |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 15:25 |
-| `feat/t1-admin-security-core` | 🟠 PR 대기 | Terminal 1 | [열기](https://github.com/jisub-dev/gembud/compare/main...feat/t1-admin-security-core) | 2026-03-06 15:16 ✅ Admin* + 전체 백엔드 |
-| `feat/t2-friend-search-flow` | 🟠 PR 대기 | Terminal 2 | [열기](https://github.com/jisub-dev/gembud/compare/main...feat/t2-friend-search-flow) | 2026-03-06 15:19 ✅ FE 20/20 + build + FriendServiceTest |
-| `feat/t3-chat-room-lifecycle` | 🟠 PR 대기 | Terminal 3 | [열기](https://github.com/jisub-dev/gembud/compare/main...feat/t3-chat-room-lifecycle) | 2026-03-06 15:20 ✅ FE vitest/build + ChatServiceTest |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 15:35 |
+| `feat/t1-admin-security-core` | 🟢 병합 완료 | Terminal 1 | #1 merged | 2026-03-06 15:30 |
+| `feat/t2-friend-search-flow` | 🟢 main에 포함 | Terminal 2 | — | 2026-03-06 15:35 |
+| `feat/t3-chat-room-lifecycle` | 🟢 main에 포함 | Terminal 3 | — | 2026-03-06 15:35 |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
