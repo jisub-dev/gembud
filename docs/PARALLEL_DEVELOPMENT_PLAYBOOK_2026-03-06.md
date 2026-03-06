@@ -19,7 +19,7 @@
 |--------|------|------|----|----------------|
 | `main` | 🟢 최신 | Claude | — | 2026-03-06 14:10 |
 | `feat/admin-security-core` | 🟠 PR 대기 | Terminal 1 | — | 2026-03-06 14:08 (Admin* / RateLimitServiceTest 통과) |
-| `feat/friend-search-flow` | 🔵 작업중 | Terminal 2 | — | 2026-03-06 14:05 |
+| `feat/friend-search-flow` | 🟠 PR 대기 (FE test/build, BE FriendServiceTest ✅) | Terminal 2 | — | 2026-03-06 14:10 |
 | `feat/chat-room-lifecycle` | 🟠 PR 대기 (FE vitest/build + BE ChatServiceTest/gradlew --continue 통과) | Terminal 3 | — | 2026-03-06 14:08 |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)

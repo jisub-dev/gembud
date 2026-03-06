@@ -173,21 +173,55 @@ class FriendServiceTest {
     }
 
     @Test
-    @DisplayName("getPendingRequests - 받은 요청만 반환")
-    void getPendingRequests_ShouldReturnReceivedPending() {
+    @DisplayName("getPendingRequests - 받은 요청 전체를 상태 정렬 순서로 반환")
+    void getPendingRequests_ShouldReturnReceivedRequests() {
         Friend pending = Friend.builder()
             .id(12L)
             .user(other)
             .friend(me)
             .status(FriendStatus.PENDING)
             .build();
+        Friend rejected = Friend.builder()
+            .id(13L)
+            .user(other)
+            .friend(me)
+            .status(FriendStatus.REJECTED)
+            .build();
 
         when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
-        when(friendRepository.findByFriendIdAndStatus(1L, FriendStatus.PENDING)).thenReturn(List.of(pending));
+        when(friendRepository.findAllReceivedRequests(1L)).thenReturn(List.of(pending, rejected));
 
         List<FriendResponse> responses = friendService.getPendingRequests("me@example.com");
 
-        assertThat(responses).hasSize(1);
+        assertThat(responses).hasSize(2);
         assertThat(responses.get(0).getUserId()).isEqualTo(2L);
+        assertThat(responses.get(0).getStatus()).isEqualTo("PENDING");
+        assertThat(responses.get(1).getStatus()).isEqualTo("REJECTED");
+    }
+
+    @Test
+    @DisplayName("getSentRequests - 보낸 요청 전체를 상태 정렬 순서로 반환")
+    void getSentRequests_ShouldReturnSentRequests() {
+        Friend pending = Friend.builder()
+            .id(20L)
+            .user(me)
+            .friend(other)
+            .status(FriendStatus.PENDING)
+            .build();
+        Friend accepted = Friend.builder()
+            .id(21L)
+            .user(me)
+            .friend(other)
+            .status(FriendStatus.ACCEPTED)
+            .build();
+
+        when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
+        when(friendRepository.findAllSentRequests(1L)).thenReturn(List.of(pending, accepted));
+
+        List<FriendResponse> responses = friendService.getSentRequests("me@example.com");
+
+        assertThat(responses).hasSize(2);
+        assertThat(responses.get(0).getStatus()).isEqualTo("PENDING");
+        assertThat(responses.get(1).getStatus()).isEqualTo("ACCEPTED");
     }
 }

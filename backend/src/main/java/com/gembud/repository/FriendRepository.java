@@ -46,6 +46,19 @@ public interface FriendRepository extends JpaRepository<Friend, Long> {
     );
 
     /**
+     * Find all friend requests sent by a user with status-priority ordering.
+     *
+     * @param userId user ID
+     * @return sorted friend relationships
+     */
+    @Query("SELECT f FROM Friend f WHERE f.user.id = :userId " +
+           "ORDER BY CASE " +
+           "WHEN f.status = 'PENDING' THEN 0 " +
+           "WHEN f.status = 'ACCEPTED' THEN 1 " +
+           "ELSE 2 END, f.updatedAt DESC")
+    List<Friend> findAllSentRequests(@Param("userId") Long userId);
+
+    /**
      * Find all friend requests received by a user.
      *
      * @param friendId friend ID (receiver)
@@ -57,6 +70,19 @@ public interface FriendRepository extends JpaRepository<Friend, Long> {
         @Param("friendId") Long friendId,
         @Param("status") FriendStatus status
     );
+
+    /**
+     * Find all friend requests received by a user with status-priority ordering.
+     *
+     * @param friendId friend ID (receiver)
+     * @return sorted friend relationships
+     */
+    @Query("SELECT f FROM Friend f WHERE f.friend.id = :friendId " +
+           "ORDER BY CASE " +
+           "WHEN f.status = 'PENDING' THEN 0 " +
+           "WHEN f.status = 'ACCEPTED' THEN 1 " +
+           "ELSE 2 END, f.updatedAt DESC")
+    List<Friend> findAllReceivedRequests(@Param("friendId") Long friendId);
 
     /**
      * Find all accepted friends for a user (bidirectional).
