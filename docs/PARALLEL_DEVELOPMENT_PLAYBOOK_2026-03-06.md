@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 14:10 KST (by Claude, main terminal)
+> **Last updated:** 2026-03-06 14:26 KST (by Claude, main terminal)
 
 ---
 
@@ -8,26 +8,34 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `a4e95fb` docs: add living document protocol |
-| Backend tests | ✅ 218 passed / 0 failed (2026-03-06 13:55 KST) |
-| Frontend tests | ✅ 19 passed / 0 failed (2026-03-06 13:55 KST) |
-| Frontend build | ✅ success (dist 454.75kB gzip 142.18kB) |
+| `main` HEAD | `67be07b` merge: Terminal 1/2/3 work into main |
+| Backend tests | ✅ 222 passed / 0 failed (2026-03-06 14:24 KST) |
+| Frontend tests | ✅ 20 passed / 0 failed (2026-03-06 14:24 KST) |
+| Frontend build | ✅ success (dist 455.59kB gzip 142.48kB) |
+
+### Worktree 구조 (2026-03-06 14:26 확정)
+
+| 경로 | 브랜치 | 담당 |
+|------|--------|------|
+| `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
+| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-admin-security-core` | Terminal 1 |
+| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-friend-search-flow` | Terminal 2 |
+| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-chat-room-lifecycle` | Terminal 3 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 14:10 |
-| `feat/admin-security-core` | 🟠 PR 대기 | Terminal 1 | — | 2026-03-06 14:08 (Admin* / RateLimitServiceTest 통과) |
-| `feat/friend-search-flow` | 🟠 PR 대기 (FE test/build, BE FriendServiceTest ✅) | Terminal 2 | — | 2026-03-06 14:10 |
-| `feat/chat-room-lifecycle` | 🟠 PR 대기 (FE vitest/build + BE ChatServiceTest/gradlew --continue 통과) | Terminal 3 | — | 2026-03-06 14:08 |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 14:26 |
+| `feat/t1-admin-security-core` | 🟡 대기 (미시작) | Terminal 1 | — | — |
+| `feat/t2-friend-search-flow` | 🟡 대기 (미시작) | Terminal 2 | — | — |
+| `feat/t3-chat-room-lifecycle` | 🟡 대기 (미시작) | Terminal 3 | — | — |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
 | 파일 | 잠금 브랜치 | 상태 | 이유 |
 |------|------------|------|------|
-| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/chat-room-lifecycle` | 해제 | Terminal 3 상태 업데이트 완료 |
-| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/admin-security-core` | 해제 | Terminal 1 시작/완료 상태 업데이트 반영 완료 |
+| 현재 없음 | — | — | 충돌 없음 |
 
 ---
 
@@ -300,14 +308,19 @@ PR 본문 필수 포함:
 
 ## 10. 즉시 실행 프롬프트 템플릿
 
-> 아래 텍스트를 각 터미널에 그대로 붙여넣는다.
+> **중요**: 각 터미널은 반드시 지정된 디렉토리에서만 작업한다.
+> 디렉토리가 다르면 브랜치가 섞이지 않는다 (git worktree 구조).
 
 ---
 
 ### Terminal 1
 
-```text
-너는 Terminal 1이야. 브랜치: feat/admin-security-core
+```
+작업 디렉토리: /Users/gimjiseob/Projects/gembud-t1
+브랜치: feat/t1-admin-security-core
+
+## 시작 명령
+cd /Users/gimjiseob/Projects/gembud-t1
 
 ## 필수: 살아있는 공유 문서 확인
 작업 시작 전 이 파일을 Read 도구로 반드시 읽어라:
@@ -316,21 +329,26 @@ PR 본문 필수 포함:
 STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업을 시작한다.
 
 ## 문서 업데이트 의무
-작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 Edit 도구로 직접 수정한다:
-- 시작 시: feat/admin-security-core 행 → 🔵 작업중 + 날짜
+작업 단계가 바뀔 때마다 아래 파일의 STATUS BOARD를 Edit 도구로 직접 수정한다:
+/Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
+- 시작 시: feat/t1-admin-security-core 행 → 🔵 작업중 + 날짜
 - 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 (수정 전 Claude에 보고)
 - 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
 
 ## 커밋/푸시 규칙
-- 브랜치 내부에서만 커밋한다. main push 금지.
-- 완료 시: git push origin feat/admin-security-core → PR 생성
+- /Users/gimjiseob/Projects/gembud-t1 에서만 작업한다.
+- 완료 시: git push origin feat/t1-admin-security-core → PR 생성
 - main이 앞서간 경우: git fetch && git rebase origin/main 후 계속
 
 ## 작업 범위 (섹션 7. A 참조)
 관리자 컨트롤러 테스트 NPE 픽스 + RateLimitService 통합 테스트 보완
 
+## 검증 명령
+cd /Users/gimjiseob/Projects/gembud-t1/backend && ./gradlew test --tests "com.gembud.controller.Admin*" --continue
+cd /Users/gimjiseob/Projects/gembud-t1/backend && ./gradlew test --continue
+
 ## 완료 후 Claude에 전달
-[완료 보고] Terminal 1 — feat/admin-security-core
+[완료 보고] Terminal 1 — feat/t1-admin-security-core
 1) 변경 파일:
 2) 핵심 변경:
 3) 테스트 결과:
@@ -343,8 +361,12 @@ STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업
 
 ### Terminal 2
 
-```text
-너는 Terminal 2야. 브랜치: feat/friend-search-flow
+```
+작업 디렉토리: /Users/gimjiseob/Projects/gembud-t2
+브랜치: feat/t2-friend-search-flow
+
+## 시작 명령
+cd /Users/gimjiseob/Projects/gembud-t2
 
 ## 필수: 살아있는 공유 문서 확인
 작업 시작 전 이 파일을 Read 도구로 반드시 읽어라:
@@ -353,21 +375,28 @@ STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업
 STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업을 시작한다.
 
 ## 문서 업데이트 의무
-작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 Edit 도구로 직접 수정한다:
-- 시작 시: feat/friend-search-flow 행 → 🔵 작업중 + 날짜
+작업 단계가 바뀔 때마다 아래 파일의 STATUS BOARD를 Edit 도구로 직접 수정한다:
+/Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
+- 시작 시: feat/t2-friend-search-flow 행 → 🔵 작업중 + 날짜
 - 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 (수정 전 Claude에 보고)
 - 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
 
 ## 커밋/푸시 규칙
-- 브랜치 내부에서만 커밋한다. main push 금지.
-- 완료 시: git push origin feat/friend-search-flow → PR 생성
+- /Users/gimjiseob/Projects/gembud-t2 에서만 작업한다.
+- 완료 시: git push origin feat/t2-friend-search-flow → PR 생성
 - main이 앞서간 경우: git fetch && git rebase origin/main 후 계속
 
 ## 작업 범위 (섹션 7. B 참조)
-친구 검색/요청/수락/거절 UX + FriendListPage 탭 분리
+친구 검색/요청/수락/거절 UX 고도화 + FriendListPage 탭 분리
+(닉네임 검색 UI, 상태 배지, sent/received 탭)
+
+## 검증 명령
+cd /Users/gimjiseob/Projects/gembud-t2/frontend && npx vitest run --reporter=verbose
+cd /Users/gimjiseob/Projects/gembud-t2/frontend && npm run build
+cd /Users/gimjiseob/Projects/gembud-t2/backend && ./gradlew test --tests "com.gembud.service.FriendServiceTest"
 
 ## 완료 후 Claude에 전달
-[완료 보고] Terminal 2 — feat/friend-search-flow
+[완료 보고] Terminal 2 — feat/t2-friend-search-flow
 1) 변경 파일:
 2) 핵심 변경:
 3) 테스트 결과:
@@ -380,8 +409,12 @@ STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업
 
 ### Terminal 3
 
-```text
-너는 Terminal 3이야. 브랜치: feat/chat-room-lifecycle
+```
+작업 디렉토리: /Users/gimjiseob/Projects/gembud-t3
+브랜치: feat/t3-chat-room-lifecycle
+
+## 시작 명령
+cd /Users/gimjiseob/Projects/gembud-t3
 
 ## 필수: 살아있는 공유 문서 확인
 작업 시작 전 이 파일을 Read 도구로 반드시 읽어라:
@@ -390,21 +423,27 @@ STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업
 STATUS BOARD를 확인하고 공통 파일 잠금 현황을 체크한 후 작업을 시작한다.
 
 ## 문서 업데이트 의무
-작업 단계가 바뀔 때마다 위 문서의 STATUS BOARD를 Edit 도구로 직접 수정한다:
-- 시작 시: feat/chat-room-lifecycle 행 → 🔵 작업중 + 날짜
+작업 단계가 바뀔 때마다 아래 파일의 STATUS BOARD를 Edit 도구로 직접 수정한다:
+/Users/gimjiseob/Projects/gembud/docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md
+- 시작 시: feat/t3-chat-room-lifecycle 행 → 🔵 작업중 + 날짜
 - 공통 파일 건드릴 때: 잠금 현황 테이블에 행 추가 (수정 전 Claude에 보고)
 - 완료 시: → 🟠 PR 대기 + 테스트 결과 기재
 
 ## 커밋/푸시 규칙
-- 브랜치 내부에서만 커밋한다. main push 금지.
-- 완료 시: git push origin feat/chat-room-lifecycle → PR 생성
+- /Users/gimjiseob/Projects/gembud-t3 에서만 작업한다.
+- 완료 시: git push origin feat/t3-chat-room-lifecycle → PR 생성
 - main이 앞서간 경우: git fetch && git rebase origin/main 후 계속
 
 ## 작업 범위 (섹션 7. C 참조)
-채팅방 라이프사이클(참여자 0명 정리) + Sidebar 회귀 테스트
+채팅방 라이프사이클 정합 + Sidebar 회귀 테스트 보강
+
+## 검증 명령
+cd /Users/gimjiseob/Projects/gembud-t3/frontend && npx vitest run --reporter=verbose
+cd /Users/gimjiseob/Projects/gembud-t3/frontend && npm run build
+cd /Users/gimjiseob/Projects/gembud-t3/backend && ./gradlew test --tests "com.gembud.service.ChatServiceTest"
 
 ## 완료 후 Claude에 전달
-[완료 보고] Terminal 3 — feat/chat-room-lifecycle
+[완료 보고] Terminal 3 — feat/t3-chat-room-lifecycle
 1) 변경 파일:
 2) 핵심 변경:
 3) 테스트 결과:
