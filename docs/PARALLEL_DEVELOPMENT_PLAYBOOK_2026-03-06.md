@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 16:40 KST (by Claude, main terminal) — 3라운드 시작
+> **Last updated:** 2026-03-06 21:58 KST (by Claude, main terminal) — 3라운드 완료
 
 ---
 
@@ -8,34 +8,34 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `dfcd866` 3라운드 시작 기준점 |
-| Backend tests | ✅ 229 passed / 0 failed (2026-03-06 16:30 KST) |
-| Frontend tests | ✅ 24 passed / 0 failed (2026-03-06 16:30 KST) |
-| Frontend build | ✅ success (dist 455.56kB gzip 142.48kB) |
+| `main` HEAD | `f48a43e` 3라운드 완료 (BCrypt + publicId URL + 방 정책) |
+| Backend tests | ✅ 239 passed / 0 failed (2026-03-06 21:56 KST) |
+| Frontend tests | ✅ 24 passed / 0 failed (2026-03-06 21:56 KST) |
+| Frontend build | ✅ success (dist 455.34kB gzip 142.42kB) |
 
-### Worktree 구조 (3라운드)
+### Worktree 구조
 
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-password-bcrypt` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-publicid-url` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-room-policy` | Terminal 3 |
+| `gembud-t1/t2/t3` | — | 제거 완료 (4라운드에 재생성) |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 16:40 |
-| `feat/t1-password-bcrypt` | 🟡 대기 (미시작) | Terminal 1 | — | — |
-| `feat/t2-publicid-url` | 🟡 대기 (미시작) | Terminal 2 | — | — |
-| `feat/t3-room-policy` | 🟡 대기 (미시작) | Terminal 3 | — | — |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 21:58 |
+| `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
+| `feat/t2-publicid-url` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 21:58 |
+| `feat/t3-room-policy` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 21:58 |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
 | 파일 | 잠금 브랜치 | 상태 | 이유 |
 |------|------------|------|------|
 | 현재 없음 | — | — | 충돌 없음 |
+| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t2-publicid-url` | 해제 | Terminal 2 시작/완료 상태 업데이트 반영 완료 |
+| `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md` | `feat/t1-password-bcrypt` | 해제 | Terminal 1 시작/완료 상태 업데이트 반영 |
 
 ---
 
