@@ -83,8 +83,8 @@ public class User {
     @Column(name = "login_locked_until")
     private LocalDateTime loginLockedUntil;
 
-    @Column(name = "nickname_changed_at")
-    private LocalDateTime nicknameChangedAt;
+    @Column(name = "last_nickname_changed_at")
+    private LocalDateTime lastNicknameChangedAt;
 
     @Column(name = "is_premium", nullable = false)
     private boolean premium = false;
@@ -155,8 +155,9 @@ public class User {
      * @return true if no change has been made, or last change was 30+ days ago
      */
     public boolean canChangeNickname() {
-        return nicknameChangedAt == null
-            || nicknameChangedAt.isBefore(LocalDateTime.now().minusDays(30));
+        LocalDateTime threshold = LocalDateTime.now().minusDays(30);
+        return lastNicknameChangedAt == null
+            || !lastNicknameChangedAt.isAfter(threshold);
     }
 
     /**
@@ -166,7 +167,7 @@ public class User {
      */
     public void updateNickname(String newNickname) {
         this.nickname = newNickname;
-        this.nicknameChangedAt = LocalDateTime.now();
+        this.lastNicknameChangedAt = LocalDateTime.now();
     }
 
     /**
