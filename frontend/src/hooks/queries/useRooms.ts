@@ -24,13 +24,13 @@ export function useRooms(gameId: number) {
 }
 
 /**
- * Hook to fetch a single room by ID.
+ * Hook to fetch a single room by public ID.
  * Auto-refetches every 3 seconds for real-time participant updates.
  */
-export function useRoom(roomId: number) {
+export function useRoom(roomPublicId: string) {
   return useQuery({
-    queryKey: roomKeys.detail(roomId),
-    queryFn: () => roomService.getRoomById(roomId),
+    queryKey: roomKeys.detail(roomPublicId),
+    queryFn: () => roomService.getRoom(roomPublicId),
     refetchInterval: 3000,
     staleTime: 2000,
   });
@@ -61,10 +61,10 @@ export function useJoinRoom() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ roomId, password }: { roomId: number; password?: string }) =>
-      roomService.joinRoom(roomId, password),
+    mutationFn: ({ roomPublicId, password }: { roomPublicId: string; password?: string }) =>
+      roomService.joinRoom(roomPublicId, password),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomId) });
+      queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomPublicId) });
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ['myRooms'] });
     },

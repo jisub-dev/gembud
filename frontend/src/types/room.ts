@@ -6,7 +6,7 @@ export interface ParticipantInfo {
 
 export interface Room {
   id: number;
-  publicId?: string;
+  publicId: string;
   title: string;
   description: string;
   gameId: number;

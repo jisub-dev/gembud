@@ -69,14 +69,9 @@ export function RoomListPage() {
   }, [rooms, selectedTiers, selectedPositions, tierOptions, positionOptions]);
 
   const doJoin = async (room: Room, password?: string) => {
-    if (!room.publicId) {
-      toast.error('방 정보를 가져올 수 없습니다');
-      return;
-    }
-
     setIsJoining(true);
     try {
-      const result = await roomService.joinRoomByPublicId(room.publicId, password);
+      const result = await roomService.joinRoom(room.publicId, password);
       setShowPasswordModal(false);
       setJoiningRoom(null);
       navigate(`/chat/${result.chatRoomId}`);
@@ -115,8 +110,8 @@ export function RoomListPage() {
     }
   };
 
-  const handleRoomClick = (roomId: number) => {
-    const room = filteredRooms.find(r => r.id === roomId);
+  const handleRoomClick = (roomPublicId: string) => {
+    const room = filteredRooms.find(r => r.publicId === roomPublicId);
     if (!room) return;
 
     if (room.isPrivate) {
