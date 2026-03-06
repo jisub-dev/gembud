@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 14:26 KST (by Claude, main terminal)
+> **Last updated:** 2026-03-06 15:25 KST (by Claude, main terminal)
 
 ---
 
@@ -26,16 +26,16 @@
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 14:26 |
-| `feat/t1-admin-security-core` | 🟡 대기 (미시작) | Terminal 1 | — | — |
-| `feat/t2-friend-search-flow` | 🟡 대기 (미시작) | Terminal 2 | — | — |
-| `feat/t3-chat-room-lifecycle` | 🟡 대기 (미시작) | Terminal 3 | — | — |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 15:25 |
+| `feat/t1-admin-security-core` | 🟠 PR 대기 | Terminal 1 | [열기](https://github.com/jisub-dev/gembud/compare/main...feat/t1-admin-security-core) | 2026-03-06 15:16 ✅ Admin* + 전체 백엔드 |
+| `feat/t2-friend-search-flow` | 🟠 PR 대기 | Terminal 2 | [열기](https://github.com/jisub-dev/gembud/compare/main...feat/t2-friend-search-flow) | 2026-03-06 15:19 ✅ FE 20/20 + build + FriendServiceTest |
+| `feat/t3-chat-room-lifecycle` | 🟠 PR 대기 | Terminal 3 | [열기](https://github.com/jisub-dev/gembud/compare/main...feat/t3-chat-room-lifecycle) | 2026-03-06 15:20 ✅ FE vitest/build + ChatServiceTest |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
 | 파일 | 잠금 브랜치 | 상태 | 이유 |
 |------|------------|------|------|
-| 현재 없음 | — | — | 충돌 없음 |
+| 현재 없음 | — | — | 전체 PR 대기 상태, 충돌 없음 |
 
 ---
 
