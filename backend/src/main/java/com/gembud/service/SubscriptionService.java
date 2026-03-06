@@ -142,6 +142,26 @@ public class SubscriptionService {
         }
     }
 
+    /**
+     * Clean up users with expired premium flag leftovers.
+     * Runs daily at 00:30.
+     */
+    @Scheduled(cron = "0 30 0 * * *")
+    @Transactional
+    public void cleanupExpiredPremiumUsers() {
+        List<User> expiredPremiumUsers =
+            userRepository.findByPremiumTrueAndPremiumExpiresAtBefore(LocalDateTime.now());
+
+        for (User user : expiredPremiumUsers) {
+            user.deactivatePremium();
+            userRepository.save(user);
+        }
+
+        if (!expiredPremiumUsers.isEmpty()) {
+            log.info("Deactivated expired premium flags for {} users", expiredPremiumUsers.size());
+        }
+    }
+
     private SubscriptionStatusResponse buildStatusResponse(User user, Subscription subscription) {
         return SubscriptionStatusResponse.builder()
             .isPremium(user.isPremium())

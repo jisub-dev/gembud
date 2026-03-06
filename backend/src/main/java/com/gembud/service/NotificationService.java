@@ -1,38 +1,19 @@
 package com.gembud.service;
 
 import com.gembud.entity.Notification;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.Notification.NotificationType;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
 import com.gembud.repository.NotificationRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import java.util.List;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 import org.springframework.transaction.annotation.Transactional;
-import com.gembud.exception.BusinessException;
-import com.gembud.exception.ErrorCode;
 
 /**
  * Service for notification management.
@@ -233,6 +214,19 @@ public class NotificationService {
         int count = notificationRepository.deleteOldReadNotifications();
         log.info("Cleaned up {} old read notifications", count);
         return count;
+    }
+
+    /**
+     * Scheduled cleanup for old read notifications (older than 30 days).
+     * Runs daily at 03:30.
+     */
+    @Scheduled(cron = "0 30 3 * * *")
+    @Transactional
+    public void scheduledCleanupOldNotifications() {
+        int count = notificationRepository.deleteOldReadNotifications();
+        if (count > 0) {
+            log.info("Scheduled cleanup removed {} old notifications", count);
+        }
     }
 
     /**
