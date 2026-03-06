@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 22:30 KST (by Claude, main terminal) — 4라운드 시작
+> **Last updated:** 2026-03-06 22:45 KST (by Claude, main terminal) — 5라운드 시작
 
 ---
 
@@ -8,28 +8,31 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `3317221` 3라운드 완료 (BCrypt + publicId URL + 방 정책) |
-| Backend tests | ✅ 239 passed / 0 failed (2026-03-06 21:56 KST) |
-| Frontend tests | ✅ 24 passed / 0 failed (2026-03-06 21:56 KST) |
-| Frontend build | ✅ success (dist 455.34kB gzip 142.42kB) |
+| `main` HEAD | `4fcd985` 4라운드 완료 (invite code frontend + auth tests + log masking) |
+| Backend tests | ✅ 239+ passed (2026-03-06 22:45 KST) |
+| Frontend tests | ✅ 24 passed / 0 failed (2026-03-06 22:45 KST) |
+| Frontend build | ✅ success |
 
 ### Worktree 구조
 
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-invite-code-frontend` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-auth-refresh-tests` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-spec-remaining` | Terminal 3 |
+| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-sidebar-split` | Terminal 1 |
+| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-admin-test-fix` | Terminal 2 |
+| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-joinroom-ratelimit` | Terminal 3 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 22:30 |
-| `feat/t1-invite-code-frontend` | 🟢 squash merged | Terminal 1 | merged | 2026-03-06 22:30 |
-| `feat/t2-auth-refresh-tests` | 🔵 진행중 | Terminal 2 | — | 2026-03-06 22:30 |
-| `feat/t3-spec-remaining` | 🔵 진행중 | Terminal 3 | — | 2026-03-06 22:30 |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 22:45 |
+| `feat/t1-sidebar-split` | 🔵 진행중 | Terminal 1 | — | 2026-03-06 22:45 |
+| `feat/t2-admin-test-fix` | 🔵 진행중 | Terminal 2 | — | 2026-03-06 22:45 |
+| `feat/t3-joinroom-ratelimit` | 🔵 진행중 | Terminal 3 | — | 2026-03-06 22:45 |
+| `feat/t1-invite-code-frontend` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 22:30 |
+| `feat/t2-auth-refresh-tests` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 22:30 |
+| `feat/t3-spec-remaining` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 22:30 |
 | `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
 | `feat/t2-publicid-url` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 21:58 |
 | `feat/t3-room-policy` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 21:58 |
