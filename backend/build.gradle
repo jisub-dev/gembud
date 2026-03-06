@@ -39,9 +39,6 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.flywaydb:flyway-core'
 
-    // H2 Database (for testing - kept for unit tests that don't need Postgres)
-    testRuntimeOnly 'com.h2database:h2'
-
     // Testcontainers for PostgreSQL integration tests
     testImplementation 'org.testcontainers:junit-jupiter:1.19.8'
     testImplementation 'org.testcontainers:postgresql:1.19.8'
