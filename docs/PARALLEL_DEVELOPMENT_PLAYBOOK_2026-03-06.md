@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 15:35 KST (by Claude, main terminal)
+> **Last updated:** 2026-03-06 15:45 KST (by Claude, main terminal) — 2라운드 시작
 
 ---
 
@@ -8,32 +8,34 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `d26f573` PR #1 merged (SecurityEventServiceTest) |
+| `main` HEAD | `125262a` 1라운드 완료 |
 | Backend tests | ✅ 222 passed / 0 failed (2026-03-06 14:24 KST) |
 | Frontend tests | ✅ 20 passed / 0 failed (2026-03-06 14:24 KST) |
 | Frontend build | ✅ success (dist 455.59kB gzip 142.48kB) |
 
-### Worktree 구조
+### Worktree 구조 (2라운드)
 
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
-| `gembud-t1/t2/t3` | — | 제거 완료 (다음 라운드에 재생성) |
+| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-testcontainers` | Terminal 1 |
+| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-room-lifecycle` | Terminal 2 |
+| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-nickname-cooldown-room-ux` | Terminal 3 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 15:35 |
-| `feat/t1-admin-security-core` | 🟢 병합 완료 | Terminal 1 | #1 merged | 2026-03-06 15:30 |
-| `feat/t2-friend-search-flow` | 🟢 main에 포함 | Terminal 2 | — | 2026-03-06 15:35 |
-| `feat/t3-chat-room-lifecycle` | 🟢 main에 포함 | Terminal 3 | — | 2026-03-06 15:35 |
+| `main` | 🟢 최신 | Claude | — | 2026-03-06 15:45 |
+| `feat/t1-testcontainers` | 🟡 대기 (미시작) | Terminal 1 | — | — |
+| `feat/t2-room-lifecycle` | 🟡 대기 (미시작) | Terminal 2 | — | — |
+| `feat/t3-nickname-cooldown-room-ux` | 🟡 대기 (미시작) | Terminal 3 | — | — |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
 | 파일 | 잠금 브랜치 | 상태 | 이유 |
 |------|------------|------|------|
-| 현재 없음 | — | — | 전체 PR 대기 상태, 충돌 없음 |
+| 현재 없음 | — | — | 충돌 없음 |
 
 ---
 
