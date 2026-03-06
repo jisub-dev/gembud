@@ -146,6 +146,26 @@ describe('Sidebar', () => {
     await waitFor(() => expect(roomButton).not.toBeDisabled());
   });
 
+  it('prevents duplicate lookup while opening room chat', async () => {
+    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([] as any);
+    vi.mocked(chatService.getChatRoomByGameRoom).mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(777), 20))
+    );
+
+    const user = userEvent.setup();
+    render(<Sidebar />, { wrapper: createWrapper() });
+
+    const roomButton = await screen.findByRole('button', { name: /내 대기방 A/i });
+    await act(async () => {
+      await Promise.all([user.click(roomButton), user.click(roomButton)]);
+    });
+
+    await waitFor(() => {
+      expect(chatService.getChatRoomByGameRoom).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/777');
+    });
+  });
+
   it('shows only DIRECT_CHAT/GROUP_CHAT in 채팅방 section', async () => {
     vi.mocked(roomService.getMyRooms).mockResolvedValue([] as any);
     vi.mocked(chatService.getMyChatRooms).mockResolvedValue([

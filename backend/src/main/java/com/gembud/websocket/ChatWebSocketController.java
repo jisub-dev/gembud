@@ -46,6 +46,20 @@ public class ChatWebSocketController {
         throw new IllegalStateException("Cannot extract user ID from principal");
     }
 
+    private String resolvePrincipalName(Principal principal) {
+        return principal != null && principal.getName() != null
+            ? principal.getName()
+            : "anonymous";
+    }
+
+    private void sendUserError(Principal principal, String message) {
+        messagingTemplate.convertAndSendToUser(
+            resolvePrincipalName(principal),
+            "/queue/errors",
+            message
+        );
+    }
+
     @MessageMapping("/chat.send/{chatRoomId}")
     public void sendMessage(
         @DestinationVariable Long chatRoomId,
@@ -56,8 +70,7 @@ public class ChatWebSocketController {
             Long userId = extractUserId(principal);
 
             if (!chatRoomId.equals(request.getChatRoomId())) {
-                messagingTemplate.convertAndSendToUser(
-                    principal.getName(), "/queue/errors", "chatRoomId mismatch");
+                sendUserError(principal, "chatRoomId mismatch");
                 return;
             }
 
@@ -78,28 +91,13 @@ public class ChatWebSocketController {
 
         } catch (NumberFormatException e) {
             log.error("Invalid user ID in principal: {}", principal.getName(), e);
-            // Send error to user
-            messagingTemplate.convertAndSendToUser(
-                principal.getName(),
-                "/queue/errors",
-                "Invalid user authentication"
-            );
+            sendUserError(principal, "Invalid user authentication");
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.error("Error processing chat message: {}", e.getMessage(), e);
-            // Send error to user
-            messagingTemplate.convertAndSendToUser(
-                principal.getName(),
-                "/queue/errors",
-                e.getMessage()
-            );
+            sendUserError(principal, e.getMessage());
         } catch (Exception e) {
             log.error("Unexpected error processing chat message", e);
-            // Send generic error to user
-            messagingTemplate.convertAndSendToUser(
-                principal.getName(),
-                "/queue/errors",
-                "An unexpected error occurred while sending your message"
-            );
+            sendUserError(principal, "An unexpected error occurred while sending your message");
         }
     }
 
@@ -120,8 +118,7 @@ public class ChatWebSocketController {
             Long userId = extractUserId(principal);
 
             if (!chatService.isChatRoomMember(chatRoomId, userId)) {
-                messagingTemplate.convertAndSendToUser(
-                    principal.getName(), "/queue/errors", "Not a member of this chat room");
+                sendUserError(principal, "Not a member of this chat room");
                 return;
             }
 
@@ -143,6 +140,7 @@ public class ChatWebSocketController {
 
         } catch (Exception e) {
             log.error("Error handling chat room join", e);
+            sendUserError(principal, "Failed to process chat room join");
         }
     }
 
@@ -163,8 +161,7 @@ public class ChatWebSocketController {
             Long userId = extractUserId(principal);
 
             if (!chatService.isChatRoomMember(chatRoomId, userId)) {
-                messagingTemplate.convertAndSendToUser(
-                    principal.getName(), "/queue/errors", "Not a member of this chat room");
+                sendUserError(principal, "Not a member of this chat room");
                 return;
             }
 
@@ -186,6 +183,7 @@ public class ChatWebSocketController {
 
         } catch (Exception e) {
             log.error("Error handling chat room leave", e);
+            sendUserError(principal, "Failed to process chat room leave");
         }
     }
 }
