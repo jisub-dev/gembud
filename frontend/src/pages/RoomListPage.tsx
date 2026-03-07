@@ -14,6 +14,7 @@ import { useAds } from '@/hooks/queries/useAds';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { roomService } from '@/services/roomService';
+import { chatService } from '@/services/chatService';
 import type { Room } from '@/types/room';
 import { isPremiumActive } from '@/config/features';
 
@@ -121,9 +122,22 @@ export function RoomListPage() {
     }
   };
 
-  const handleRoomClick = (roomPublicId: string) => {
+  const handleRoomClick = async (roomPublicId: string) => {
     const room = filteredRooms.find(r => r.publicId === roomPublicId);
     if (!room) return;
+
+    // 이미 참여 중인 방이면 join 없이 채팅방으로 바로 이동
+    try {
+      const myRooms = await roomService.getMyRooms();
+      const alreadyIn = myRooms.find(r => r.publicId === roomPublicId);
+      if (alreadyIn) {
+        const chatRoomId = await chatService.getChatRoomByGameRoom(alreadyIn.id);
+        navigate(`/chat/${chatRoomId}`);
+        return;
+      }
+    } catch {
+      // 조회 실패 시 일반 입장 플로우로 진행
+    }
 
     if (room.isPrivate) {
       setJoiningRoom(room);
