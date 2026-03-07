@@ -29,6 +29,7 @@ export default function ChatPage() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('chat');
   const [isStartingRoom, setIsStartingRoom] = useState(false);
+  const [isResettingRoom, setIsResettingRoom] = useState(false);
 
   const roomId = Number(chatRoomId);
   const queryClient = useQueryClient();
@@ -115,6 +116,20 @@ export default function ChatPage() {
       window.alert('게임 시작에 실패했습니다.');
     } finally {
       setIsStartingRoom(false);
+    }
+  };
+
+  const handleResetRoom = async () => {
+    if (!relatedRoom) return;
+    setIsResettingRoom(true);
+    try {
+      await roomService.resetRoom(relatedRoom.publicId);
+      await refetchMyRooms();
+      toast.success('방 상태를 대기중으로 변경했습니다.');
+    } catch {
+      toast.error('대기중으로 변경에 실패했습니다.');
+    } finally {
+      setIsResettingRoom(false);
     }
   };
 
@@ -221,14 +236,28 @@ export default function ChatPage() {
                     />
 
                     {isHost && (
-                      <button
-                        type="button"
-                        onClick={handleStartRoom}
-                        disabled={isStartingRoom || relatedRoom.status !== 'OPEN'}
-                        className="w-full py-2 rounded bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
-                      >
-                        {isStartingRoom ? '시작 중...' : '게임 시작'}
-                      </button>
+                      <div className="flex gap-2">
+                        {relatedRoom.status === 'OPEN' && (
+                          <button
+                            type="button"
+                            onClick={handleStartRoom}
+                            disabled={isStartingRoom}
+                            className="flex-1 py-2 rounded bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
+                          >
+                            {isStartingRoom ? '시작 중...' : '게임 시작'}
+                          </button>
+                        )}
+                        {relatedRoom.status === 'IN_PROGRESS' && (
+                          <button
+                            type="button"
+                            onClick={handleResetRoom}
+                            disabled={isResettingRoom}
+                            className="flex-1 py-2 rounded bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
+                          >
+                            {isResettingRoom ? '변경 중...' : '대기중으로 변경'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 ) : (
