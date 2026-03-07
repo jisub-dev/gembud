@@ -137,6 +137,23 @@ const privateRoom: Room = {
   isPrivate: true,
 };
 
+const fullRoom: Room = {
+  ...publicRoom,
+  id: 3,
+  publicId: 'full-room-3',
+  title: '풀방',
+  status: 'FULL',
+  currentParticipants: 5,
+};
+
+const inProgressRoom: Room = {
+  ...publicRoom,
+  id: 4,
+  publicId: 'in-progress-room-4',
+  title: '게임중 방',
+  status: 'IN_PROGRESS',
+};
+
 function createApiError(code: string) {
   return {
     response: {
@@ -296,5 +313,19 @@ describe('RoomListPage auto-join UX', () => {
       expect(roomService.regenerateInviteCode).toHaveBeenCalledWith('private-room-2');
       expect(toastSuccess).toHaveBeenCalledWith('초대 링크가 클립보드에 복사되었습니다');
     });
+  });
+
+  it('shows OPEN and FULL rooms, but hides IN_PROGRESS rooms in list', async () => {
+    vi.mocked(useRooms).mockReturnValue({
+      data: [publicRoom, fullRoom, inProgressRoom],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    render(<RoomListPage />, { wrapper: createWrapper() });
+
+    expect(await screen.findByRole('button', { name: '공개 방' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '풀방' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '게임중 방' })).not.toBeInTheDocument();
   });
 });
