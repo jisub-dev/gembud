@@ -54,7 +54,7 @@ export function RoomListPage() {
       .filter(Boolean) as string[];
 
     return rooms.filter(room => {
-      if (room.status !== 'OPEN') return false;
+      if (room.status !== 'OPEN' && room.status !== 'FULL') return false;
 
       const filters = room.filters ?? {};
 
