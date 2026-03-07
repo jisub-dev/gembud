@@ -242,6 +242,20 @@ public class RoomController {
     }
 
     /**
+     * Reset a room from IN_PROGRESS to OPEN (host only).
+     */
+    @Operation(summary = "Reset room", description = "방 상태를 IN_PROGRESS에서 OPEN으로 변경 (방장만 가능)")
+    @PostMapping("/{publicId}/reset")
+    public ResponseEntity<ApiResponse<Void>> resetRoom(
+        @PathVariable String publicId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        RoomResponse room = roomService.getRoomByPublicId(publicId);
+        roomService.resetRoom(room.getId(), userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    /**
      * Regenerate invite code for a private room (host only).
      *
      * @param publicId room public UUID

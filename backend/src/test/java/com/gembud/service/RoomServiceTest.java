@@ -729,6 +729,79 @@ class RoomServiceTest {
             .isEqualTo(ErrorCode.NOT_HOST);
     }
 
+    @Test
+    @DisplayName("resetRoom - should reset IN_PROGRESS room to OPEN when requester is host")
+    void resetRoom_HostAndInProgress_ShouldResetToOpen() {
+        User host = User.builder()
+            .email("host@example.com")
+            .nickname("Host")
+            .build();
+        ReflectionTestUtils.setField(host, "id", 1L);
+
+        Room inProgressRoom = Room.builder()
+            .game(game)
+            .title("In Progress Room")
+            .maxParticipants(5)
+            .currentParticipants(3)
+            .isPrivate(false)
+            .createdBy(host)
+            .build();
+        ReflectionTestUtils.setField(inProgressRoom, "id", 11L);
+        inProgressRoom.start();
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(inProgressRoom)
+            .user(host)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
+        when(roomRepository.findById(11L)).thenReturn(Optional.of(inProgressRoom));
+        when(participantRepository.findByRoomIdAndUserId(11L, 1L)).thenReturn(Optional.of(hostParticipant));
+
+        roomService.resetRoom(11L, "host@example.com");
+
+        assertThat(inProgressRoom.getStatus()).isEqualTo(Room.RoomStatus.OPEN);
+        verify(roomRepository).save(inProgressRoom);
+    }
+
+    @Test
+    @DisplayName("resetRoom - should throw when room status is not IN_PROGRESS")
+    void resetRoom_NotInProgress_ShouldThrow() {
+        User host = User.builder()
+            .email("host@example.com")
+            .nickname("Host")
+            .build();
+        ReflectionTestUtils.setField(host, "id", 1L);
+
+        Room openRoom = Room.builder()
+            .game(game)
+            .title("Open Room")
+            .maxParticipants(5)
+            .currentParticipants(2)
+            .isPrivate(false)
+            .createdBy(host)
+            .build();
+        ReflectionTestUtils.setField(openRoom, "id", 12L);
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(openRoom)
+            .user(host)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
+        when(roomRepository.findById(12L)).thenReturn(Optional.of(openRoom));
+        when(participantRepository.findByRoomIdAndUserId(12L, 1L)).thenReturn(Optional.of(hostParticipant));
+
+        assertThatThrownBy(() -> roomService.resetRoom(12L, "host@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.ROOM_NOT_IN_PROGRESS);
+    }
+
     // ──────────────────────────────────────────────
     // getRoomById
     // ──────────────────────────────────────────────
