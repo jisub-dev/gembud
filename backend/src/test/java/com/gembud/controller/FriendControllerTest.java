@@ -3,6 +3,7 @@ package com.gembud.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -98,6 +99,15 @@ class FriendControllerTest {
         mockMvc.perform(put("/friends/requests/1/accept"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
+    }
+
+    @Test
+    @DisplayName("DELETE /friends/requests/{id} - 보낸 요청 취소")
+    @WithMockUser(username = "test@example.com")
+    void cancelSentRequest_ShouldReturnOk() throws Exception {
+        mockMvc.perform(delete("/friends/requests/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(204));
     }
 
     @Test

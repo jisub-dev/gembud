@@ -135,6 +135,32 @@ public class FriendService {
     }
 
     /**
+     * Cancel sent friend request.
+     *
+     * @param userEmail current user email
+     * @param requestId friend request ID
+     */
+    @Transactional
+    public void cancelSentRequest(String userEmail, Long requestId) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Friend friendRequest = friendRepository.findById(requestId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.FRIEND_REQUEST_NOT_FOUND));
+
+        // Only the sender can cancel the request.
+        if (!friendRequest.getUser().getId().equals(user.getId())) {
+            throw new BusinessException(ErrorCode.NOT_REQUEST_RECEIVER);
+        }
+
+        if (friendRequest.getStatus() != FriendStatus.PENDING) {
+            throw new BusinessException(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+        }
+
+        friendRepository.delete(friendRequest);
+    }
+
+    /**
      * Unfriend (remove friend).
      *
      * @param userEmail current user email
