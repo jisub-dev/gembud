@@ -198,7 +198,7 @@ export default function ChatPage() {
 
           <div className="flex-1 container mx-auto px-4 py-4 max-w-6xl min-h-0">
             <div className="h-full grid grid-cols-1 lg:grid-cols-5 gap-4">
-              <section className={`${activeTab === 'info' ? 'block' : 'hidden'} lg:block lg:col-span-2 bg-[#18181b] border border-gray-800 rounded-lg p-4 overflow-y-auto`}>
+              <section className={`${activeTab === 'info' ? 'block' : 'hidden'} lg:block lg:col-span-3 bg-[#18181b] border border-gray-800 rounded-lg p-4 overflow-y-auto`}>
                 {relatedRoom ? (
                   <div className="space-y-4">
                     <div className="flex items-start justify-between gap-2">
@@ -238,7 +238,7 @@ export default function ChatPage() {
                 )}
               </section>
 
-              <section className={`${activeTab === 'chat' ? 'block' : 'hidden'} lg:block lg:col-span-3 min-h-0`}>
+              <section className={`${activeTab === 'chat' ? 'block' : 'hidden'} lg:block lg:col-span-2 min-h-0`}>
                 <ChatPanel chatRoomId={roomId} canChat={true} className="h-full" />
               </section>
             </div>
