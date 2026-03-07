@@ -39,19 +39,41 @@ export default function ChatPage() {
   });
 
   const chatRoomInfo = myChatRooms.find(c => c.id === roomId);
-  const relatedRoomId = chatRoomInfo?.relatedRoomId;
+  const relatedRoomIdFromChatList = chatRoomInfo?.relatedRoomId;
+  const isRoomChatByType = chatRoomInfo?.type === 'ROOM_CHAT';
 
   const { data: myRooms = [], refetch: refetchMyRooms } = useQuery({
     queryKey: ['myRooms'],
     queryFn: roomService.getMyRooms,
-    enabled: !!relatedRoomId,
+    enabled: !!roomId,
     refetchInterval: 10000,
   });
 
-  const relatedRoom = relatedRoomId
-    ? myRooms.find(r => r.id === relatedRoomId)
+  const { data: inferredRelatedRoomId } = useQuery({
+    queryKey: ['chatRoomRelatedRoom', roomId, myRooms.map(r => r.id).join(',')],
+    queryFn: async () => {
+      for (const room of myRooms) {
+        try {
+          const mappedChatRoomId = await chatService.getChatRoomByGameRoom(room.id);
+          if (mappedChatRoomId === roomId) {
+            return room.id;
+          }
+        } catch {
+          // Ignore per-room lookup failure and continue
+        }
+      }
+      return null;
+    },
+    enabled: !!roomId && !relatedRoomIdFromChatList && myRooms.length > 0,
+    staleTime: 30000,
+  });
+
+  const resolvedRelatedRoomId = relatedRoomIdFromChatList ?? inferredRelatedRoomId ?? null;
+
+  const relatedRoom = resolvedRelatedRoomId
+    ? myRooms.find(r => r.id === resolvedRelatedRoomId)
     : null;
-  const isRoomChat = chatRoomInfo?.type === 'ROOM_CHAT';
+  const isRoomChat = isRoomChatByType || !!resolvedRelatedRoomId;
   const isHost = useMemo(() => {
     if (!relatedRoom || !user) return false;
     return relatedRoom.participants?.some(p => p.userId === user.id && p.isHost) ?? false;
