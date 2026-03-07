@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +20,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -74,15 +74,15 @@ public class UserController {
     /**
      * Search users for friend request.
      *
-     * @param userDetails authenticated user details
+     * @param principal authenticated user principal
      * @param query nickname/email query
      * @param limit max result count
      * @return user summaries
      */
     @Operation(summary = "Search users", description = "친구 추가용 사용자 검색")
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> searchUsers(
-        @AuthenticationPrincipal CustomUserDetails userDetails,
+    public ResponseEntity<ApiResponse<List<UserSearchResponse>>> searchUsers(
+        @AuthenticationPrincipal Object principal,
         @RequestParam("q") String query,
         @RequestParam(defaultValue = "10") int limit
     ) {
@@ -91,24 +91,20 @@ public class UserController {
             return ResponseEntity.ok(ApiResponse.success(List.of()));
         }
 
+        Long currentUserId = resolveAuthenticatedUserId(principal);
         int safeLimit = Math.min(Math.max(limit, 1), 20);
-        List<User> users = userRepository
+
+        List<UserSearchResponse> response = userRepository
             .findByIdNotAndNicknameContainingIgnoreCaseOrIdNotAndEmailContainingIgnoreCase(
-                userDetails.getUserId(),
+                currentUserId,
                 normalized,
-                userDetails.getUserId(),
+                currentUserId,
                 normalized,
                 PageRequest.of(0, safeLimit)
-            );
-
-        List<Map<String, Object>> response = new ArrayList<>();
-        for (User user : users) {
-            Map<String, Object> row = new HashMap<>();
-            row.put("id", user.getId());
-            row.put("nickname", user.getNickname());
-            row.put("email", user.getEmail());
-            response.add(row);
-        }
+            )
+            .stream()
+            .map(user -> new UserSearchResponse(user.getId(), user.getNickname(), user.getEmail()))
+            .toList();
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -132,6 +128,20 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(buildUserResponse(user)));
     }
 
+    private Long resolveAuthenticatedUserId(Object principal) {
+        if (principal instanceof CustomUserDetails customUserDetails) {
+            return customUserDetails.getUserId();
+        }
+
+        if (principal instanceof UserDetails userDetails) {
+            return userRepository.findByEmail(userDetails.getUsername())
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+        }
+
+        throw new IllegalStateException("Authenticated principal is missing or invalid");
+    }
+
     private Map<String, Object> buildUserResponse(User user) {
         Map<String, Object> data = new HashMap<>();
         data.put("id", user.getId());
@@ -141,6 +151,9 @@ public class UserController {
         data.put("isPremium", premiumFeatureEnabled && user.isPremium());
         data.put("premiumExpiresAt", premiumFeatureEnabled ? user.getPremiumExpiresAt() : null);
         return data;
+    }
+
+    public record UserSearchResponse(Long id, String nickname, String email) {
     }
 
     @Data
