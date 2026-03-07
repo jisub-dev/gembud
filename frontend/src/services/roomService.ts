@@ -67,5 +67,10 @@ export const roomService = {
   async transferHost(roomId: number, userId: number): Promise<void> {
     await api.post(`/rooms/${roomId}/transfer/${userId}`);
   },
+
+  // 방 상태 초기화 (IN_PROGRESS -> OPEN, 방장만, publicId 기반)
+  async resetRoom(publicId: string): Promise<void> {
+    await api.post(`/rooms/${publicId}/reset`);
+  },
 };
 export default roomService;

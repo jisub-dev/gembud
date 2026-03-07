@@ -157,6 +157,13 @@ public class Room {
     }
 
     /**
+     * Reset room status back to OPEN.
+     */
+    public void resetToOpen() {
+        this.status = RoomStatus.OPEN;
+    }
+
+    /**
      * Generate an invite code valid for the given number of hours.
      *
      * @param ttlHours time-to-live in hours
