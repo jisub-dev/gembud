@@ -83,10 +83,12 @@ public class UserController {
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<UserSearchResponse>>> searchUsers(
         @AuthenticationPrincipal Object principal,
-        @RequestParam("q") String query,
+        @RequestParam(value = "q", required = false) String query,
+        @RequestParam(value = "nickname", required = false) String nickname,
         @RequestParam(defaultValue = "10") int limit
     ) {
-        String normalized = query == null ? "" : query.trim();
+        String effectiveQuery = query != null ? query : nickname;
+        String normalized = effectiveQuery == null ? "" : effectiveQuery.trim();
         if (normalized.length() < 2) {
             return ResponseEntity.ok(ApiResponse.success(List.of()));
         }

@@ -30,6 +30,11 @@ export const friendService = {
     await api.put(`/friends/requests/${requestId}/reject`);
   },
 
+  // 보낸 친구 요청 취소
+  async cancelSentFriendRequest(requestId: number): Promise<void> {
+    await api.delete(`/friends/requests/${requestId}`);
+  },
+
   // 친구 삭제
   async removeFriend(friendId: number): Promise<void> {
     await api.delete(`/friends/${friendId}`);
