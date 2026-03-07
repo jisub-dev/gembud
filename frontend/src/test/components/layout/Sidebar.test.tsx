@@ -8,6 +8,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import { roomService } from '@/services/roomService';
 import { chatService } from '@/services/chatService';
 import { useGames } from '@/hooks/queries/useGames';
+import { useFriends } from '@/hooks/queries/useFriends';
 import { useAuthStore } from '@/store/authStore';
 
 const { mockNavigate } = vi.hoisted(() => ({
@@ -36,6 +37,10 @@ vi.mock('@/services/chatService', () => ({
 
 vi.mock('@/hooks/queries/useGames', () => ({
   useGames: vi.fn(),
+}));
+
+vi.mock('@/hooks/queries/useFriends', () => ({
+  useFriends: vi.fn(),
 }));
 
 vi.mock('@/store/authStore', () => ({
@@ -92,6 +97,7 @@ describe('Sidebar', () => {
 
     vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as any);
     vi.mocked(useGames).mockReturnValue({ data: [] } as any);
+    vi.mocked(useFriends).mockReturnValue({ data: [] } as any);
     vi.mocked(roomService.getMyRooms).mockResolvedValue([mockRoom] as any);
     vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
       if (type === 'ROOM_CHAT') {
@@ -166,5 +172,58 @@ describe('Sidebar', () => {
     expect(await screen.findByText('DM Visible')).toBeInTheDocument();
     expect(screen.getByText('GROUP Visible')).toBeInTheDocument();
     expect(screen.queryByText('ROOM SHOULD HIDE')).not.toBeInTheDocument();
+  });
+
+  it('shows "친구 없음" when no friends exist', async () => {
+    render(<Sidebar />, { wrapper: createWrapper() });
+    expect(await screen.findByText('친구')).toBeInTheDocument();
+    expect(screen.getByText('친구 없음')).toBeInTheDocument();
+  });
+
+  it('renders friend list and navigates to /friends on click', async () => {
+    vi.mocked(useFriends).mockReturnValue({
+      data: [
+        {
+          id: 1,
+          userId: 10,
+          friendId: 11,
+          friendNickname: '친구A',
+          status: 'ACCEPTED',
+        },
+      ],
+    } as any);
+
+    const user = userEvent.setup();
+    render(<Sidebar />, { wrapper: createWrapper() });
+
+    const friendButton = await screen.findByRole('button', { name: /친구A/i });
+    await user.click(friendButton);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/friends');
+  });
+
+  it('toggles friend section open/closed', async () => {
+    vi.mocked(useFriends).mockReturnValue({
+      data: [
+        {
+          id: 1,
+          userId: 10,
+          friendId: 11,
+          friendNickname: '토글친구',
+          status: 'ACCEPTED',
+        },
+      ],
+    } as any);
+
+    const user = userEvent.setup();
+    render(<Sidebar />, { wrapper: createWrapper() });
+
+    expect(await screen.findByText('토글친구')).toBeInTheDocument();
+    const friendSectionToggle = screen.getByText('친구').closest('button');
+    expect(friendSectionToggle).toBeTruthy();
+    await user.click(friendSectionToggle!);
+    expect(screen.queryByText('토글친구')).not.toBeInTheDocument();
+    await user.click(friendSectionToggle!);
+    expect(await screen.findByText('토글친구')).toBeInTheDocument();
   });
 });
