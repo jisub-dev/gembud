@@ -6,6 +6,7 @@ import { roomService } from '@/services/roomService';
 import { chatService } from '@/services/chatService';
 import { useAuthStore } from '@/store/authStore';
 import { useGames } from '@/hooks/queries/useGames';
+import { useFriends } from '@/hooks/queries/useFriends';
 import type { Room } from '@/types/room';
 import type { ChatRoomInfo } from '@/types/chat';
 
@@ -60,6 +61,7 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [roomsOpen, setRoomsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
+  const [friendsOpen, setFriendsOpen] = useState(true);
   const [gamesOpen, setGamesOpen] = useState(true);
   const [isOpeningRoomChat, setIsOpeningRoomChat] = useState(false);
 
@@ -85,6 +87,7 @@ export default function Sidebar() {
     enabled: isAuthenticated,
     refetchInterval: 15000,
   });
+  const { data: friends = [] } = useFriends();
 
   const myWaitingRoomChat = myRoomChatRooms[0] ?? null;
 
@@ -209,6 +212,43 @@ export default function Sidebar() {
             </div>
           );
         })()}
+
+        {/* 친구 섹션 */}
+        {!isCollapsed && isAuthenticated && (
+          <div className="mb-1">
+            <SectionHeader
+              title="친구"
+              isOpen={friendsOpen}
+              onToggle={() => setFriendsOpen(!friendsOpen)}
+              count={friends.length}
+            />
+            {friendsOpen && (
+              <div className="px-2 pb-1 space-y-0.5">
+                {friends.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-text-muted italic">친구 없음</p>
+                ) : (
+                  friends.map((friend) => (
+                    <button
+                      type="button"
+                      key={friend.id}
+                      onClick={() => navigate('/friends')}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group"
+                    >
+                      <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center flex-shrink-0">
+                        <User size={16} className="text-neon-pink" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-pink transition-colors">
+                          {friend.friendNickname}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 구분선 */}
         {!isCollapsed && isAuthenticated && (
