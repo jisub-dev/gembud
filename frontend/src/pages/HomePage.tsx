@@ -1,13 +1,13 @@
 import GameGrid from '@/components/game/GameGrid';
 import Button from '@/components/common/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Sparkles, Thermometer } from 'lucide-react';
+import { ArrowRight, Sparkles, Thermometer, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useGames } from '@/hooks/queries/useGames';
 import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import AdBanner from '@/components/common/AdBanner';
 import { useAds } from '@/hooks/queries/useAds';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { isPremiumActive } from '@/config/features';
 
 /**
@@ -17,14 +17,26 @@ const HomePage = () => {
   const { isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
 
-  const { data: games = [] } = useGames();
+  const { data: games = [], isLoading: gamesLoading, error: gamesError } = useGames();
   const [selectedGameId, setSelectedGameId] = useState<number | undefined>();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredGames = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    if (!keyword) return games;
+    return games.filter((game) => game.name.toLowerCase().includes(keyword));
+  }, [games, searchQuery]);
 
   useEffect(() => {
-    if (games[0] && !selectedGameId) {
-      setSelectedGameId(games[0].id);
+    if (!filteredGames.length) {
+      setSelectedGameId(undefined);
+      return;
     }
-  }, [games, selectedGameId]);
+
+    if (!selectedGameId || !filteredGames.some((game) => game.id === selectedGameId)) {
+      setSelectedGameId(filteredGames[0].id);
+    }
+  }, [filteredGames, selectedGameId]);
 
   const { data: recommendedRooms = [], isLoading: recsLoading } = useRecommendedRooms(selectedGameId, 3);
   const { data: ads = [] } = useAds();
@@ -64,16 +76,49 @@ const HomePage = () => {
 
       {/* Games Section */}
       <section className="space-y-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="font-display text-h2 text-white">게임 목록</h2>
-            <p className="text-text-secondary mt-2">
-              원하는 게임을 선택하고 방을 찾아보세요
-            </p>
+            <p className="text-text-secondary mt-2">원하는 게임을 선택하고 방을 찾아보세요</p>
+          </div>
+          <div className="w-full max-w-xs">
+            <label htmlFor="home-game-search" className="sr-only">
+              게임 검색
+            </label>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                id="home-game-search"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="게임 이름으로 검색"
+                className="w-full rounded-lg border border-neon-purple/30 bg-dark-secondary py-2 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:border-neon-purple focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 
-        <GameGrid />
+        {gamesLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="aspect-[3/4] bg-dark-secondary rounded-card animate-pulse" />
+            ))}
+          </div>
+        ) : gamesError ? (
+          <div className="text-center py-12 text-neon-pink font-gaming">게임 목록을 불러올 수 없습니다</div>
+        ) : (
+          <GameGrid
+            games={filteredGames}
+            selectedGameId={selectedGameId}
+            onGameSelect={setSelectedGameId}
+            emptyMessage={
+              searchQuery.trim()
+                ? `'${searchQuery.trim()}'에 해당하는 게임이 없습니다`
+                : '등록된 게임이 없습니다'
+            }
+          />
+        )}
       </section>
 
       {/* Recommended Rooms Section */}
@@ -83,7 +128,7 @@ const HomePage = () => {
             <div>
               <h2 className="font-display text-h2 text-white">추천 방</h2>
               <p className="text-text-secondary mt-2">
-                당신에게 맞는 팀원을 AI가 추천합니다
+                {selectedGame ? `${selectedGame.name} 기준 추천 방입니다` : '게임을 선택하면 추천 방을 보여드립니다'}
               </p>
             </div>
             {selectedGameId && (
@@ -97,26 +142,9 @@ const HomePage = () => {
             )}
           </div>
 
-          {/* Game Tabs */}
-          {games.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {games.map((game) => (
-                <button
-                  key={game.id}
-                  onClick={() => setSelectedGameId(game.id)}
-                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-gaming transition-all ${
-                    selectedGameId === game.id
-                      ? 'bg-neon-purple text-white shadow-glow-purple'
-                      : 'bg-dark-secondary border border-neon-purple/30 text-text-secondary hover:border-neon-purple hover:text-text-primary'
-                  }`}
-                >
-                  {game.name}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {recsLoading ? (
+          {!selectedGameId ? (
+            <div className="text-center py-12 text-text-muted font-gaming">게임을 선택해주세요</div>
+          ) : recsLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(3)].map((_, i) => (
                 <div
@@ -127,7 +155,7 @@ const HomePage = () => {
             </div>
           ) : recommendedRooms.length === 0 ? (
             <div className="text-center py-12 text-text-muted font-gaming">
-              추천할 방이 없습니다. 방을 먼저 만들어보세요!
+              현재 모집 중인 방이 없습니다. 방을 만들어보세요!
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -142,81 +170,57 @@ const HomePage = () => {
                     ? 'bg-neon-pink'
                     : 'bg-text-muted';
 
-                const filters = rec.room?.filters ?? {};
-                const filterEntries = Object.entries(filters);
+                const room = rec.room;
+                const roomPublicId = room?.publicId;
 
                 return (
-                  <button
-                    key={rec.room?.id ?? rec.roomId}
-                    onClick={() => navigate(`/rooms/${rec.room?.id ?? rec.roomId}`)}
-                    className="bg-dark-secondary border border-neon-purple/30 rounded-card p-5 text-left hover:border-neon-purple hover:shadow-glow-purple transition-all group"
+                  <div
+                    key={room?.publicId ?? room?.id ?? rec.roomId}
+                    className="bg-dark-secondary border border-neon-purple/30 rounded-card p-5 hover:border-neon-purple hover:shadow-glow-purple transition-all"
                   >
-                    {/* Game name + score badge */}
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-gaming text-neon-cyan">
-                        {rec.room?.gameName ?? selectedGame?.name}
+                      <span className="text-xs font-gaming text-neon-cyan">{room?.gameName ?? selectedGame?.name}</span>
+                      <span className="text-xs font-gaming text-neon-cyan bg-neon-cyan/10 px-2 py-1 rounded-full flex-shrink-0">
+                        {score}점
                       </span>
-                      {rec.matchingScore !== undefined && (
-                        <span className="text-xs font-gaming text-neon-cyan bg-neon-cyan/10 px-2 py-1 rounded-full flex-shrink-0">
-                          {score}점
+                    </div>
+
+                    <h3 className="font-semibold text-text-primary truncate mb-3">{room?.title ?? '방'}</h3>
+
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles size={11} className="text-neon-cyan flex-shrink-0" />
+                        <span className="text-xs text-text-muted font-gaming">매칭 점수</span>
+                      </div>
+                      <div className="h-1.5 bg-dark-primary rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${scoreColor}`} style={{ width: `${score}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-sm text-text-secondary mb-4">
+                      <span>
+                        {room?.currentParticipants ?? 0}/{room?.maxParticipants ?? '?'}명
+                      </span>
+                      {rec.hostTemperature !== undefined && (
+                        <span className="flex items-center gap-0.5 text-neon-pink">
+                          <Thermometer size={12} />
+                          {Number(rec.hostTemperature).toFixed(1)}°C
                         </span>
                       )}
                     </div>
 
-                    <h3 className="font-semibold text-text-primary truncate group-hover:text-neon-purple transition-colors mb-3">
-                      {rec.room?.title ?? '방'}
-                    </h3>
-
-                    {/* Matching score progress bar */}
-                    {rec.matchingScore !== undefined && (
-                      <div className="mb-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Sparkles size={11} className="text-neon-cyan flex-shrink-0" />
-                          <span className="text-xs text-text-muted font-gaming">매칭도</span>
-                        </div>
-                        <div className="h-1.5 bg-dark-primary rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${scoreColor}`}
-                            style={{ width: `${score}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Filter tags */}
-                    {filterEntries.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {filterEntries.map(([key, value]) => (
-                          <span
-                            key={key}
-                            className="text-xs bg-neon-purple/10 text-neon-purple border border-neon-purple/30 px-2 py-0.5 rounded-full font-gaming"
-                          >
-                            {value}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-3 text-sm text-text-secondary mb-3">
-                      <span>
-                        {rec.room?.currentParticipants ?? 0}/{rec.room?.maxParticipants ?? '?'}명
-                      </span>
-                      <span>•</span>
-                      <span>{rec.room?.createdBy}</span>
-                      {rec.hostTemperature !== undefined && (
-                        <>
-                          <span>•</span>
-                          <span className="flex items-center gap-0.5 text-neon-pink">
-                            <Thermometer size={12} />
-                            {Number(rec.hostTemperature).toFixed(1)}°C
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    {rec.reason && (
-                      <p className="text-xs text-text-muted line-clamp-2">{rec.reason}</p>
-                    )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!selectedGameId) return;
+                        const path = `/games/${selectedGameId}/rooms`;
+                        navigate(roomPublicId ? `${path}?room=${roomPublicId}` : path);
+                      }}
+                      className="w-full rounded-lg bg-neon-purple px-4 py-2 text-sm font-semibold text-white hover:bg-neon-pink transition-colors"
+                    >
+                      입장하기
+                    </button>
+                  </div>
                 );
               })}
             </div>
