@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Bell, ChevronDown, User, LogOut, Crown } from 'lucide-react';
-import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
+import { notificationKeys, useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
 import PremiumBadge from '@/components/common/PremiumBadge';
 import { featureFlags } from '@/config/features';
 
@@ -16,6 +17,7 @@ function getTemperatureColor(temperature: number): string {
 export default function Header() {
   const { user, logout } = useAuthStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const queryClient = useQueryClient();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   return (
@@ -45,6 +47,9 @@ export default function Header() {
                 {/* Notification Button */}
                 <Link
                   to="/notifications"
+                  onClick={() => {
+                    queryClient.setQueryData(notificationKeys.unreadCount(), 0);
+                  }}
                   className="relative p-2 rounded-lg hover:bg-dark-tertiary transition-colors group"
                 >
                   <Bell className="w-6 h-6 text-text-secondary group-hover:text-neon-cyan transition-colors" />
