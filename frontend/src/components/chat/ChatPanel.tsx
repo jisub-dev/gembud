@@ -9,6 +9,7 @@ import type { ChatMessage } from '@/types/chat';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 const WS_URL = API_BASE_URL + '/ws';
+const EMOJIS = ['😀', '🎮', '👍', '💪', '🔥', '😂', '👋', '🎉', '😎', '🤝', '🙏', '😅', '👏', '🫡', '💯'];
 
 interface ChatPanelProps {
   chatRoomId: number;
@@ -25,6 +26,9 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [newMessageCount, setNewMessageCount] = useState(0);
+  const [showNewMessageButton, setShowNewMessageButton] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
     userId: number;
     nickname: string;
@@ -32,33 +36,66 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
   } | null>(null);
 
   const stompClientRef = useRef<Client | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const isAtBottomRef = useRef(true);
   const onRoomUpdateRef = useRef(onRoomUpdate);
-  useEffect(() => { onRoomUpdateRef.current = onRoomUpdate; }, [onRoomUpdate]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    onRoomUpdateRef.current = onRoomUpdate;
+  }, [onRoomUpdate]);
+
+  const isNearBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return true;
+    return container.scrollHeight - container.scrollTop - container.clientHeight < 48;
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+    isAtBottomRef.current = true;
+    setNewMessageCount(0);
+    setShowNewMessageButton(false);
+  }, []);
+
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const lineHeight = Number.parseInt(window.getComputedStyle(textarea).lineHeight || '20', 10);
+    const maxHeight = lineHeight * 4 + 12;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputText, adjustTextareaHeight]);
 
   useEffect(() => {
     if (!canChat) return;
-    chatService.getMessages(chatRoomId, 50)
-      .then((history) => setMessages([...history].reverse()))
+    chatService
+      .getMessages(chatRoomId, 50)
+      .then((history) => {
+        setMessages([...history].reverse());
+        requestAnimationFrame(() => scrollToBottom('auto'));
+      })
       .catch(() => {});
-  }, [chatRoomId, canChat]);
+  }, [chatRoomId, canChat, scrollToBottom]);
 
   useEffect(() => {
-    // StrictMode에서 double-invoke 방지: 이전 클라이언트가 아직 살아있으면 먼저 정리
     if (stompClientRef.current) {
       stompClientRef.current.deactivate();
       stompClientRef.current = null;
     }
 
-    let active = true; // cleanup 후 콜백이 state를 건드리지 않도록
+    let active = true;
 
     const client = new Client({
-      webSocketFactory: () => new SockJS(WS_URL, null, { transports: ['websocket', 'xhr-streaming', 'xhr-polling'] }),
+      webSocketFactory: () =>
+        new SockJS(WS_URL, null, { transports: ['websocket', 'xhr-streaming', 'xhr-polling'] }),
       reconnectDelay: 5000,
       onConnect: () => {
         if (!active) return;
@@ -66,7 +103,6 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
         setConnecting(false);
         setError(null);
 
-        // Subscribe to session-expired notifications (new login on another device)
         client.subscribe('/user/queue/session-expired', () => {
           if (!active) return;
           useAuthStore.setState({ isSessionExpired: true, isAuthenticated: false, user: null });
@@ -81,16 +117,30 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
               onRoomUpdateRef.current?.();
               return;
             }
+
             setMessages((prev) => {
               if (msg.id && prev.some((m: ChatMessage) => m.id === msg.id)) return prev;
-              return [...prev, msg as ChatMessage];
+              const next = [...prev, msg as ChatMessage];
+
+              if (isAtBottomRef.current) {
+                requestAnimationFrame(() => scrollToBottom('smooth'));
+              } else {
+                setNewMessageCount((count) => count + 1);
+                setShowNewMessageButton(true);
+              }
+
+              return next;
             });
-          } catch {}
+          } catch {
+            // no-op
+          }
         });
 
         client.publish({ destination: `/app/chat.join/${chatRoomId}`, body: '' });
       },
-      onDisconnect: () => { if (active) setConnected(false); },
+      onDisconnect: () => {
+        if (active) setConnected(false);
+      },
       onStompError: (frame) => {
         if (!active) return;
         setError('연결 실패: ' + (frame.headers?.message || '알 수 없는 오류'));
@@ -114,7 +164,18 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
       }
       client.deactivate();
     };
-  }, [chatRoomId]);
+  }, [chatRoomId, scrollToBottom]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   const sendMessage = useCallback(() => {
     const text = inputText.trim();
@@ -126,18 +187,41 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
     });
 
     setInputText('');
-    inputRef.current?.focus();
-  }, [inputText, chatRoomId, canChat]);
+    requestAnimationFrame(() => {
+      adjustTextareaHeight();
+      inputRef.current?.focus();
+    });
+  }, [adjustTextareaHeight, inputText, chatRoomId, canChat]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       sendMessage();
     }
   };
 
+  const handleScroll = () => {
+    const atBottom = isNearBottom();
+    isAtBottomRef.current = atBottom;
+
+    if (atBottom) {
+      setNewMessageCount(0);
+      setShowNewMessageButton(false);
+    }
+  };
+
+  const appendEmoji = (emoji: string) => {
+    setInputText((prev) => prev + emoji);
+    inputRef.current?.focus();
+  };
+
   const formatTime = (isoString: string) =>
     new Date(isoString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+  const formatDateDivider = (isoString: string) => {
+    const date = new Date(isoString);
+    return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+  };
 
   const isSystemMessage = (msg: ChatMessage) =>
     msg.message === 'User joined the chat' || msg.message === 'User left the chat';
@@ -173,95 +257,129 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
         </span>
       </div>
 
-
       {/* Error */}
       {error && (
-        <div className="bg-red-500/20 px-3 py-1.5 text-red-400 text-xs text-center flex-shrink-0">
-          {error}
-        </div>
+        <div className="bg-red-500/20 px-3 py-1.5 text-red-400 text-xs text-center flex-shrink-0">{error}</div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
-        {connecting && messages.length === 0 && (
-          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-            <Loader2 size={20} className="animate-spin mr-2 text-purple-500" />
-            채팅 연결 중...
-          </div>
-        )}
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-auto px-3 py-3 space-y-2"
+        >
+          {connecting && messages.length === 0 && (
+            <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+              <Loader2 size={20} className="animate-spin mr-2 text-purple-500" />
+              채팅 연결 중...
+            </div>
+          )}
 
-        {messages.map((msg, idx) => {
-          if (isSystemMessage(msg)) {
+          {messages.map((msg, idx) => {
+            const prev = messages[idx - 1];
+            const showDateDivider = Boolean(
+              msg.createdAt &&
+                (!prev?.createdAt ||
+                  new Date(prev.createdAt).toDateString() !== new Date(msg.createdAt).toDateString())
+            );
+
+            if (isSystemMessage(msg)) {
+              return (
+                <div key={`system-${msg.id ?? idx}`}>
+                  {showDateDivider && msg.createdAt && (
+                    <div className="flex justify-center py-1">
+                      <span className="text-[11px] text-gray-400 bg-gray-800/80 px-2 py-0.5 rounded-full">
+                        {formatDateDivider(msg.createdAt)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
+                      {msg.username || `사용자 ${msg.userId}`}님이{' '}
+                      {msg.message === 'User joined the chat' ? '입장' : '퇴장'}했습니다
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            const isOwn = user && msg.userId === user.id;
+
             return (
-              <div key={idx} className="text-center">
-                <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
-                  {msg.username || `사용자 ${msg.userId}`}님이{' '}
-                  {msg.message === 'User joined the chat' ? '입장' : '퇴장'}했습니다
-                </span>
+              <div key={msg.id ?? `msg-${idx}`}>
+                {showDateDivider && msg.createdAt && (
+                  <div className="flex justify-center py-1">
+                    <span className="text-[11px] text-gray-400 bg-gray-800/80 px-2 py-0.5 rounded-full">
+                      {formatDateDivider(msg.createdAt)}
+                    </span>
+                  </div>
+                )}
+
+                <div
+                  className={`group flex items-end gap-1.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
+                  onContextMenu={(e) => {
+                    if (isOwn) return;
+                    e.preventDefault();
+                    setReportTarget({
+                      userId: msg.userId,
+                      nickname: msg.username || `사용자 ${msg.userId}`,
+                      chatMessageId: msg.id,
+                    });
+                  }}
+                >
+                  {!isOwn && (
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      {msg.username?.[0] || '?'}
+                    </div>
+                  )}
+                  <div className={`flex flex-col max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {!isOwn && <span className="text-xs text-gray-400 mb-0.5 ml-1">{msg.username}</span>}
+                    <div
+                      className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                        isOwn
+                          ? 'bg-purple-600 text-white rounded-br-sm'
+                          : 'bg-[#2a2a2f] text-gray-100 rounded-bl-sm'
+                      }`}
+                    >
+                      {msg.message}
+                    </div>
+                    {msg.createdAt && (
+                      <span className="text-xs text-gray-500 mt-0.5 mx-1">{formatTime(msg.createdAt)}</span>
+                    )}
+                    {!isOwn && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReportTarget({
+                            userId: msg.userId,
+                            nickname: msg.username || `사용자 ${msg.userId}`,
+                            chatMessageId: msg.id,
+                          })
+                        }
+                        className="text-[11px] text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-300 transition"
+                      >
+                        신고
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             );
-          }
+          })}
 
-          const isOwn = user && msg.userId === user.id;
+          <div ref={messagesEndRef} />
+        </div>
 
-          return (
-            <div
-              key={idx}
-              className={`group flex items-end gap-1.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
-              onContextMenu={(e) => {
-                if (isOwn) return;
-                e.preventDefault();
-                setReportTarget({
-                  userId: msg.userId,
-                  nickname: msg.username || `사용자 ${msg.userId}`,
-                  chatMessageId: msg.id,
-                });
-              }}
-            >
-              {!isOwn && (
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                  {msg.username?.[0] || '?'}
-                </div>
-              )}
-              <div className={`flex flex-col max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}>
-                {!isOwn && (
-                  <span className="text-xs text-gray-400 mb-0.5 ml-1">{msg.username}</span>
-                )}
-                <div
-                  className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed ${
-                    isOwn
-                      ? 'bg-purple-600 text-white rounded-br-sm'
-                      : 'bg-[#2a2a2f] text-gray-100 rounded-bl-sm'
-                  }`}
-                >
-                  {msg.message}
-                </div>
-                {msg.createdAt && (
-                  <span className="text-xs text-gray-500 mt-0.5 mx-1">
-                    {formatTime(msg.createdAt)}
-                  </span>
-                )}
-                {!isOwn && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setReportTarget({
-                        userId: msg.userId,
-                        nickname: msg.username || `사용자 ${msg.userId}`,
-                        chatMessageId: msg.id,
-                      })
-                    }
-                    className="text-[11px] text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-300 transition"
-                  >
-                    신고
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        <div ref={messagesEndRef} />
+        {showNewMessageButton && newMessageCount > 0 && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom('smooth')}
+            className="absolute bottom-3 right-3 bg-neon-purple/90 hover:bg-neon-purple text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg"
+          >
+            새 메시지 {newMessageCount}개 ↓
+          </button>
+        )}
       </div>
 
       {/* Input */}
@@ -269,24 +387,52 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
         {!canChat ? (
           <p className="text-center text-xs text-gray-500 py-1">입장 후 채팅 가능합니다</p>
         ) : (
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={connected ? '메시지 입력... (Enter)' : '연결 중...'}
-              disabled={!connected}
-              className="flex-1 bg-[#0e0e10] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!connected || !inputText.trim()}
-              className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition"
-            >
-              <Send size={15} />
-            </button>
+          <div className="relative">
+            {showEmojiPicker && (
+              <div className="absolute bottom-14 left-0 z-20 grid grid-cols-5 gap-1 rounded-lg border border-gray-700 bg-[#0e0e10] p-2 shadow-xl">
+                {EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => appendEmoji(emoji)}
+                    className="h-8 w-8 rounded hover:bg-gray-800 text-lg"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                disabled={!connected}
+                className="px-2.5 py-2 text-lg bg-[#0e0e10] border border-gray-700 rounded-lg hover:border-purple-500 disabled:opacity-50"
+                aria-label="이모지 팔레트"
+              >
+                😊
+              </button>
+
+              <textarea
+                ref={inputRef}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={connected ? '메시지 입력... (Enter 전송 / Shift+Enter 줄바꿈)' : '연결 중...'}
+                disabled={!connected}
+                rows={1}
+                className="flex-1 resize-none bg-[#0e0e10] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              />
+
+              <button
+                onClick={sendMessage}
+                disabled={!connected || !inputText.trim()}
+                className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition"
+              >
+                <Send size={15} />
+              </button>
+            </div>
           </div>
         )}
       </div>
