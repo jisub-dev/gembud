@@ -14,6 +14,7 @@ import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
 import com.gembud.dto.response.RoomResponse;
 import com.gembud.entity.Game;
+import com.gembud.entity.Notification.NotificationType;
 import com.gembud.entity.Room;
 import com.gembud.entity.RoomFilter;
 import com.gembud.entity.RoomParticipant;
@@ -81,6 +82,9 @@ class RoomServiceTest {
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private RoomService roomService;
@@ -221,6 +225,13 @@ class RoomServiceTest {
             .build();
         ReflectionTestUtils.setField(joiner, "id", 2L);
 
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(room)
+            .user(user)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
         when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
@@ -229,7 +240,7 @@ class RoomServiceTest {
         when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenReturn(room);
         when(chatService.getChatRoomByGameRoomId(1L)).thenReturn(10L);
-        when(participantRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
+        when(participantRepository.findByRoomId(1L)).thenReturn(List.of(hostParticipant));
         when(filterRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
 
         // When
@@ -239,6 +250,12 @@ class RoomServiceTest {
         assertThat(response).isNotNull();
         verify(participantRepository).save(any(RoomParticipant.class));
         verify(chatService).addMemberToChatRoomInternal(10L, 2L);
+        verify(notificationService).createNotification(
+            eq(1L),
+            eq(NotificationType.ROOM_JOIN),
+            eq("Joiner님이 대기방에 참가했습니다"),
+            eq(1L)
+        );
     }
 
     @Test
