@@ -34,6 +34,9 @@ export default function ChatPage() {
   const [isResettingRoom, setIsResettingRoom] = useState(false);
   const [isClosingRoom, setIsClosingRoom] = useState(false);
   const [isEvaluateModalOpen, setIsEvaluateModalOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | undefined>(undefined);
+  const [isRegeneratingInvite, setIsRegeneratingInvite] = useState(false);
 
   const roomId = Number(chatRoomId);
   const queryClient = useQueryClient();
@@ -125,6 +128,25 @@ export default function ChatPage() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!isHost || !relatedRoom?.isPrivate) {
+      setInviteLink('');
+      setInviteExpiresAt(undefined);
+      return;
+    }
+
+    setInviteExpiresAt(relatedRoom.inviteCodeExpiresAt);
+    if (relatedRoom.inviteCode) {
+      try {
+        setInviteLink(roomService.buildInviteLink(relatedRoom));
+      } catch {
+        setInviteLink('');
+      }
+    } else {
+      setInviteLink('');
+    }
+  }, [isHost, relatedRoom]);
+
   const handleKick = async (userId: number, nickname: string) => {
     if (!relatedRoom) return;
     if (!window.confirm(`${nickname}님을 강퇴하시겠습니까?`)) return;
@@ -190,18 +212,37 @@ export default function ChatPage() {
   };
 
   const handleCopyInviteLink = async () => {
+    if (!inviteLink) {
+      toast.error('현재 사용할 수 있는 초대 링크가 없습니다');
+      return;
+    }
+    try {
+      await copyToClipboard(inviteLink);
+      toast.success('초대 링크가 복사되었습니다');
+    } catch {
+      toast.error('초대 링크 복사에 실패했습니다');
+    }
+  };
+
+  const handleRegenerateInviteLink = async () => {
     if (!relatedRoom?.publicId) return;
+    if (!window.confirm('재발급하면 이전 링크가 무효화됩니다')) return;
+
+    setIsRegeneratingInvite(true);
     try {
       const updatedRoom = await roomService.regenerateInviteCode(relatedRoom.publicId);
       if (!updatedRoom.inviteCode) {
-        toast.error('초대 링크 생성에 실패했습니다');
+        toast.error('초대 링크 재발급에 실패했습니다');
         return;
       }
-      const inviteUrl = `${window.location.origin}/games/${relatedRoom.gameId}/rooms?room=${updatedRoom.publicId}&invite=${encodeURIComponent(updatedRoom.inviteCode)}`;
-      await copyToClipboard(inviteUrl);
-      toast.success('초대 링크가 복사되었습니다');
+
+      setInviteLink(roomService.buildInviteLink(updatedRoom));
+      setInviteExpiresAt(updatedRoom.inviteCodeExpiresAt);
+      toast.success('초대 링크를 재발급했습니다');
     } catch {
-      toast.error('초대 링크 생성에 실패했습니다');
+      toast.error('초대 링크 재발급에 실패했습니다');
+    } finally {
+      setIsRegeneratingInvite(false);
     }
   };
 
@@ -313,13 +354,37 @@ export default function ChatPage() {
                     />
 
                     {isHost && relatedRoom.isPrivate && (
-                      <button
-                        type="button"
-                        onClick={handleCopyInviteLink}
-                        className="w-full py-2 rounded border border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 font-semibold transition"
-                      >
-                        초대 링크 복사
-                      </button>
+                      <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 space-y-3">
+                        <p className="text-sm font-semibold text-blue-200">초대 링크 관리</p>
+                        <div className="flex gap-2">
+                          <input
+                            readOnly
+                            value={inviteLink || '초대 링크가 없습니다. 재발급해주세요.'}
+                            className="flex-1 min-w-0 rounded border border-gray-700 bg-[#0e0e10] px-3 py-2 text-xs text-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleCopyInviteLink}
+                            disabled={!inviteLink}
+                            className="px-3 py-2 rounded bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-sm font-semibold transition"
+                          >
+                            복사
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-gray-400">
+                            만료 시각: {formatDateTime(inviteExpiresAt)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleRegenerateInviteLink}
+                            disabled={isRegeneratingInvite}
+                            className="px-3 py-1.5 rounded border border-blue-400/40 bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-60 text-xs font-semibold text-blue-200 transition"
+                          >
+                            {isRegeneratingInvite ? '재발급 중...' : '초대 링크 재발급'}
+                          </button>
+                        </div>
+                      </div>
                     )}
 
                     <div className="flex flex-col gap-2">
@@ -419,4 +484,17 @@ async function copyToClipboard(text: string): Promise<void> {
   textarea.select();
   document.execCommand('copy');
   document.body.removeChild(textarea);
+}
+
+function formatDateTime(iso?: string): string {
+  if (!iso) return '미설정';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '미설정';
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
