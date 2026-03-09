@@ -9,6 +9,7 @@ import {
   useSendFriendRequest,
   useAcceptFriendRequest,
   useRejectFriendRequest,
+  useCancelSentFriendRequest,
   useRemoveFriend,
 } from '@/hooks/queries/useFriends';
 import friendService from '@/services/friendService';
@@ -22,6 +23,7 @@ vi.mock('@/services/friendService', () => ({
     sendFriendRequest: vi.fn(),
     acceptFriendRequest: vi.fn(),
     rejectFriendRequest: vi.fn(),
+    cancelSentFriendRequest: vi.fn(),
     removeFriend: vi.fn(),
   },
 }));
@@ -144,6 +146,21 @@ describe('useFriends mutations', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(friendService.rejectFriendRequest).toHaveBeenCalledWith(2);
+  });
+
+  it('calls cancelSentFriendRequest with requestId', async () => {
+    vi.mocked(friendService.cancelSentFriendRequest).mockResolvedValue(undefined as any);
+
+    const { result } = renderHook(() => useCancelSentFriendRequest(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate(2);
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(friendService.cancelSentFriendRequest).toHaveBeenCalledWith(2);
   });
 
   it('calls removeFriend with friendId', async () => {

@@ -114,6 +114,28 @@ public class FriendController {
     }
 
     /**
+     * Cancel sent friend request.
+     *
+     * @param userDetails authenticated user
+     * @param requestId friend request ID
+     * @return no content
+     */
+    @Operation(summary = "Cancel sent request", description = "보낸 친구 요청 취소")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "친구 요청 취소 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "요청을 찾을 수 없음")
+    })
+    @DeleteMapping("/requests/{requestId}")
+    public ResponseEntity<ApiResponse<Void>> cancelSentRequest(
+        @AuthenticationPrincipal UserDetails userDetails,
+        @PathVariable Long requestId
+    ) {
+        friendService.cancelSentRequest(userDetails.getUsername(), requestId);
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    /**
      * Unfriend (remove friend).
      *
      * @param userDetails authenticated user

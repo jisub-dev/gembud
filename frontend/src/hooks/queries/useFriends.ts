@@ -97,6 +97,18 @@ export function useRejectFriendRequest() {
   });
 }
 
+// Cancel sent friend request
+export function useCancelSentFriendRequest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (requestId: number) => friendService.cancelSentFriendRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: friendKeys.sent() });
+    },
+  });
+}
+
 // Remove friend
 export function useRemoveFriend() {
   const queryClient = useQueryClient();

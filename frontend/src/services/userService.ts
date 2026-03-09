@@ -10,7 +10,7 @@ export const userService = {
 
   async searchUsers(query: string, limit: number = 10): Promise<UserSearchResult[]> {
     const response = await api.get<ApiResponse<UserSearchResult[]>>('/users/search', {
-      params: { q: query, limit },
+      params: { q: query, nickname: query, limit },
     });
     return response.data.data;
   },

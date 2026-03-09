@@ -8,6 +8,7 @@ import {
   useSendFriendRequest,
   useAcceptFriendRequest,
   useRejectFriendRequest,
+  useCancelSentFriendRequest,
   useRemoveFriend,
 } from '@/hooks/queries/useFriends';
 import { useToast } from '@/hooks/useToast';
@@ -43,6 +44,7 @@ export default function FriendListPage() {
   const sendRequestMutation = useSendFriendRequest();
   const acceptMutation = useAcceptFriendRequest();
   const rejectMutation = useRejectFriendRequest();
+  const cancelSentMutation = useCancelSentFriendRequest();
   const removeMutation = useRemoveFriend();
   const toast = useToast();
 
@@ -93,6 +95,13 @@ export default function FriendListPage() {
     rejectMutation.mutate(requestId, {
       onSuccess: () => toast.info('친구 요청을 거절했습니다'),
       onError: (error: any) => toast.error(error.response?.data?.message || '거절 실패'),
+    });
+  };
+
+  const handleCancelSent = (requestId: number) => {
+    cancelSentMutation.mutate(requestId, {
+      onSuccess: () => toast.info('보낸 친구 요청을 취소했습니다'),
+      onError: (error: any) => toast.error(error.response?.data?.message || '요청 취소 실패'),
     });
   };
 
@@ -314,6 +323,16 @@ export default function FriendListPage() {
                             {statusLabel[request.status]}
                           </span>
                         </div>
+                        {request.status === 'PENDING' ? (
+                          <button
+                            onClick={() => handleCancelSent(request.id)}
+                            disabled={cancelSentMutation.isPending}
+                            className="flex items-center gap-1.5 rounded bg-red-500 px-3 py-2 text-sm font-semibold transition hover:bg-red-600 disabled:bg-gray-600"
+                          >
+                            <UserX size={14} />
+                            취소
+                          </button>
+                        ) : null}
                       </div>
                     ))}
                   </div>

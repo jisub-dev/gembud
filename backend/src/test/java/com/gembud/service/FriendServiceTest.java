@@ -159,6 +159,45 @@ class FriendServiceTest {
     }
 
     @Test
+    @DisplayName("cancelSentRequest - 보낸 PENDING 요청 취소 성공")
+    void cancelSentRequest_ShouldDeletePendingRequest() {
+        Friend pendingSent = Friend.builder()
+            .id(30L)
+            .user(me)
+            .friend(other)
+            .status(FriendStatus.PENDING)
+            .build();
+
+        when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
+        when(friendRepository.findById(30L)).thenReturn(Optional.of(pendingSent));
+
+        friendService.cancelSentRequest("me@example.com", 30L);
+
+        verify(friendRepository, times(1)).delete(pendingSent);
+    }
+
+    @Test
+    @DisplayName("cancelSentRequest - PENDING이 아니면 예외")
+    void cancelSentRequest_NotPending_ShouldThrow() {
+        Friend rejectedSent = Friend.builder()
+            .id(31L)
+            .user(me)
+            .friend(other)
+            .status(FriendStatus.REJECTED)
+            .build();
+
+        when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
+        when(friendRepository.findById(31L)).thenReturn(Optional.of(rejectedSent));
+
+        assertThatThrownBy(() -> friendService.cancelSentRequest("me@example.com", 31L))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+
+        verify(friendRepository, never()).delete(any(Friend.class));
+    }
+
+    @Test
     @DisplayName("unfriend - 친구가 아니면 삭제하지 않고 예외")
     void unfriend_NotFriends_ShouldThrow() {
         when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
