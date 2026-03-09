@@ -5,6 +5,7 @@ import { ToastContainer } from './components/common/ToastContainer';
 import { SessionExpiredModal } from './components/common/SessionExpiredModal';
 import { authService } from './services/authService';
 import { featureFlags, isPremiumActive } from './config/features';
+import { useNotificationSocket } from './hooks/useNotificationSocket';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -58,6 +59,7 @@ function SessionExpiredHandler() {
 }
 
 function App() {
+  useNotificationSocket();
 
   useEffect(() => {
     // 새로고침 시 HTTP-only 쿠키로 세션 복원 (1회만 실행)
