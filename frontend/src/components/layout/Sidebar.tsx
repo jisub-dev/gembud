@@ -231,7 +231,7 @@ export default function Sidebar() {
                     <button
                       type="button"
                       key={friend.id}
-                      onClick={() => navigate('/friends')}
+                      onClick={() => navigate(`/profile/${friend.friendId}`)}
                       className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group"
                     >
                       <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center flex-shrink-0">

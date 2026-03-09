@@ -1,4 +1,5 @@
 import { UserX, Crown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ParticipantInfo } from '@/types/room';
 
 interface RoomParticipantsProps {
@@ -59,6 +60,8 @@ interface ParticipantSlotProps {
 }
 
 function ParticipantSlot({ participant, slotNumber, currentUserId, isCurrentUserHost, onKick, onTransferHost }: ParticipantSlotProps) {
+  const navigate = useNavigate();
+
   if (!participant) {
     return (
       <div className="flex items-center gap-3 p-3 bg-dark-tertiary border border-gray-700 rounded-lg opacity-40">
@@ -92,10 +95,14 @@ function ParticipantSlot({ participant, slotNumber, currentUserId, isCurrentUser
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-text-primary truncate">
+          <button
+            type="button"
+            onClick={() => navigate(`/profile/${participant.userId}`)}
+            className="text-sm font-medium text-text-primary truncate hover:text-neon-cyan transition-colors"
+          >
             {participant.nickname}
             {isMe && <span className="text-xs text-gray-400 ml-1">(나)</span>}
-          </p>
+          </button>
           {participant.isHost && (
             <span className="px-2 py-0.5 bg-gradient-to-r from-neon-purple to-neon-pink rounded text-xs font-gaming font-bold flex-shrink-0">
               HOST
