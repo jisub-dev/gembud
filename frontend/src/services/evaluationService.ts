@@ -27,6 +27,11 @@ export const evaluationService = {
     return response.data.data;
   },
 
+  // 평가 가능 여부 조회 (alias)
+  async getEvaluatable(roomId: number): Promise<number[]> {
+    return this.getEvaluatableUsers(roomId);
+  },
+
   // 사용자가 받은 평가 조회
   async getUserEvaluations(userId: number): Promise<Evaluation[]> {
     const response = await api.get<ApiResponse<Evaluation[]>>(`/evaluations/users/${userId}`);
