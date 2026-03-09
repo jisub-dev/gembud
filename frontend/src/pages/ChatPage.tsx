@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, LogOut } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChatPanel } from '@/components/chat/ChatPanel';
@@ -29,7 +29,7 @@ export default function ChatPage() {
   const { roomId: chatRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'info' | 'chat'>('chat');
+  const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
   const [isStartingRoom, setIsStartingRoom] = useState(false);
   const [isResettingRoom, setIsResettingRoom] = useState(false);
   const [isEvaluateModalOpen, setIsEvaluateModalOpen] = useState(false);
@@ -116,6 +116,12 @@ export default function ChatPage() {
     isEvaluatableLoading ||
     evaluatableParticipants.length === 0 ||
     !hasEvaluatableParticipants;
+
+  useEffect(() => {
+    if (window.innerWidth < 1024) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab]);
 
   const handleKick = async (userId: number, nickname: string) => {
     if (!relatedRoom) return;

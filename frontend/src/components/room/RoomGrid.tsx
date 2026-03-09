@@ -8,6 +8,7 @@ interface RoomGridProps {
   onRoomClick?: (roomPublicId: string) => void;
   shouldShowRegenerateInviteButton?: (room: Room) => boolean;
   onRegenerateInviteCode?: (roomPublicId: string) => void;
+  isMyRoom?: (room: Room) => boolean;
 }
 
 export function RoomGrid({
@@ -16,6 +17,7 @@ export function RoomGrid({
   onRoomClick,
   shouldShowRegenerateInviteButton,
   onRegenerateInviteCode,
+  isMyRoom,
 }: RoomGridProps) {
   if (isLoading) {
     return (
@@ -57,6 +59,7 @@ export function RoomGrid({
           onClick={onRoomClick}
           showRegenerateInviteButton={shouldShowRegenerateInviteButton?.(room) ?? false}
           onRegenerateInviteCode={onRegenerateInviteCode}
+          isMyRoom={isMyRoom?.(room) ?? false}
         />
       ))}
     </div>

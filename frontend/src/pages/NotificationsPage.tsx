@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Users, Gamepad2, Star, Trash2, Check } from 'lucide-react';
 import {
   useNotifications,
@@ -7,9 +8,11 @@ import {
   useDeleteNotification,
 } from '@/hooks/queries/useNotifications';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 import type { Notification } from '@/types/notification';
 
 export default function NotificationsPage() {
+  const navigate = useNavigate();
   const { data: notifications = [], isLoading } = useNotifications();
   const markAsReadMutation = useMarkNotificationAsRead();
   const markAllAsReadMutation = useMarkAllNotificationsAsRead();
@@ -28,6 +31,25 @@ export default function NotificationsPage() {
 
   const handleDelete = (id: number) => {
     setDeletingId(id);
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.isRead) {
+      markAsReadMutation.mutate(notification.id);
+    }
+
+    if (notification.type === 'FRIEND_REQUEST' || notification.type === 'FRIEND_ACCEPTED') {
+      navigate('/friends');
+      return;
+    }
+
+    if (notification.type === 'ROOM_JOIN' && notification.relatedUrl) {
+      if (notification.relatedUrl.startsWith('/')) {
+        navigate(notification.relatedUrl);
+      } else {
+        window.location.href = notification.relatedUrl;
+      }
+    }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -126,7 +148,7 @@ export default function NotificationsPage() {
         {/* Notifications List */}
         <div className="space-y-3">
           {isLoading ? (
-            <div className="text-center text-gray-400 py-12">불러오는 중...</div>
+            <LoadingSpinner className="py-12" />
           ) : notifications.length === 0 ? (
             <div className="bg-[#18181b] border-2 border-gray-700 rounded-lg p-12 text-center">
               <Bell size={56} className="text-gray-600 mx-auto mb-4" />
@@ -136,9 +158,10 @@ export default function NotificationsPage() {
             notifications.map((notification: Notification) => (
               <div
                 key={notification.id}
+                onClick={() => handleNotificationClick(notification)}
                 className={`bg-[#18181b] border-2 ${
                   notification.isRead ? 'border-gray-700' : getNotificationBorder(notification.type)
-                } rounded-lg p-5 ${notification.isRead ? 'opacity-60' : ''} transition`}
+                } rounded-lg p-5 ${notification.isRead ? 'opacity-60' : ''} transition cursor-pointer hover:border-purple-400/60`}
               >
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0 mt-0.5">
@@ -155,7 +178,10 @@ export default function NotificationsPage() {
                       <div className="flex gap-2 flex-shrink-0">
                         {!notification.isRead && (
                           <button
-                            onClick={() => handleMarkAsRead(notification.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkAsRead(notification.id);
+                            }}
                             disabled={markAsReadMutation.isPending}
                             className="p-1.5 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-600 rounded transition"
                             title="읽음 처리"
@@ -164,7 +190,10 @@ export default function NotificationsPage() {
                           </button>
                         )}
                         <button
-                          onClick={() => handleDelete(notification.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(notification.id);
+                          }}
                           disabled={deleteMutation.isPending}
                           className="p-1.5 bg-red-500/20 hover:bg-red-500/40 disabled:bg-gray-600 text-red-400 rounded transition"
                           title="삭제"
@@ -175,12 +204,16 @@ export default function NotificationsPage() {
                     </div>
 
                     {notification.relatedUrl && (
-                      <a
-                        href={notification.relatedUrl}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNotificationClick(notification);
+                        }}
                         className="inline-block mt-2 text-sm text-purple-400 hover:text-purple-300 transition"
                       >
                         자세히 보기 →
-                      </a>
+                      </button>
                     )}
                   </div>
                 </div>
