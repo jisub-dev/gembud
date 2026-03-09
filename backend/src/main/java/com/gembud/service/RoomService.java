@@ -5,6 +5,7 @@ import com.gembud.dto.request.JoinRoomRequest;
 import com.gembud.dto.response.ChatMessageResponse;
 import com.gembud.dto.response.RoomResponse;
 import com.gembud.entity.Game;
+import com.gembud.entity.Notification.NotificationType;
 import com.gembud.entity.Room;
 import com.gembud.entity.RoomFilter;
 import com.gembud.entity.RoomParticipant;
@@ -45,6 +46,7 @@ public class RoomService {
     private final ChatService chatService;
     private final RateLimitService rateLimitService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationService notificationService;
 
     /**
      * Create a new room.
@@ -268,6 +270,7 @@ public class RoomService {
         Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
         chatService.addMemberToChatRoomInternal(chatRoomId, user.getId());
 
+        notifyHostOnJoin(roomId, user, room);
         broadcastRoomUpdate(chatRoomId);
 
         return buildRoomResponse(room);
@@ -551,6 +554,20 @@ public class RoomService {
      * Result object for joinRoomByPublicId.
      */
     public record JoinRoomResult(RoomResponse room, Long chatRoomId) {}
+
+    private void notifyHostOnJoin(Long roomId, User joiner, Room room) {
+        participantRepository.findByRoomId(roomId).stream()
+            .filter(RoomParticipant::getIsHost)
+            .map(RoomParticipant::getUser)
+            .filter(host -> !host.getId().equals(joiner.getId()))
+            .findFirst()
+            .ifPresent(host -> notificationService.createNotification(
+                host.getId(),
+                NotificationType.ROOM_JOIN,
+                joiner.getNickname() + "님이 대기방에 참가했습니다",
+                room.getId()
+            ));
+    }
 
     private void broadcastRoomUpdate(Long chatRoomId) {
         messagingTemplate.convertAndSend(
