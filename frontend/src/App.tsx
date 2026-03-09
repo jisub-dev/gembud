@@ -24,6 +24,7 @@ import ProfilePage from './pages/ProfilePage';
 import FriendListPage from './pages/FriendListPage';
 import NotificationsPage from './pages/NotificationsPage';
 import PremiumPage from './pages/PremiumPage';
+import AdminPage from './pages/AdminPage';
 import AboutPage from './pages/AboutPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsPage from './pages/TermsPage';
@@ -160,6 +161,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <NotificationsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin: 관리자 페이지 (Protected) */}
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute>
+                <AdminPage />
               </ProtectedRoute>
             }
           />

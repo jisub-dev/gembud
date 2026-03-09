@@ -19,6 +19,8 @@ export default function Header() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const queryClient = useQueryClient();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
+  const isAdmin = !!user && (((user as { role?: string }).role === 'ADMIN') || (!!adminEmail && user.email === adminEmail));
 
   return (
     <header className="sticky top-0 z-50 bg-dark-secondary border-b border-neon-purple/30 shadow-glow-purple backdrop-blur-sm">
@@ -38,6 +40,7 @@ export default function Header() {
           <nav className="hidden md:flex items-center space-x-1">
             <NavLink to="/">홈</NavLink>
             <NavLink to="/friends">친구</NavLink>
+            {isAdmin && <NavLink to="/admin">관리자</NavLink>}
           </nav>
 
           {/* Right Section */}
@@ -96,6 +99,16 @@ export default function Header() {
                         <User size={16} className="text-gray-400" />
                         내 프로필
                       </Link>
+                      {isAdmin && (
+                        <Link
+                          to="/admin"
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-dark-tertiary transition-colors text-neon-cyan"
+                          onClick={() => setShowProfileMenu(false)}
+                        >
+                          <User size={16} />
+                          관리자
+                        </Link>
+                      )}
                       {featureFlags.premium && !user.isPremium && (
                         <Link
                           to="/premium"
