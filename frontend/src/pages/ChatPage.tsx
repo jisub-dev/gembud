@@ -4,8 +4,10 @@ import { ChevronLeft, LogOut } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoomParticipants } from '@/components/room/RoomParticipants';
+import { EvaluateModal } from '@/components/room/EvaluateModal';
 import { chatService } from '@/services/chatService';
 import { roomService } from '@/services/roomService';
+import evaluationService from '@/services/evaluationService';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 
@@ -30,6 +32,7 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('chat');
   const [isStartingRoom, setIsStartingRoom] = useState(false);
   const [isResettingRoom, setIsResettingRoom] = useState(false);
+  const [isEvaluateModalOpen, setIsEvaluateModalOpen] = useState(false);
 
   const roomId = Number(chatRoomId);
   const queryClient = useQueryClient();
@@ -83,6 +86,36 @@ export default function ChatPage() {
     if (!relatedRoom || !user) return false;
     return relatedRoom.participants?.some(p => p.userId === user.id && p.isHost) ?? false;
   }, [relatedRoom, user]);
+  const evaluatableParticipants = useMemo(() => {
+    if (!relatedRoom?.participants || !user) return [];
+    return relatedRoom.participants.filter((participant) => participant.userId !== user.id);
+  }, [relatedRoom, user]);
+
+  const {
+    data: evaluatableUserIds = [],
+    isLoading: isEvaluatableLoading,
+    refetch: refetchEvaluatable,
+  } = useQuery({
+    queryKey: ['roomEvaluatableUsers', relatedRoom?.id, user?.id],
+    queryFn: () => evaluationService.getEvaluatable(relatedRoom!.id),
+    enabled: !!relatedRoom?.id && !!user?.id,
+    staleTime: 15000,
+  });
+
+  const canEvaluateRoom = useMemo(() => {
+    if (!relatedRoom) return false;
+    return relatedRoom.status === 'IN_PROGRESS' || relatedRoom.status === 'CLOSED';
+  }, [relatedRoom]);
+
+  const hasEvaluatableParticipants = evaluatableParticipants.some((participant) =>
+    evaluatableUserIds.includes(participant.userId),
+  );
+
+  const isEvaluateButtonDisabled =
+    !canEvaluateRoom ||
+    isEvaluatableLoading ||
+    evaluatableParticipants.length === 0 ||
+    !hasEvaluatableParticipants;
 
   const handleKick = async (userId: number, nickname: string) => {
     if (!relatedRoom) return;
@@ -261,30 +294,47 @@ export default function ChatPage() {
                       </button>
                     )}
 
-                    {isHost && (
-                      <div className="flex gap-2">
-                        {relatedRoom.status === 'OPEN' && (
-                          <button
-                            type="button"
-                            onClick={handleStartRoom}
-                            disabled={isStartingRoom}
-                            className="flex-1 py-2 rounded bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
-                          >
-                            {isStartingRoom ? '시작 중...' : '게임 시작'}
-                          </button>
-                        )}
-                        {relatedRoom.status === 'IN_PROGRESS' && (
-                          <button
-                            type="button"
-                            onClick={handleResetRoom}
-                            disabled={isResettingRoom}
-                            className="flex-1 py-2 rounded bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
-                          >
-                            {isResettingRoom ? '변경 중...' : '대기중으로 변경'}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex flex-col gap-2">
+                      {(relatedRoom.status === 'IN_PROGRESS' || relatedRoom.status === 'CLOSED') && (
+                        <button
+                          type="button"
+                          onClick={() => setIsEvaluateModalOpen(true)}
+                          disabled={isEvaluateButtonDisabled}
+                          className="w-full py-2 rounded bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
+                        >
+                          {isEvaluatableLoading
+                            ? '평가 가능 여부 확인 중...'
+                            : hasEvaluatableParticipants
+                              ? '평가하기'
+                              : '이미 평가 완료'}
+                        </button>
+                      )}
+
+                      {isHost && (
+                        <div className="flex gap-2">
+                          {relatedRoom.status === 'OPEN' && (
+                            <button
+                              type="button"
+                              onClick={handleStartRoom}
+                              disabled={isStartingRoom}
+                              className="flex-1 py-2 rounded bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
+                            >
+                              {isStartingRoom ? '시작 중...' : '게임 시작'}
+                            </button>
+                          )}
+                          {relatedRoom.status === 'IN_PROGRESS' && (
+                            <button
+                              type="button"
+                              onClick={handleResetRoom}
+                              disabled={isResettingRoom}
+                              className="flex-1 py-2 rounded bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
+                            >
+                              {isResettingRoom ? '변경 중...' : '대기중으로 변경'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="h-full flex items-center justify-center text-sm text-gray-400">
@@ -299,6 +349,19 @@ export default function ChatPage() {
             </div>
           </div>
         </>
+      )}
+
+      {isEvaluateModalOpen && relatedRoom && (
+        <EvaluateModal
+          roomId={relatedRoom.id}
+          participants={evaluatableParticipants.filter((participant) =>
+            evaluatableUserIds.includes(participant.userId),
+          )}
+          onClose={async () => {
+            setIsEvaluateModalOpen(false);
+            await refetchEvaluatable();
+          }}
+        />
       )}
     </div>
   );
