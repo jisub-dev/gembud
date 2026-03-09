@@ -256,6 +256,20 @@ public class RoomController {
     }
 
     /**
+     * Close a room (host only). Changes status to CLOSED.
+     */
+    @Operation(summary = "Close room", description = "방 종료 (방장만 가능)")
+    @PostMapping("/{publicId}/close")
+    public ResponseEntity<ApiResponse<Void>> closeRoom(
+        @PathVariable String publicId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        RoomResponse room = roomService.getRoomByPublicId(publicId);
+        roomService.closeRoom(room.getId(), userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.noContent());
+    }
+
+    /**
      * Regenerate invite code for a private room (host only).
      *
      * @param publicId room public UUID

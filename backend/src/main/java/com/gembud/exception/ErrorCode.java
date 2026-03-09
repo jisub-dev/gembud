@@ -55,6 +55,7 @@ public enum ErrorCode {
     CANNOT_TRANSFER_TO_SELF(HttpStatus.BAD_REQUEST, "ROOM011", "Cannot transfer host to yourself"),
     INVALID_INVITE_CODE(HttpStatus.UNAUTHORIZED, "ROOM012", "Invalid or expired invite code"),
     ROOM_NOT_IN_PROGRESS(HttpStatus.BAD_REQUEST, "ROOM013", "Room is not in progress"),
+    ROOM_ALREADY_CLOSED(HttpStatus.CONFLICT, "ROOM014", "Room is already closed"),
 
     // Evaluation
     ROOM_NOT_CLOSED_FOR_EVALUATION(HttpStatus.BAD_REQUEST, "EVAL001", "Can only evaluate after room is closed"),
