@@ -24,7 +24,7 @@ export function RoomCard({
 
   const statusLabels = {
     OPEN: '모집중',
-    FULL: '인원마감',
+    FULL: '인원 가득',
     IN_PROGRESS: '게임중',
     CLOSED: '종료',
   };

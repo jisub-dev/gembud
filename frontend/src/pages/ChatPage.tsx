@@ -133,6 +133,22 @@ export default function ChatPage() {
     }
   };
 
+  const handleCopyInviteLink = async () => {
+    if (!relatedRoom?.publicId) return;
+    try {
+      const updatedRoom = await roomService.regenerateInviteCode(relatedRoom.publicId);
+      if (!updatedRoom.inviteCode) {
+        toast.error('초대 링크 생성에 실패했습니다');
+        return;
+      }
+      const inviteUrl = `${window.location.origin}/games/${relatedRoom.gameId}/rooms?room=${updatedRoom.publicId}&invite=${encodeURIComponent(updatedRoom.inviteCode)}`;
+      await copyToClipboard(inviteUrl);
+      toast.success('초대 링크가 복사되었습니다');
+    } catch {
+      toast.error('초대 링크 생성에 실패했습니다');
+    }
+  };
+
   const handleLeave = async () => {
     if (!relatedRoom) return;
     setIsLeaving(true);
@@ -235,6 +251,16 @@ export default function ChatPage() {
                       onTransferHost={handleTransferHost}
                     />
 
+                    {isHost && relatedRoom.isPrivate && (
+                      <button
+                        type="button"
+                        onClick={handleCopyInviteLink}
+                        className="w-full py-2 rounded border border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 font-semibold transition"
+                      >
+                        초대 링크 복사
+                      </button>
+                    )}
+
                     {isHost && (
                       <div className="flex gap-2">
                         {relatedRoom.status === 'OPEN' && (
@@ -276,4 +302,20 @@ export default function ChatPage() {
       )}
     </div>
   );
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
 }
