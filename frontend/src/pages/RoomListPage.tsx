@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Plus } from 'lucide-react';
 import { useRooms } from '@/hooks/queries/useRooms';
 import { useGameOptions } from '@/hooks/queries/useGames';
@@ -9,6 +9,7 @@ import { RoomGrid } from '@/components/room/RoomGrid';
 import { RoomFilter } from '@/components/room/RoomFilter';
 import { CreateRoomModal } from '@/components/room/CreateRoomModal';
 import { PasswordModal } from '@/components/room/PasswordModal';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 import AdBanner from '@/components/common/AdBanner';
 import { useAds } from '@/hooks/queries/useAds';
 import { useAuthStore } from '@/store/authStore';
@@ -41,6 +42,15 @@ export function RoomListPage() {
 
   const { data: rooms, isLoading: roomsLoading, error: roomsError } = useRooms(Number(gameId));
   const { game, tierOptions, positionOptions, isLoading: gameLoading } = useGameOptions(Number(gameId));
+  const { data: myRooms = [] } = useQuery({
+    queryKey: ['myRooms'],
+    queryFn: roomService.getMyRooms,
+    enabled: !!user,
+  });
+  const myJoinedRoomPublicIds = useMemo(
+    () => new Set(myRooms.map((room) => room.publicId)),
+    [myRooms]
+  );
 
   const filteredRooms = useMemo(() => {
     if (!rooms) return [];
@@ -127,16 +137,15 @@ export function RoomListPage() {
     if (!room) return;
 
     // 이미 참여 중인 방이면 join 없이 채팅방으로 바로 이동
-    try {
-      const myRooms = await roomService.getMyRooms();
-      const alreadyIn = myRooms.find(r => r.publicId === roomPublicId);
-      if (alreadyIn) {
+    const alreadyIn = myRooms.find(r => r.publicId === roomPublicId);
+    if (alreadyIn) {
+      try {
         const chatRoomId = await chatService.getChatRoomByGameRoom(alreadyIn.id);
         navigate(`/chat/${chatRoomId}`);
         return;
+      } catch {
+        // 조회 실패 시 일반 입장 플로우로 진행
       }
-    } catch {
-      // 조회 실패 시 일반 입장 플로우로 진행
     }
 
     if (room.isPrivate) {
@@ -224,7 +233,7 @@ export function RoomListPage() {
   if (gameLoading) {
     return (
       <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <LoadingSpinner size="lg" label="게임 정보를 불러오는 중..." />
       </div>
     );
   }
@@ -242,8 +251,8 @@ export function RoomListPage() {
       {/* Header */}
       <div className="border-b border-gray-800">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
               <button
                 onClick={() => navigate('/')}
                 className="flex items-center gap-1.5 text-gray-400 hover:text-white mb-2 transition"
@@ -251,11 +260,11 @@ export function RoomListPage() {
                 <ChevronLeft size={18} />
                 뒤로가기
               </button>
-              <h1 className="text-3xl font-bold text-white">{game.name}</h1>
-              <p className="text-gray-400 mt-1">{game.description}</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white truncate">{game.name}</h1>
+              <p className="text-gray-400 mt-1 text-sm sm:text-base truncate">{game.description}</p>
             </div>
             <button
-              className="flex items-center gap-2 px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition"
+              className="ml-3 flex-shrink-0 flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition text-sm sm:text-base"
               onClick={() => setShowCreateModal(true)}
             >
               <Plus size={18} />
@@ -296,6 +305,7 @@ export function RoomListPage() {
           onRoomClick={handleRoomClick}
           shouldShowRegenerateInviteButton={shouldShowRegenerateInviteButton}
           onRegenerateInviteCode={handleRegenerateInviteCode}
+          isMyRoom={(room) => myJoinedRoomPublicIds.has(room.publicId)}
         />
 
         {/* Inline banner — 방 5개 이상일 때 목록 아래 */}
