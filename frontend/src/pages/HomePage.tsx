@@ -1,5 +1,6 @@
 import GameGrid from '@/components/game/GameGrid';
 import Button from '@/components/common/Button';
+import { RoomFilter } from '@/components/room/RoomFilter';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Sparkles, Thermometer, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
@@ -20,6 +21,8 @@ const HomePage = () => {
   const { data: games = [], isLoading: gamesLoading, error: gamesError } = useGames();
   const [selectedGameId, setSelectedGameId] = useState<number | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTiers, setSelectedTiers] = useState<number[]>([]);
+  const [selectedPositions, setSelectedPositions] = useState<number[]>([]);
 
   const filteredGames = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -38,11 +41,44 @@ const HomePage = () => {
     }
   }, [filteredGames, selectedGameId]);
 
-  const { data: recommendedRooms = [], isLoading: recsLoading } = useRecommendedRooms(selectedGameId, 3);
+  const recommendationLimit = isPremiumActive(user?.isPremium) ? 20 : 10;
+  const { data: recommendedRooms = [], isLoading: recsLoading } = useRecommendedRooms(selectedGameId, recommendationLimit);
   const { data: ads = [] } = useAds();
   const showAds = !isPremiumActive(user?.isPremium);
 
   const selectedGame = games.find((g) => g.id === selectedGameId);
+  const tierOptions = selectedGame?.options.filter((option) => option.optionType === 'TIER') ?? [];
+  const positionOptions = selectedGame?.options.filter((option) => option.optionType === 'POSITION') ?? [];
+
+  useEffect(() => {
+    setSelectedTiers([]);
+    setSelectedPositions([]);
+  }, [selectedGameId]);
+
+  const filteredRecommendedRooms = useMemo(() => {
+    const selectedTierValues = selectedTiers
+      .map((id) => tierOptions.find((option) => option.id === id)?.optionKey)
+      .filter(Boolean) as string[];
+    const selectedPositionValues = selectedPositions
+      .map((id) => positionOptions.find((option) => option.id === id)?.optionKey)
+      .filter(Boolean) as string[];
+
+    return recommendedRooms.filter((rec) => {
+      const filters = rec.room?.filters ?? {};
+
+      if (selectedTierValues.length > 0) {
+        const roomTier = filters.tier ?? filters.TIER;
+        if (!roomTier || !selectedTierValues.includes(roomTier)) return false;
+      }
+
+      if (selectedPositionValues.length > 0) {
+        const roomPosition = filters.position ?? filters.POSITION;
+        if (!roomPosition || !selectedPositionValues.includes(roomPosition)) return false;
+      }
+
+      return true;
+    });
+  }, [recommendedRooms, selectedTiers, selectedPositions, tierOptions, positionOptions]);
 
   return (
     <div className="space-y-12">
@@ -142,6 +178,21 @@ const HomePage = () => {
             )}
           </div>
 
+          {selectedGameId && (
+            <RoomFilter
+              tierOptions={tierOptions}
+              positionOptions={positionOptions}
+              selectedTiers={selectedTiers}
+              selectedPositions={selectedPositions}
+              onTierChange={setSelectedTiers}
+              onPositionChange={setSelectedPositions}
+              onReset={() => {
+                setSelectedTiers([]);
+                setSelectedPositions([]);
+              }}
+            />
+          )}
+
           {!selectedGameId ? (
             <div className="text-center py-12 text-text-muted font-gaming">게임을 선택해주세요</div>
           ) : recsLoading ? (
@@ -153,13 +204,13 @@ const HomePage = () => {
                 />
               ))}
             </div>
-          ) : recommendedRooms.length === 0 ? (
+          ) : filteredRecommendedRooms.length === 0 ? (
             <div className="text-center py-12 text-text-muted font-gaming">
               현재 모집 중인 방이 없습니다. 방을 만들어보세요!
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {recommendedRooms.map((rec) => {
+              {filteredRecommendedRooms.map((rec) => {
                 const score = Math.round(rec.matchingScore ?? 0);
                 const scoreColor =
                   score >= 80
@@ -181,7 +232,7 @@ const HomePage = () => {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-gaming text-neon-cyan">{room?.gameName ?? selectedGame?.name}</span>
                       <span className="text-xs font-gaming text-neon-cyan bg-neon-cyan/10 px-2 py-1 rounded-full flex-shrink-0">
-                        {score}점
+                        매칭
                       </span>
                     </div>
 

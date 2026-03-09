@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Star, Pencil, UserPlus, Flag } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useGetEvaluations, useUserTemperature } from '@/hooks/queries/useEvaluation';
@@ -11,6 +12,8 @@ import {
 } from '@/hooks/queries/useFriends';
 import { useToast } from '@/hooks/useToast';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+import reportService from '@/services/reportService';
 import type { Evaluation } from '@/types/evaluation';
 
 /**
@@ -32,6 +35,11 @@ export default function ProfilePage() {
 
   const { data: evaluations, isLoading: evalsLoading } = useGetEvaluations(targetUserId ?? 0);
   const { data: tempStats, isLoading: tempLoading } = useUserTemperature(targetUserId ?? 0);
+  const { data: myReports = [], isLoading: reportsLoading } = useQuery({
+    queryKey: ['myReports'],
+    queryFn: reportService.getMyReports,
+    enabled: isOwnProfile,
+  });
 
   const { data: friends = [] } = useFriends();
   const { data: sentRequests = [] } = useSentFriendRequests();
@@ -164,6 +172,26 @@ export default function ProfilePage() {
     );
   };
 
+  const reportStatusStyle = (status: string) => {
+    if (status === 'PENDING') {
+      return 'bg-amber-500/20 text-amber-300 border border-amber-400/40';
+    }
+    if (status === 'RESOLVED') {
+      return 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40';
+    }
+    if (status === 'REJECTED' || status === 'REVIEWED') {
+      return 'bg-rose-500/20 text-rose-300 border border-rose-400/40';
+    }
+    return 'bg-gray-500/20 text-gray-300 border border-gray-400/40';
+  };
+
+  const reportStatusLabel = (status: string) => {
+    if (status === 'PENDING') return 'PENDING';
+    if (status === 'RESOLVED') return 'RESOLVED';
+    if (status === 'REJECTED' || status === 'REVIEWED') return 'REJECTED';
+    return status;
+  };
+
   return (
     <>
       {showEditModal && user && (
@@ -288,7 +316,7 @@ export default function ProfilePage() {
             <h2 className="text-xl font-semibold mb-4">최근 받은 평가</h2>
 
             {evalsLoading ? (
-              <div className="text-center py-8 text-gray-400">불러오는 중...</div>
+              <LoadingSpinner className="py-8" />
             ) : !evaluations || evaluations.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <p>아직 받은 평가가 없습니다</p>
@@ -315,6 +343,37 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+
+          {isOwnProfile && (
+            <div className="bg-[#18181b] border-2 border-gray-700 rounded-lg p-6 mt-6">
+              <h2 className="text-xl font-semibold mb-4">내 신고 내역</h2>
+              {reportsLoading ? (
+                <LoadingSpinner className="py-8" />
+              ) : myReports.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>등록된 신고 내역이 없습니다</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myReports.slice(0, 10).map((report) => (
+                    <div key={report.id} className="rounded bg-[#0e0e10] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-200">
+                            {report.reported?.nickname ?? `사용자 ${report.reported?.id ?? ''}`}
+                          </p>
+                          <p className="text-sm text-gray-400 mt-1">{report.reason}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${reportStatusStyle(report.status)}`}>
+                          {reportStatusLabel(report.status)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>
