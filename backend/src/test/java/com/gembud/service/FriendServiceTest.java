@@ -3,6 +3,7 @@ package com.gembud.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,7 @@ import com.gembud.dto.request.FriendRequest;
 import com.gembud.dto.response.FriendResponse;
 import com.gembud.entity.Friend;
 import com.gembud.entity.Friend.FriendStatus;
+import com.gembud.entity.Notification.NotificationType;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
@@ -36,6 +38,9 @@ class FriendServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private FriendService friendService;
@@ -64,7 +69,11 @@ class FriendServiceTest {
         when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
         when(userRepository.findById(2L)).thenReturn(Optional.of(other));
         when(friendRepository.requestExists(1L, 2L)).thenReturn(false);
-        when(friendRepository.save(any(Friend.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(friendRepository.save(any(Friend.class))).thenAnswer(inv -> {
+            Friend saved = inv.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", 100L);
+            return saved;
+        });
 
         FriendRequest request = FriendRequest.builder().friendId(2L).build();
 
@@ -73,6 +82,12 @@ class FriendServiceTest {
         assertThat(response.getStatus()).isEqualTo("PENDING");
         assertThat(response.getFriendId()).isEqualTo(2L);
         verify(friendRepository, times(1)).save(any(Friend.class));
+        verify(notificationService, times(1)).createNotification(
+            eq(2L),
+            eq(NotificationType.FRIEND_REQUEST),
+            eq("Me님이 친구 요청을 보냈습니다"),
+            any(Long.class)
+        );
     }
 
     @Test
@@ -81,7 +96,11 @@ class FriendServiceTest {
         when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
         when(userRepository.findByEmail("other@example.com")).thenReturn(Optional.of(other));
         when(friendRepository.requestExists(1L, 2L)).thenReturn(false);
-        when(friendRepository.save(any(Friend.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(friendRepository.save(any(Friend.class))).thenAnswer(inv -> {
+            Friend saved = inv.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", 101L);
+            return saved;
+        });
 
         FriendRequest request = FriendRequest.builder().email("other@example.com").build();
 
@@ -89,6 +108,12 @@ class FriendServiceTest {
 
         assertThat(response.getStatus()).isEqualTo("PENDING");
         assertThat(response.getFriendId()).isEqualTo(2L);
+        verify(notificationService, times(1)).createNotification(
+            eq(2L),
+            eq(NotificationType.FRIEND_REQUEST),
+            eq("Me님이 친구 요청을 보냈습니다"),
+            any(Long.class)
+        );
     }
 
     @Test
@@ -137,6 +162,31 @@ class FriendServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.FRIEND_REQUEST_NOT_PENDING);
+    }
+
+    @Test
+    @DisplayName("acceptFriendRequest - 요청 수락 성공 시 알림 발송")
+    void acceptFriendRequest_ShouldNotifyRequester() {
+        Friend pending = Friend.builder()
+            .id(10L)
+            .user(other)
+            .friend(me)
+            .status(FriendStatus.PENDING)
+            .build();
+
+        when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(me));
+        when(friendRepository.findById(10L)).thenReturn(Optional.of(pending));
+        when(friendRepository.save(any(Friend.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        FriendResponse response = friendService.acceptFriendRequest("me@example.com", 10L);
+
+        assertThat(response.getStatus()).isEqualTo("ACCEPTED");
+        verify(notificationService, times(1)).createNotification(
+            eq(2L),
+            eq(NotificationType.FRIEND_ACCEPTED),
+            eq("Me님이 친구 요청을 수락했습니다"),
+            eq(10L)
+        );
     }
 
     @Test

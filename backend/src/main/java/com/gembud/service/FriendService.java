@@ -4,6 +4,7 @@ import com.gembud.dto.request.FriendRequest;
 import com.gembud.dto.response.FriendResponse;
 import com.gembud.entity.Friend;
 import com.gembud.entity.Friend.FriendStatus;
+import com.gembud.entity.Notification.NotificationType;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
@@ -29,6 +30,7 @@ public class FriendService {
 
     private final FriendRepository friendRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     /**
      * Send friend request.
@@ -60,14 +62,22 @@ public class FriendService {
             .status(FriendStatus.PENDING)
             .build();
 
+        Friend savedRequest;
         try {
-            friendRepository.save(friendRelation);
+            savedRequest = friendRepository.save(friendRelation);
         } catch (DataIntegrityViolationException e) {
             // Race-safe duplicate handling (bidirectional unique index)
             throw new BusinessException(ErrorCode.FRIEND_REQUEST_ALREADY_EXISTS);
         }
 
-        return FriendResponse.from(friendRelation);
+        notificationService.createNotification(
+            friend.getId(),
+            NotificationType.FRIEND_REQUEST,
+            user.getNickname() + "님이 친구 요청을 보냈습니다",
+            savedRequest.getId()
+        );
+
+        return FriendResponse.from(savedRequest);
     }
 
     /**
@@ -100,6 +110,13 @@ public class FriendService {
 
         friendRequest.accept();
         friendRepository.save(friendRequest);
+
+        notificationService.createNotification(
+            friendRequest.getUser().getId(),
+            NotificationType.FRIEND_ACCEPTED,
+            user.getNickname() + "님이 친구 요청을 수락했습니다",
+            friendRequest.getId()
+        );
 
         return FriendResponse.from(friendRequest);
     }
