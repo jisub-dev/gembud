@@ -72,5 +72,10 @@ export const roomService = {
   async resetRoom(publicId: string): Promise<void> {
     await api.post(`/rooms/${publicId}/reset`);
   },
+
+  // 방 종료 (방장만, publicId 기반)
+  async closeRoom(publicId: string): Promise<void> {
+    await api.post(`/rooms/${publicId}/close`);
+  },
 };
 export default roomService;

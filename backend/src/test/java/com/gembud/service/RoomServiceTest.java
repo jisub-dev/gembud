@@ -819,6 +819,79 @@ class RoomServiceTest {
             .isEqualTo(ErrorCode.ROOM_NOT_IN_PROGRESS);
     }
 
+    @Test
+    @DisplayName("closeRoom - should close room when requester is host")
+    void closeRoom_Host_ShouldClose() {
+        User host = User.builder()
+            .email("host@example.com")
+            .nickname("Host")
+            .build();
+        ReflectionTestUtils.setField(host, "id", 1L);
+
+        Room openRoom = Room.builder()
+            .game(game)
+            .title("Open Room")
+            .maxParticipants(5)
+            .currentParticipants(3)
+            .isPrivate(false)
+            .createdBy(host)
+            .build();
+        ReflectionTestUtils.setField(openRoom, "id", 13L);
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(openRoom)
+            .user(host)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
+        when(roomRepository.findById(13L)).thenReturn(Optional.of(openRoom));
+        when(participantRepository.findByRoomIdAndUserId(13L, 1L)).thenReturn(Optional.of(hostParticipant));
+
+        roomService.closeRoom(13L, "host@example.com");
+
+        assertThat(openRoom.getStatus()).isEqualTo(Room.RoomStatus.CLOSED);
+        verify(roomRepository).save(openRoom);
+    }
+
+    @Test
+    @DisplayName("closeRoom - should throw when room is already closed")
+    void closeRoom_AlreadyClosed_ShouldThrow() {
+        User host = User.builder()
+            .email("host@example.com")
+            .nickname("Host")
+            .build();
+        ReflectionTestUtils.setField(host, "id", 1L);
+
+        Room closedRoom = Room.builder()
+            .game(game)
+            .title("Closed Room")
+            .maxParticipants(5)
+            .currentParticipants(3)
+            .isPrivate(false)
+            .createdBy(host)
+            .build();
+        ReflectionTestUtils.setField(closedRoom, "id", 14L);
+        closedRoom.close();
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(closedRoom)
+            .user(host)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
+        when(roomRepository.findById(14L)).thenReturn(Optional.of(closedRoom));
+        when(participantRepository.findByRoomIdAndUserId(14L, 1L)).thenReturn(Optional.of(hostParticipant));
+
+        assertThatThrownBy(() -> roomService.closeRoom(14L, "host@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.ROOM_ALREADY_CLOSED);
+    }
+
     // ──────────────────────────────────────────────
     // getRoomById
     // ──────────────────────────────────────────────

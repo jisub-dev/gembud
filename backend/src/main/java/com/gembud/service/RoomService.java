@@ -487,6 +487,35 @@ public class RoomService {
     }
 
     /**
+     * Close a room (host only). Changes status to CLOSED.
+     *
+     * @param roomId room ID
+     * @param hostEmail current user email (must be host)
+     */
+    @Transactional
+    public void closeRoom(Long roomId, String hostEmail) {
+        User host = userRepository.findByEmail(hostEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        RoomParticipant hostParticipant = participantRepository.findByRoomIdAndUserId(roomId, host.getId())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
+
+        if (!hostParticipant.getIsHost()) {
+            throw new BusinessException(ErrorCode.NOT_HOST);
+        }
+
+        if (room.getStatus() == Room.RoomStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.ROOM_ALREADY_CLOSED);
+        }
+
+        room.close();
+        roomRepository.save(room);
+    }
+
+    /**
      * Join a room by public ID.
      *
      * @param publicId public room UUID
