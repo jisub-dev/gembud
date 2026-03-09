@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('chat');
   const [isStartingRoom, setIsStartingRoom] = useState(false);
   const [isResettingRoom, setIsResettingRoom] = useState(false);
+  const [isClosingRoom, setIsClosingRoom] = useState(false);
   const [isEvaluateModalOpen, setIsEvaluateModalOpen] = useState(false);
 
   const roomId = Number(chatRoomId);
@@ -106,6 +107,7 @@ export default function ChatPage() {
     if (!relatedRoom) return false;
     return relatedRoom.status === 'IN_PROGRESS' || relatedRoom.status === 'CLOSED';
   }, [relatedRoom]);
+  const isRoomClosed = relatedRoom?.status === 'CLOSED';
 
   const hasEvaluatableParticipants = evaluatableParticipants.some((participant) =>
     evaluatableUserIds.includes(participant.userId),
@@ -163,6 +165,21 @@ export default function ChatPage() {
       toast.error('대기중으로 변경에 실패했습니다.');
     } finally {
       setIsResettingRoom(false);
+    }
+  };
+
+  const handleCloseRoom = async () => {
+    if (!relatedRoom) return;
+    if (!window.confirm('방을 종료하시겠습니까? 종료 후에는 되돌릴 수 없습니다.')) return;
+    setIsClosingRoom(true);
+    try {
+      await roomService.closeRoom(relatedRoom.publicId);
+      await refetchMyRooms();
+      toast.success('방을 종료했습니다. 참가자 평가를 진행해주세요.');
+    } catch {
+      toast.error('방 종료에 실패했습니다.');
+    } finally {
+      setIsClosingRoom(false);
     }
   };
 
@@ -265,6 +282,11 @@ export default function ChatPage() {
               <section className={`${activeTab === 'info' ? 'block' : 'hidden'} lg:block lg:col-span-3 bg-[#18181b] border border-gray-800 rounded-lg p-4 overflow-y-auto`}>
                 {relatedRoom ? (
                   <div className="space-y-4">
+                    {isRoomClosed && (
+                      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+                        종료된 방입니다. 채팅은 읽기 전용으로 전환되었습니다.
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h2 className="text-lg font-bold text-white truncate">{relatedRoom.title}</h2>
@@ -332,6 +354,16 @@ export default function ChatPage() {
                               {isResettingRoom ? '변경 중...' : '대기중으로 변경'}
                             </button>
                           )}
+                          {(relatedRoom.status === 'OPEN' || relatedRoom.status === 'IN_PROGRESS') && (
+                            <button
+                              type="button"
+                              onClick={handleCloseRoom}
+                              disabled={isClosingRoom}
+                              className="flex-1 py-2 rounded bg-red-500 hover:bg-red-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
+                            >
+                              {isClosingRoom ? '종료 중...' : '방 종료'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -344,7 +376,7 @@ export default function ChatPage() {
               </section>
 
               <section className={`${activeTab === 'chat' ? 'block' : 'hidden'} lg:block lg:col-span-2 min-h-0`}>
-                <ChatPanel chatRoomId={roomId} canChat={true} className="h-full" />
+                <ChatPanel chatRoomId={roomId} canChat={!isRoomClosed} className="h-full" />
               </section>
             </div>
           </div>
