@@ -4,6 +4,7 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { chatService } from '@/services/chatService';
 import { useAuthStore } from '@/store/authStore';
+import { ReportModal } from '@/components/common/ReportModal';
 import type { ChatMessage } from '@/types/chat';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
@@ -24,6 +25,11 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{
+    userId: number;
+    nickname: string;
+    chatMessageId?: number;
+  } | null>(null);
 
   const stompClientRef = useRef<Client | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -138,6 +144,15 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
 
   return (
     <div className={`flex flex-col bg-[#18181b] border border-gray-700 rounded-lg overflow-hidden ${className}`}>
+      {reportTarget && (
+        <ReportModal
+          reportedUserId={reportTarget.userId}
+          reportedNickname={reportTarget.nickname}
+          chatMessageId={reportTarget.chatMessageId}
+          onClose={() => setReportTarget(null)}
+        />
+      )}
+
       {/* Chat Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 flex-shrink-0">
         <span className="text-sm font-semibold text-gray-300">대기방 채팅</span>
@@ -190,7 +205,19 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
           const isOwn = user && msg.userId === user.id;
 
           return (
-            <div key={idx} className={`flex items-end gap-1.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+            <div
+              key={idx}
+              className={`group flex items-end gap-1.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
+              onContextMenu={(e) => {
+                if (isOwn) return;
+                e.preventDefault();
+                setReportTarget({
+                  userId: msg.userId,
+                  nickname: msg.username || `사용자 ${msg.userId}`,
+                  chatMessageId: msg.id,
+                });
+              }}
+            >
               {!isOwn && (
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
                   {msg.username?.[0] || '?'}
@@ -213,6 +240,21 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
                   <span className="text-xs text-gray-500 mt-0.5 mx-1">
                     {formatTime(msg.createdAt)}
                   </span>
+                )}
+                {!isOwn && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReportTarget({
+                        userId: msg.userId,
+                        nickname: msg.username || `사용자 ${msg.userId}`,
+                        chatMessageId: msg.id,
+                      })
+                    }
+                    className="text-[11px] text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-300 transition"
+                  >
+                    신고
+                  </button>
                 )}
               </div>
             </div>
