@@ -58,11 +58,10 @@ public class ChatService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        ChatRoom chatRoom = chatRoomRepository.findById(request.getChatRoomId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        ChatRoom chatRoom = findByPublicId(request.getChatRoomId());
 
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserId(
-            request.getChatRoomId(), userId)) {
+            chatRoom.getId(), userId)) {
             throw new BusinessException(ErrorCode.NOT_CHAT_MEMBER);
         }
 
@@ -119,16 +118,16 @@ public class ChatService {
     /**
      * Get recent messages from a chat room.
      *
-     * @param chatRoomId chat room ID
+     * @param chatRoomPublicId chat room public ID
      * @param userId user ID
      * @param limit maximum number of messages
      * @return list of messages
      */
     public List<ChatMessageResponse> getRecentMessages(
-        Long chatRoomId, Long userId, int limit) {
+        String chatRoomPublicId, Long userId, int limit) {
 
-        chatRoomRepository.findById(chatRoomId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        ChatRoom chatRoom = findByPublicId(chatRoomPublicId);
+        Long chatRoomId = chatRoom.getId();
 
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, userId)) {
             throw new BusinessException(ErrorCode.NOT_CHAT_MEMBER);
@@ -257,11 +256,56 @@ public class ChatService {
      * Get chat room by game room ID.
      *
      * @param roomId game room ID
+     * @return chat room public ID
+     */
+    public String getChatRoomByGameRoomId(Long roomId) {
+        return chatRoomRepository.findByRelatedRoomId(roomId)
+            .map(ChatRoom::getPublicId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    /**
+     * Get numeric chat room ID by game room ID (internal use).
+     *
+     * @param roomId game room ID
      * @return chat room ID
      */
-    public Long getChatRoomByGameRoomId(Long roomId) {
+    public Long getChatRoomIdByGameRoomId(Long roomId) {
         return chatRoomRepository.findByRelatedRoomId(roomId)
             .map(ChatRoom::getId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    /**
+     * Find chat room by public ID.
+     *
+     * @param publicId chat room public ID
+     * @return chat room entity
+     */
+    public ChatRoom findByPublicId(String publicId) {
+        return chatRoomRepository.findByPublicId(publicId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    /**
+     * Get numeric chat room ID by public ID.
+     *
+     * @param publicId chat room public ID
+     * @return chat room ID
+     */
+    public Long getChatRoomIdByPublicId(String publicId) {
+        return findByPublicId(publicId).getId();
+    }
+
+    /**
+     * Get chat room public ID by numeric ID.
+     *
+     * @param chatRoomId chat room ID
+     * @return chat room public ID
+     */
+    public String getPublicIdByChatRoomId(Long chatRoomId) {
+        return chatRoomRepository.findById(chatRoomId)
+            .map(ChatRoom::getPublicId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
     }
 
@@ -274,6 +318,18 @@ public class ChatService {
      */
     public boolean isChatRoomMember(Long chatRoomId, Long userId) {
         return chatRoomMemberRepository.existsByChatRoomIdAndUserId(chatRoomId, userId);
+    }
+
+    /**
+     * Check if a user is a member of a chat room by public ID.
+     *
+     * @param chatRoomPublicId chat room public ID
+     * @param userId user ID
+     * @return true if user is a member
+     */
+    public boolean isChatRoomMemberByPublicId(String chatRoomPublicId, Long userId) {
+        Long chatRoomId = getChatRoomIdByPublicId(chatRoomPublicId);
+        return isChatRoomMember(chatRoomId, userId);
     }
 
     /**

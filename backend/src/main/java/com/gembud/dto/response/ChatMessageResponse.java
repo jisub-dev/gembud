@@ -27,7 +27,7 @@ public class ChatMessageResponse {
     /**
      * Chat room ID.
      */
-    private Long chatRoomId;
+    private String chatRoomId;
 
     /**
      * User ID who sent the message.
@@ -63,7 +63,7 @@ public class ChatMessageResponse {
     public static ChatMessageResponse from(ChatMessage chatMessage) {
         return ChatMessageResponse.builder()
             .id(chatMessage.getId())
-            .chatRoomId(chatMessage.getChatRoom().getId())
+            .chatRoomId(chatMessage.getChatRoom().getPublicId())
             .userId(chatMessage.getUser().getId())
             .username(chatMessage.getUser().getNickname())
             .message(chatMessage.getMessage())

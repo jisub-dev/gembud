@@ -23,7 +23,7 @@ public class ChatMessageRequest {
      * Chat room ID.
      */
     @NotNull(message = "Chat room ID is required")
-    private Long chatRoomId;
+    private String chatRoomId;
 
     /**
      * Message content.

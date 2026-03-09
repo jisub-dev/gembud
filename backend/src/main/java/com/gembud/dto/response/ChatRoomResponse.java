@@ -15,6 +15,7 @@ import lombok.Getter;
 public class ChatRoomResponse {
 
     private Long id;
+    private String publicId;
     private String type;
     private String name;
     private Long relatedRoomId;
@@ -23,6 +24,7 @@ public class ChatRoomResponse {
     public static ChatRoomResponse from(ChatRoom chatRoom) {
         return ChatRoomResponse.builder()
             .id(chatRoom.getId())
+            .publicId(chatRoom.getPublicId())
             .type(chatRoom.getType().name())
             .name(chatRoom.getName())
             .relatedRoomId(chatRoom.getRelatedRoom() != null ? chatRoom.getRelatedRoom().getId() : null)

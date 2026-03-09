@@ -267,11 +267,12 @@ public class RoomService {
         roomRepository.save(room);
 
         // Add user to chat room (internal, no auth check)
-        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        Long chatRoomId = chatService.getChatRoomIdByGameRoomId(roomId);
+        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
         chatService.addMemberToChatRoomInternal(chatRoomId, user.getId());
 
         notifyHostOnJoin(roomId, user, room);
-        broadcastRoomUpdate(chatRoomId);
+        broadcastRoomUpdate(chatRoomPublicId);
 
         return buildRoomResponse(room);
     }
@@ -300,14 +301,15 @@ public class RoomService {
         room.decrementParticipants();
 
         // Remove user from chat room
-        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        Long chatRoomId = chatService.getChatRoomIdByGameRoomId(roomId);
+        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
         chatService.removeMemberFromChatRoom(chatRoomId, user.getId());
 
         // If no participants left, soft-delete room
         if (room.getCurrentParticipants() == 0) {
             room.softDelete();
             roomRepository.save(room);
-            broadcastRoomUpdate(chatRoomId);
+            broadcastRoomUpdate(chatRoomPublicId);
             return;
         }
 
@@ -330,7 +332,7 @@ public class RoomService {
         }
 
         roomRepository.save(room);
-        broadcastRoomUpdate(chatRoomId);
+        broadcastRoomUpdate(chatRoomPublicId);
     }
 
     /**
@@ -366,9 +368,10 @@ public class RoomService {
         room.decrementParticipants();
         roomRepository.save(room);
 
-        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        Long chatRoomId = chatService.getChatRoomIdByGameRoomId(roomId);
+        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
         chatService.removeMemberFromChatRoom(chatRoomId, targetUserId);
-        broadcastRoomUpdate(chatRoomId);
+        broadcastRoomUpdate(chatRoomPublicId);
     }
 
     /**
@@ -424,8 +427,8 @@ public class RoomService {
             .build();
         participantRepository.save(newHost);
 
-        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
-        broadcastRoomUpdate(chatRoomId);
+        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
+        broadcastRoomUpdate(chatRoomPublicId);
     }
 
     /**
@@ -548,7 +551,7 @@ public class RoomService {
         }
 
         rateLimitService.resetJoinLimit(ip, publicId);
-        Long chatRoomId = chatService.getChatRoomByGameRoomId(room.getId());
+        String chatRoomId = chatService.getChatRoomByGameRoomId(room.getId());
         return new JoinRoomResult(roomResponse, chatRoomId);
     }
 
@@ -582,7 +585,7 @@ public class RoomService {
     /**
      * Result object for joinRoomByPublicId.
      */
-    public record JoinRoomResult(RoomResponse room, Long chatRoomId) {}
+    public record JoinRoomResult(RoomResponse room, String chatRoomId) {}
 
     private void notifyHostOnJoin(Long roomId, User joiner, Room room) {
         participantRepository.findByRoomId(roomId).stream()
@@ -598,7 +601,7 @@ public class RoomService {
             ));
     }
 
-    private void broadcastRoomUpdate(Long chatRoomId) {
+    private void broadcastRoomUpdate(String chatRoomId) {
         messagingTemplate.convertAndSend(
             "/topic/chat/" + chatRoomId,
             ChatMessageResponse.builder()

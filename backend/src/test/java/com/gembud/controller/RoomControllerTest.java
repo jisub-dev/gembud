@@ -296,7 +296,7 @@ class RoomControllerTest {
             any(JoinRoomRequest.class),
             eq("test@example.com"),
             eq("203.0.113.10")
-        )).thenReturn(new RoomService.JoinRoomResult(response, 777L));
+        )).thenReturn(new RoomService.JoinRoomResult(response, "chat-public-777"));
 
         mockMvc.perform(post("/rooms/123e4567-e89b-12d3-a456-426614174000/join")
                 .header("X-Forwarded-For", "203.0.113.10")
@@ -304,7 +304,7 @@ class RoomControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.room.publicId").value("123e4567-e89b-12d3-a456-426614174000"))
-            .andExpect(jsonPath("$.data.chatRoomId").value(777));
+            .andExpect(jsonPath("$.data.chatRoomId").value("chat-public-777"));
     }
 
     @Test
