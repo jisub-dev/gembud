@@ -1,16 +1,21 @@
-import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Card from '../common/Card';
 import { Game } from '@/types/game';
 
 interface GameCardProps {
   game: Game;
+  isSelected?: boolean;
+  onSelect?: (gameId: number) => void;
 }
 
-const GameCard = ({ game }: GameCardProps) => {
+const GameCard = ({ game, isSelected = false, onSelect }: GameCardProps) => {
   return (
-    <Link to={`/games/${game.id}/rooms`}>
-      <Card className="group overflow-hidden p-0 relative aspect-[3/4]">
+    <button type="button" onClick={() => onSelect?.(game.id)} className="w-full text-left">
+      <Card
+        className={`group overflow-hidden p-0 relative aspect-[3/4] ${
+          isSelected ? 'ring-2 ring-neon-cyan shadow-glow-cyan' : ''
+        }`}
+      >
         <div className="relative w-full h-full">
           <img
             src={game.imageUrl}
@@ -26,15 +31,13 @@ const GameCard = ({ game }: GameCardProps) => {
             <h3 className="font-display text-2xl text-white group-hover:text-neon-purple transition-colors">
               {game.name}
             </h3>
-            <p className="text-text-secondary text-sm line-clamp-2">
-              {game.description}
-            </p>
+            <p className="text-text-secondary text-sm line-clamp-2">{game.description}</p>
             <div className="flex items-center justify-between pt-2">
               <span className="px-3 py-1 rounded-full bg-dark-secondary/80 border border-neon-purple/30 text-neon-purple text-xs font-gaming">
                 {game.genre}
               </span>
               <span className="flex items-center gap-1 text-text-secondary text-sm font-gaming">
-                방 목록 보기
+                추천 방 보기
                 <ArrowRight size={14} />
               </span>
             </div>
@@ -44,7 +47,7 @@ const GameCard = ({ game }: GameCardProps) => {
           <div className="absolute inset-0 ring-2 ring-neon-purple/0 group-hover:ring-neon-purple/50 transition-all rounded-card" />
         </div>
       </Card>
-    </Link>
+    </button>
   );
 };
 
