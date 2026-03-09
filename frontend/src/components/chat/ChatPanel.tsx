@@ -13,12 +13,19 @@ const EMOJIS = ['😀', '🎮', '👍', '💪', '🔥', '😂', '👋', '🎉', 
 
 interface ChatPanelProps {
   chatRoomId: number;
+  chatPublicId: string;
   canChat?: boolean;
   className?: string;
   onRoomUpdate?: () => void;
 }
 
-export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUpdate }: ChatPanelProps) {
+export function ChatPanel({
+  chatRoomId,
+  chatPublicId,
+  canChat = true,
+  className = '',
+  onRoomUpdate,
+}: ChatPanelProps) {
   const { user } = useAuthStore();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -77,13 +84,13 @@ export function ChatPanel({ chatRoomId, canChat = true, className = '', onRoomUp
   useEffect(() => {
     if (!canChat) return;
     chatService
-      .getMessages(chatRoomId, 50)
+      .getMessages(chatPublicId, 50)
       .then((history) => {
         setMessages([...history].reverse());
         requestAnimationFrame(() => scrollToBottom('auto'));
       })
       .catch(() => {});
-  }, [chatRoomId, canChat, scrollToBottom]);
+  }, [chatPublicId, canChat, scrollToBottom]);
 
   useEffect(() => {
     if (stompClientRef.current) {

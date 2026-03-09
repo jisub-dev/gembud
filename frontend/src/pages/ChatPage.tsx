@@ -26,7 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ChatPage() {
-  const { roomId: chatRoomId } = useParams<{ roomId: string }>();
+  const { roomId: chatPublicId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
@@ -35,36 +35,41 @@ export default function ChatPage() {
   const [isClosingRoom, setIsClosingRoom] = useState(false);
   const [isEvaluateModalOpen, setIsEvaluateModalOpen] = useState(false);
 
-  const roomId = Number(chatRoomId);
   const queryClient = useQueryClient();
   const toast = useToast();
   const [isLeaving, setIsLeaving] = useState(false);
+  const hasChatPublicId = !!chatPublicId;
 
-  // 이 채팅방이 ROOM_CHAT인지 확인하고 관련 대기방 정보 조회
-  const { data: myChatRooms = [] } = useQuery({
+  const {
+    data: myChatRooms = [],
+    isLoading: isMyChatRoomsLoading,
+  } = useQuery({
     queryKey: ['myChatRooms'],
     queryFn: () => chatService.getMyChatRooms(),
-    enabled: !!roomId,
+    enabled: hasChatPublicId,
   });
 
-  const chatRoomInfo = myChatRooms.find(c => c.id === roomId);
+  const chatRoomInfo = myChatRooms.find(
+    (chatRoom) => chatRoom.publicId === chatPublicId || String(chatRoom.id) === chatPublicId,
+  );
+  const chatRoomId = chatRoomInfo?.id;
   const relatedRoomIdFromChatList = chatRoomInfo?.relatedRoomId;
   const isRoomChatByType = chatRoomInfo?.type === 'ROOM_CHAT';
 
   const { data: myRooms = [], refetch: refetchMyRooms } = useQuery({
     queryKey: ['myRooms'],
     queryFn: roomService.getMyRooms,
-    enabled: !!roomId,
+    enabled: hasChatPublicId,
     refetchInterval: 10000,
   });
 
   const { data: inferredRelatedRoomId } = useQuery({
-    queryKey: ['chatRoomRelatedRoom', roomId, myRooms.map(r => r.id).join(',')],
+    queryKey: ['chatRoomRelatedRoom', chatPublicId, myRooms.map((room) => room.id).join(',')],
     queryFn: async () => {
       for (const room of myRooms) {
         try {
-          const mappedChatRoomId = await chatService.getChatRoomByGameRoom(room.id);
-          if (mappedChatRoomId === roomId) {
+          const mappedChatPublicId = await chatService.getChatRoomByGameRoom(room.id);
+          if (mappedChatPublicId === chatPublicId) {
             return room.id;
           }
         } catch {
@@ -73,19 +78,19 @@ export default function ChatPage() {
       }
       return null;
     },
-    enabled: !!roomId && !relatedRoomIdFromChatList && myRooms.length > 0,
+    enabled: hasChatPublicId && !relatedRoomIdFromChatList && myRooms.length > 0,
     staleTime: 30000,
   });
 
   const resolvedRelatedRoomId = relatedRoomIdFromChatList ?? inferredRelatedRoomId ?? null;
 
   const relatedRoom = resolvedRelatedRoomId
-    ? myRooms.find(r => r.id === resolvedRelatedRoomId)
+    ? myRooms.find((room) => room.id === resolvedRelatedRoomId)
     : null;
   const isRoomChat = isRoomChatByType || !!resolvedRelatedRoomId;
   const isHost = useMemo(() => {
     if (!relatedRoom || !user) return false;
-    return relatedRoom.participants?.some(p => p.userId === user.id && p.isHost) ?? false;
+    return relatedRoom.participants?.some((participant) => participant.userId === user.id && participant.isHost) ?? false;
   }, [relatedRoom, user]);
   const evaluatableParticipants = useMemo(() => {
     if (!relatedRoom?.participants || !user) return [];
@@ -222,10 +227,26 @@ export default function ChatPage() {
     }
   };
 
-  if (!roomId) {
+  if (!hasChatPublicId) {
     return (
       <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center text-white">
         채팅방을 찾을 수 없습니다
+      </div>
+    );
+  }
+
+  if (isMyChatRoomsLoading) {
+    return (
+      <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center text-white">
+        채팅방 정보를 불러오는 중입니다...
+      </div>
+    );
+  }
+
+  if (!chatRoomInfo || !chatRoomId) {
+    return (
+      <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center text-white">
+        접근할 수 없는 채팅방입니다
       </div>
     );
   }
@@ -257,7 +278,12 @@ export default function ChatPage() {
 
       {!isRoomChat && (
         <div className="flex-1 container mx-auto px-4 py-4 max-w-4xl flex flex-col min-h-0">
-          <ChatPanel chatRoomId={roomId} canChat={true} className="flex-1" />
+          <ChatPanel
+            chatRoomId={chatRoomId}
+            chatPublicId={chatPublicId!}
+            canChat={true}
+            className="flex-1"
+          />
         </div>
       )}
 
@@ -382,7 +408,12 @@ export default function ChatPage() {
               </section>
 
               <section className={`${activeTab === 'chat' ? 'block' : 'hidden'} lg:block lg:col-span-2 min-h-0`}>
-                <ChatPanel chatRoomId={roomId} canChat={!isRoomClosed} className="h-full" />
+                <ChatPanel
+                  chatRoomId={chatRoomId}
+                  chatPublicId={chatPublicId!}
+                  canChat={!isRoomClosed}
+                  className="h-full"
+                />
               </section>
             </div>
           </div>

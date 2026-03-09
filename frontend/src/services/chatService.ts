@@ -10,17 +10,17 @@ import { ApiResponse } from '@/types/api';
  */
 export const chatService = {
   // 채팅 메시지 조회
-  async getMessages(chatRoomId: number, limit: number = 50): Promise<ChatMessage[]> {
+  async getMessages(chatPublicId: string, limit: number = 50): Promise<ChatMessage[]> {
     const response = await api.get<ApiResponse<ChatMessage[]>>(
-      `/chat/rooms/${chatRoomId}/messages`,
+      `/chat/rooms/${chatPublicId}/messages`,
       { params: { limit } }
     );
     return response.data.data;
   },
 
-  // 게임 룸의 채팅룸 ID 조회
-  async getChatRoomByGameRoom(gameRoomId: number): Promise<number> {
-    const response = await api.get<ApiResponse<number>>(
+  // 게임 룸의 채팅룸 publicId 조회
+  async getChatRoomByGameRoom(gameRoomId: number): Promise<string> {
+    const response = await api.get<ApiResponse<string>>(
       `/chat/rooms/by-game-room/${gameRoomId}`
     );
     return response.data.data;

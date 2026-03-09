@@ -89,7 +89,7 @@ export function RoomListPage() {
       setShowPasswordModal(false);
       setJoiningRoom(null);
       setJoiningInviteCode(undefined);
-      navigate(`/chat/${result.chatRoomId}`);
+      navigate(`/chat/${result.room.publicId}`);
     } catch (err: unknown) {
       const errorCode = extractErrorCode(err);
       if (errorCode === 'ROOM006' || errorCode === 'ROOM012') {
@@ -140,8 +140,8 @@ export function RoomListPage() {
     const alreadyIn = myRooms.find(r => r.publicId === roomPublicId);
     if (alreadyIn) {
       try {
-        const chatRoomId = await chatService.getChatRoomByGameRoom(alreadyIn.id);
-        navigate(`/chat/${chatRoomId}`);
+        const chatPublicId = await chatService.getChatRoomByGameRoom(alreadyIn.id);
+        navigate(`/chat/${chatPublicId}`);
         return;
       } catch {
         // 조회 실패 시 일반 입장 플로우로 진행

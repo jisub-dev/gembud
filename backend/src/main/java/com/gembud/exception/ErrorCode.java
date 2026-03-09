@@ -93,6 +93,7 @@ public enum ErrorCode {
     CHAT_MESSAGE_EMPTY(HttpStatus.BAD_REQUEST, "CHAT003", "Message cannot be empty"),
     UNKNOWN_CHAT_ROOM_TYPE(HttpStatus.INTERNAL_SERVER_ERROR, "CHAT004", "Unknown chat room type"),
     CHAT_ADD_MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "CHAT005", "채팅방에 멤버를 추가할 권한이 없습니다"),
+    CHAT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "CHAT006", "채팅방 접근 권한이 없습니다"),
 
     // Validation
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "VAL001", "Invalid input"),
