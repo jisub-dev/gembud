@@ -7,6 +7,7 @@ interface RoomCardProps {
   onClick?: (roomPublicId: string) => void;
   showRegenerateInviteButton?: boolean;
   onRegenerateInviteCode?: (roomPublicId: string) => void;
+  isMyRoom?: boolean;
 }
 
 export function RoomCard({
@@ -14,6 +15,7 @@ export function RoomCard({
   onClick,
   showRegenerateInviteButton,
   onRegenerateInviteCode,
+  isMyRoom = false,
 }: RoomCardProps) {
   const statusStyles = {
     OPEN: 'border-green-500 hover:shadow-green-500/50',
@@ -46,11 +48,27 @@ export function RoomCard({
     <div
       onClick={handleClick}
       className={`
-        bg-[#18181b] border-2 rounded-lg p-4 transition
+        relative group bg-[#18181b] border-2 rounded-lg p-4 transition overflow-hidden
         ${statusStyles[room.status]}
         ${room.status === 'OPEN' ? 'cursor-pointer hover:scale-105' : ''}
       `}
     >
+      {room.status === 'FULL' && (
+        <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px] pointer-events-none flex items-center justify-center">
+          <span className="rounded-full border border-orange-300/50 bg-orange-500/20 px-3 py-1 text-xs font-bold text-orange-200">
+            인원 가득
+          </span>
+        </div>
+      )}
+
+      {room.status === 'OPEN' && isMyRoom && (
+        <div className="absolute left-3 bottom-3 z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="rounded-full border border-cyan-300/50 bg-cyan-500/20 px-2.5 py-1 text-xs font-semibold text-cyan-200">
+            이미 참여 중
+          </span>
+        </div>
+      )}
+
       {/* Header: Status Badge + Participants */}
       <div className="flex justify-between items-start mb-3">
         <span className={`

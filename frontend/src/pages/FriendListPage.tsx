@@ -13,6 +13,7 @@ import {
 } from '@/hooks/queries/useFriends';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 import type { Friend, FriendRequest } from '@/types/friend';
 import { userService } from '@/services/userService';
 
@@ -55,17 +56,13 @@ export default function FriendListPage() {
     staleTime: 30_000,
   });
 
-  const blockedUserIds = useMemo(() => {
-    return new Set<number>([
-      ...friends.map((friend) => friend.friendId),
-      ...requests.map((request) => request.userId),
-      ...sentRequests.map((request) => request.friendId),
-    ]);
-  }, [friends, requests, sentRequests]);
-
-  const filteredUsers = useMemo(
-    () => searchedUsers.filter((user) => !blockedUserIds.has(user.id)),
-    [searchedUsers, blockedUserIds]
+  const existingFriendIds = useMemo(
+    () => new Set<number>(friends.map((friend) => friend.friendId)),
+    [friends]
+  );
+  const sentRequestIds = useMemo(
+    () => new Set<number>(sentRequests.filter((request) => request.status === 'PENDING').map((request) => request.friendId)),
+    [sentRequests]
   );
 
   const handleSendRequest = (targetUserId: number, nickname: string) => {
@@ -73,6 +70,7 @@ export default function FriendListPage() {
     sendRequestMutation.mutate(targetUserId, {
       onSuccess: () => {
         toast.success(`${nickname}님에게 친구 요청을 보냈습니다`);
+        setActiveTab('sent');
         setSearchQuery('');
       },
       onError: (error: any) => {
@@ -153,12 +151,15 @@ export default function FriendListPage() {
             {searchQuery.trim().length >= 2 && (
               <div className="mt-3 max-h-56 space-y-2 overflow-y-auto">
                 {searchingUsers ? (
-                  <p className="text-sm text-gray-400">검색 중...</p>
-                ) : filteredUsers.length === 0 ? (
+                  <LoadingSpinner size="sm" label="검색 중..." className="py-2" />
+                ) : searchedUsers.length === 0 ? (
                   <p className="text-sm text-gray-400">요청 가능한 사용자가 없습니다</p>
                 ) : (
-                  filteredUsers.map((user) => {
+                  searchedUsers.map((user) => {
+                    const isFriend = existingFriendIds.has(user.id);
+                    const isRequested = sentRequestIds.has(user.id);
                     const isSending = sendingUserId === user.id && sendRequestMutation.isPending;
+                    const isDisabled = isFriend || isRequested || sendRequestMutation.isPending;
                     return (
                       <div
                         key={user.id}
@@ -171,11 +172,19 @@ export default function FriendListPage() {
                         <button
                           type="button"
                           onClick={() => handleSendRequest(user.id, user.nickname)}
-                          disabled={sendRequestMutation.isPending}
+                          disabled={isDisabled}
                           className="flex items-center gap-1.5 rounded bg-purple-500 px-3 py-2 text-sm font-semibold transition hover:bg-purple-600 disabled:bg-gray-600"
                         >
-                          <Send size={14} />
-                          {isSending ? '전송 중...' : '요청 보내기'}
+                          {isFriend ? (
+                            '이미 친구'
+                          ) : isRequested ? (
+                            '요청됨'
+                          ) : (
+                            <>
+                              <Send size={14} />
+                              {isSending ? '전송 중...' : '요청 보내기'}
+                            </>
+                          )}
                         </button>
                       </div>
                     );
@@ -185,10 +194,10 @@ export default function FriendListPage() {
             )}
           </section>
 
-          <div className="mb-6 flex gap-2">
+          <div className="mb-6 flex flex-wrap gap-2">
             <button
               onClick={() => setActiveTab('friends')}
-              className={`flex items-center gap-2 rounded px-6 py-2 font-semibold transition ${
+              className={`flex items-center gap-2 rounded px-4 py-2 text-sm sm:text-base sm:px-6 font-semibold transition ${
                 activeTab === 'friends' ? 'bg-purple-500 text-white' : 'bg-[#18181b] text-gray-400 hover:text-white'
               }`}
             >
@@ -197,7 +206,7 @@ export default function FriendListPage() {
             </button>
             <button
               onClick={() => setActiveTab('received')}
-              className={`flex items-center gap-2 rounded px-6 py-2 font-semibold transition ${
+              className={`flex items-center gap-2 rounded px-4 py-2 text-sm sm:text-base sm:px-6 font-semibold transition ${
                 activeTab === 'received' ? 'bg-purple-500 text-white' : 'bg-[#18181b] text-gray-400 hover:text-white'
               }`}
             >
@@ -206,7 +215,7 @@ export default function FriendListPage() {
             </button>
             <button
               onClick={() => setActiveTab('sent')}
-              className={`flex items-center gap-2 rounded px-6 py-2 font-semibold transition ${
+              className={`flex items-center gap-2 rounded px-4 py-2 text-sm sm:text-base sm:px-6 font-semibold transition ${
                 activeTab === 'sent' ? 'bg-purple-500 text-white' : 'bg-[#18181b] text-gray-400 hover:text-white'
               }`}
             >
@@ -219,7 +228,7 @@ export default function FriendListPage() {
             {activeTab === 'friends' && (
               <div>
                 {friendsLoading ? (
-                  <div className="py-8 text-center text-gray-400">Loading...</div>
+                  <LoadingSpinner className="py-8" />
                 ) : friends.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 py-8 text-gray-400">
                     <Users size={40} className="text-gray-600" />
@@ -257,7 +266,7 @@ export default function FriendListPage() {
             {activeTab === 'received' && (
               <div>
                 {requestsLoading ? (
-                  <div className="py-8 text-center text-gray-400">Loading...</div>
+                  <LoadingSpinner className="py-8" />
                 ) : requests.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 py-8 text-gray-400">
                     <UserPlus size={40} className="text-gray-600" />
@@ -305,7 +314,7 @@ export default function FriendListPage() {
             {activeTab === 'sent' && (
               <div>
                 {sentLoading ? (
-                  <div className="py-8 text-center text-gray-400">Loading...</div>
+                  <LoadingSpinner className="py-8" />
                 ) : sentRequests.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 py-8 text-gray-400">
                     <Clock size={40} className="text-gray-600" />
