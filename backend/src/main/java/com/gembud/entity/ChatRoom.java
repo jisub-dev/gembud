@@ -10,8 +10,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -51,9 +53,19 @@ public class ChatRoom {
     @JoinColumn(name = "created_by")
     private User createdBy;
 
+    @Column(name = "public_id", nullable = false, unique = true, length = 36)
+    private String publicId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onPrePersist() {
+        if (publicId == null) {
+            publicId = UUID.randomUUID().toString();
+        }
+    }
 
     /**
      * Chat room type enum.

@@ -64,7 +64,7 @@ public class ChatController {
      * Get recent messages from a chat room.
      *
      * @param userDetails authenticated user
-     * @param chatRoomId chat room ID
+     * @param chatRoomPublicId chat room public ID
      * @param limit maximum number of messages (default: 50)
      * @return list of messages
      */
@@ -74,14 +74,14 @@ public class ChatController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "채팅방 접근 권한 없음")
     })
-    @GetMapping("/rooms/{chatRoomId}/messages")
+    @GetMapping("/rooms/{chatRoomPublicId}/messages")
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> getRecentMessages(
         @AuthenticationPrincipal CustomUserDetails userDetails,
-        @PathVariable Long chatRoomId,
+        @PathVariable String chatRoomPublicId,
         @RequestParam(defaultValue = "50") int limit
     ) {
         List<ChatMessageResponse> messages = chatService.getRecentMessages(
-            chatRoomId,
+            chatRoomPublicId,
             userDetails.getUserId(),
             limit
         );
@@ -93,7 +93,7 @@ public class ChatController {
      * Get chat room ID for a game room.
      *
      * @param roomId game room ID
-     * @return chat room ID
+     * @return chat room public ID
      */
     @Operation(summary = "Get chat room by game room", description = "게임 방 ID로 채팅방 ID 조회")
     @ApiResponses({
@@ -101,10 +101,10 @@ public class ChatController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "채팅방을 찾을 수 없음")
     })
     @GetMapping("/rooms/by-game-room/{roomId}")
-    public ResponseEntity<ApiResponse<Long>> getChatRoomByGameRoomId(
+    public ResponseEntity<ApiResponse<String>> getChatRoomByGameRoomId(
         @PathVariable Long roomId
     ) {
-        Long chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
+        String chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
         return ResponseEntity.ok(ApiResponse.success(chatRoomId));
     }
 
@@ -131,8 +131,9 @@ public class ChatController {
             userDetails.getUserId(),
             request.getFriendId()
         );
+        String publicId = chatService.getPublicIdByChatRoomId(chatRoomId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.created(new ChatRoomIdResponse(chatRoomId)));
+            .body(ApiResponse.created(new ChatRoomIdResponse(publicId)));
     }
 
     /**
@@ -157,8 +158,9 @@ public class ChatController {
             request.getName(),
             userDetails.getUserId()
         );
+        String publicId = chatService.getPublicIdByChatRoomId(chatRoomId);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.created(new ChatRoomIdResponse(chatRoomId)));
+            .body(ApiResponse.created(new ChatRoomIdResponse(publicId)));
     }
 
     /**
@@ -212,6 +214,6 @@ public class ChatController {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ChatRoomIdResponse {
-        private Long chatRoomId;
+        private String chatRoomId;
     }
 }

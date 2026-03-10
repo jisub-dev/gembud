@@ -32,9 +32,9 @@ public class ChatWebSocketController {
     /**
      * Handle incoming chat messages.
      * Client sends message to: /app/chat.send
-     * Server broadcasts to: /topic/chat/{chatRoomId}
+     * Server broadcasts to: /topic/chat/{chatRoomPublicId}
      *
-     * @param chatRoomId chat room ID
+     * @param chatRoomPublicId chat room public ID
      * @param request message request
      * @param principal authenticated user
      */
@@ -60,34 +60,34 @@ public class ChatWebSocketController {
         );
     }
 
-    @MessageMapping("/chat.send/{chatRoomId}")
+    @MessageMapping("/chat.send/{chatRoomPublicId}")
     public void sendMessage(
-        @DestinationVariable Long chatRoomId,
+        @DestinationVariable String chatRoomPublicId,
         @Payload ChatMessageRequest request,
         Principal principal
     ) {
         try {
             Long userId = extractUserId(principal);
 
-            if (!chatRoomId.equals(request.getChatRoomId())) {
+            if (!chatRoomPublicId.equals(request.getChatRoomId())) {
                 sendUserError(principal, "chatRoomId mismatch");
                 return;
             }
 
             log.debug("Received message from user {} to chat room {}, len={}",
-                userId, chatRoomId, request.getMessage().length());
+                userId, chatRoomPublicId, request.getMessage().length());
 
             // Process message through ChatService
             ChatMessageResponse response = chatService.sendMessage(userId, request);
 
             // Broadcast message to all subscribers of this chat room
             messagingTemplate.convertAndSend(
-                "/topic/chat/" + chatRoomId,
+                "/topic/chat/" + chatRoomPublicId,
                 response
             );
 
             log.debug("Broadcasted message to /topic/chat/{}: {}",
-                chatRoomId, response.getId());
+                chatRoomPublicId, response.getId());
 
         } catch (NumberFormatException e) {
             log.error("Invalid user ID in principal: {}", principal.getName(), e);
@@ -103,21 +103,21 @@ public class ChatWebSocketController {
 
     /**
      * Handle user joining a chat room.
-     * Client sends to: /app/chat.join/{chatRoomId}
-     * Server broadcasts join notification to: /topic/chat/{chatRoomId}
+     * Client sends to: /app/chat.join/{chatRoomPublicId}
+     * Server broadcasts join notification to: /topic/chat/{chatRoomPublicId}
      *
-     * @param chatRoomId chat room ID
+     * @param chatRoomPublicId chat room public ID
      * @param principal authenticated user
      */
-    @MessageMapping("/chat.join/{chatRoomId}")
+    @MessageMapping("/chat.join/{chatRoomPublicId}")
     public void joinChatRoom(
-        @DestinationVariable Long chatRoomId,
+        @DestinationVariable String chatRoomPublicId,
         Principal principal
     ) {
         try {
             Long userId = extractUserId(principal);
 
-            if (!chatService.isChatRoomMember(chatRoomId, userId)) {
+            if (!chatService.isChatRoomMemberByPublicId(chatRoomPublicId, userId)) {
                 sendUserError(principal, "Not a member of this chat room");
                 return;
             }
@@ -126,12 +126,12 @@ public class ChatWebSocketController {
                 .map(u -> u.getNickname())
                 .orElse("사용자 " + userId);
 
-            log.info("User {} joined chat room {}", userId, chatRoomId);
+            log.info("User {} joined chat room {}", userId, chatRoomPublicId);
 
             messagingTemplate.convertAndSend(
-                "/topic/chat/" + chatRoomId,
+                "/topic/chat/" + chatRoomPublicId,
                 ChatMessageResponse.builder()
-                    .chatRoomId(chatRoomId)
+                    .chatRoomId(chatRoomPublicId)
                     .userId(userId)
                     .username(nickname)
                     .message("User joined the chat")
@@ -146,21 +146,21 @@ public class ChatWebSocketController {
 
     /**
      * Handle user leaving a chat room.
-     * Client sends to: /app/chat.leave/{chatRoomId}
-     * Server broadcasts leave notification to: /topic/chat/{chatRoomId}
+     * Client sends to: /app/chat.leave/{chatRoomPublicId}
+     * Server broadcasts leave notification to: /topic/chat/{chatRoomPublicId}
      *
-     * @param chatRoomId chat room ID
+     * @param chatRoomPublicId chat room public ID
      * @param principal authenticated user
      */
-    @MessageMapping("/chat.leave/{chatRoomId}")
+    @MessageMapping("/chat.leave/{chatRoomPublicId}")
     public void leaveChatRoom(
-        @DestinationVariable Long chatRoomId,
+        @DestinationVariable String chatRoomPublicId,
         Principal principal
     ) {
         try {
             Long userId = extractUserId(principal);
 
-            if (!chatService.isChatRoomMember(chatRoomId, userId)) {
+            if (!chatService.isChatRoomMemberByPublicId(chatRoomPublicId, userId)) {
                 sendUserError(principal, "Not a member of this chat room");
                 return;
             }
@@ -169,12 +169,12 @@ public class ChatWebSocketController {
                 .map(u -> u.getNickname())
                 .orElse("사용자 " + userId);
 
-            log.info("User {} left chat room {}", userId, chatRoomId);
+            log.info("User {} left chat room {}", userId, chatRoomPublicId);
 
             messagingTemplate.convertAndSend(
-                "/topic/chat/" + chatRoomId,
+                "/topic/chat/" + chatRoomPublicId,
                 ChatMessageResponse.builder()
-                    .chatRoomId(chatRoomId)
+                    .chatRoomId(chatRoomPublicId)
                     .userId(userId)
                     .username(nickname)
                     .message("User left the chat")

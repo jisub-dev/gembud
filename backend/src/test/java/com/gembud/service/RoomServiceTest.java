@@ -239,7 +239,8 @@ class RoomServiceTest {
         when(participantRepository.countByRoomId(1L)).thenReturn(1L);
         when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenReturn(room);
-        when(chatService.getChatRoomByGameRoomId(1L)).thenReturn(10L);
+        when(chatService.getChatRoomIdByGameRoomId(1L)).thenReturn(10L);
+        when(chatService.getChatRoomByGameRoomId(1L)).thenReturn("chat-public-10");
         when(participantRepository.findByRoomId(1L)).thenReturn(List.of(hostParticipant));
         when(filterRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
 
@@ -432,7 +433,8 @@ class RoomServiceTest {
         when(participantRepository.countByRoomId(6L)).thenReturn(1L);
         when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenReturn(privateRoom);
-        when(chatService.getChatRoomByGameRoomId(6L)).thenReturn(60L);
+        when(chatService.getChatRoomIdByGameRoomId(6L)).thenReturn(60L);
+        when(chatService.getChatRoomByGameRoomId(6L)).thenReturn("chat-public-60");
         when(participantRepository.findByRoomId(6L)).thenReturn(Collections.emptyList());
         when(filterRepository.findByRoomId(6L)).thenReturn(Collections.emptyList());
 
@@ -441,7 +443,7 @@ class RoomServiceTest {
         );
 
         assertThat(result).isNotNull();
-        assertThat(result.chatRoomId()).isEqualTo(60L);
+        assertThat(result.chatRoomId()).isEqualTo("chat-public-60");
         assertThat(result.room().getId()).isEqualTo(6L);
         verify(chatService).addMemberToChatRoomInternal(60L, 2L);
         verify(rateLimitService).resetJoinLimit("127.0.0.1", "public-6");
@@ -568,7 +570,8 @@ class RoomServiceTest {
         when(passwordEncoder.matches("correct-password", "$2a$10$hashed")).thenReturn(true);
         when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenReturn(privateRoom);
-        when(chatService.getChatRoomByGameRoomId(4L)).thenReturn(10L);
+        when(chatService.getChatRoomIdByGameRoomId(4L)).thenReturn(10L);
+        when(chatService.getChatRoomByGameRoomId(4L)).thenReturn("chat-public-10");
         when(participantRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
         when(filterRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
 
@@ -639,7 +642,8 @@ class RoomServiceTest {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(roomRepository.findById(3L)).thenReturn(Optional.of(singleRoom));
         when(participantRepository.findByRoomIdAndUserId(3L, 1L)).thenReturn(Optional.of(hostParticipant));
-        when(chatService.getChatRoomByGameRoomId(3L)).thenReturn(10L);
+        when(chatService.getChatRoomIdByGameRoomId(3L)).thenReturn(10L);
+        when(chatService.getChatRoomByGameRoomId(3L)).thenReturn("chat-public-10");
         when(roomRepository.save(any(Room.class))).thenReturn(singleRoom);
 
         // When
