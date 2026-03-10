@@ -2,9 +2,12 @@ package com.gembud.config;
 
 import com.gembud.entity.SecurityEvent.EventType;
 import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.security.JwtTokenProvider;
+import com.gembud.service.ChatService;
 import com.gembud.service.RateLimitService;
 import com.gembud.service.SecurityEventService;
+import com.gembud.repository.UserRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +45,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final JwtTokenProvider jwtTokenProvider;
     private final RateLimitService rateLimitService;
     private final SecurityEventService securityEventService;
+    private final ChatService chatService;
+    private final UserRepository userRepository;
 
     /**
      * Configure message broker for pub/sub messaging.
@@ -84,7 +89,42 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
                     message, StompHeaderAccessor.class);
 
-                if (accessor == null || !StompCommand.CONNECT.equals(accessor.getCommand())) {
+                if (accessor == null) {
+                    return message;
+                }
+
+                if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+                    String destination = accessor.getDestination();
+                    if (destination != null && destination.startsWith("/topic/chat/")) {
+                        String chatRoomIdRaw = destination.substring("/topic/chat/".length());
+                        Long chatRoomId;
+                        try {
+                            chatRoomId = Long.parseLong(chatRoomIdRaw);
+                        } catch (NumberFormatException e) {
+                            throw new org.springframework.messaging.MessageDeliveryException(
+                                message, ErrorCode.CHAT_ACCESS_DENIED.getMessage());
+                        }
+
+                        if (accessor.getUser() == null || accessor.getUser().getName() == null) {
+                            throw new org.springframework.messaging.MessageDeliveryException(
+                                message, ErrorCode.CHAT_ACCESS_DENIED.getMessage());
+                        }
+
+                        String email = accessor.getUser().getName();
+                        Long userId = userRepository.findByEmail(email)
+                            .map(u -> u.getId())
+                            .orElseThrow(() -> new org.springframework.messaging.MessageDeliveryException(
+                                message, ErrorCode.CHAT_ACCESS_DENIED.getMessage()));
+
+                        if (!chatService.isChatRoomMember(chatRoomId, userId)) {
+                            throw new org.springframework.messaging.MessageDeliveryException(
+                                message, ErrorCode.CHAT_ACCESS_DENIED.getMessage());
+                        }
+                    }
+                    return message;
+                }
+
+                if (!StompCommand.CONNECT.equals(accessor.getCommand())) {
                     return message;
                 }
 
