@@ -4,6 +4,8 @@ import { useAuthStore } from './store/authStore';
 import { ToastContainer } from './components/common/ToastContainer';
 import { SessionExpiredModal } from './components/common/SessionExpiredModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
+import { PwaUpdateBanner } from './components/common/PwaUpdateBanner';
+import { OfflineStatusBanner } from './components/common/OfflineStatusBanner';
 import { authService } from './services/authService';
 import { featureFlags, isPremiumActive } from './config/features';
 import { useNotificationSocket } from './hooks/useNotificationSocket';
@@ -96,6 +98,8 @@ function App() {
     <ToastContainer />
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <SessionExpiredHandler />
+      <OfflineStatusBanner />
+      <PwaUpdateBanner />
       <PwaInstallPrompt />
       <Routes>
         {/* Public Routes */}

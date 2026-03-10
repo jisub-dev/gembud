@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App.tsx'
 import './index.css'
 
+const PWA_UPDATE_READY_EVENT = 'pwa:update-ready';
+const PWA_APPLY_UPDATE_EVENT = 'pwa:apply-update';
+
 // Dynamically inject AdSense script if Publisher ID is configured
 const adsenseId = import.meta.env.VITE_ADSENSE_CLIENT_ID;
 if (adsenseId) {
@@ -34,8 +37,42 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    let isRefreshing = false;
+
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
+      const dispatchUpdateReady = () => {
+        window.dispatchEvent(new Event(PWA_UPDATE_READY_EVENT));
+      };
+
+      if (registration.waiting) {
+        dispatchUpdateReady();
+      }
+
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            dispatchUpdateReady();
+          }
+        });
+      });
+
+      const applyUpdate = () => {
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      };
+
+      window.addEventListener(PWA_APPLY_UPDATE_EVENT, applyUpdate);
+    }).catch(() => {
       // Keep startup resilient if service worker registration fails.
+    });
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      window.location.reload();
     });
   });
 }
