@@ -9,6 +9,13 @@ import { ApiResponse } from '@/types/api';
  * @since 2026-02-21
  */
 export const roomService = {
+  buildInviteLink(room: Pick<Room, 'gameId' | 'publicId' | 'inviteCode'>): string {
+    if (!room.inviteCode) {
+      throw new Error('Invite code is missing');
+    }
+    return `${window.location.origin}/games/${room.gameId}/rooms?room=${room.publicId}&invite=${encodeURIComponent(room.inviteCode)}`;
+  },
+
   // 게임별 방 목록 조회
   async getRoomsByGame(gameId: number): Promise<Room[]> {
     const response = await api.get<ApiResponse<Room[]>>('/rooms', { params: { gameId } });
@@ -40,6 +47,12 @@ export const roomService = {
   async regenerateInviteCode(publicId: string): Promise<Room> {
     const response = await api.post<ApiResponse<Room>>(`/rooms/${publicId}/invite/regenerate`);
     return response.data.data;
+  },
+
+  // 초대 링크 조회 (publicId 기반)
+  async getInviteLink(publicId: string): Promise<string> {
+    const room = await this.getRoom(publicId);
+    return this.buildInviteLink(room);
   },
 
   // 방 퇴장
