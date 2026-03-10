@@ -22,7 +22,7 @@ vi.mock('@/hooks/useToast', () => ({
 
 vi.mock('@/services/reportService', () => ({
   default: {
-    getReportsByStatus: vi.fn(),
+    getAdminReports: vi.fn(),
     warnReport: vi.fn(),
     resolveReport: vi.fn(),
   },
@@ -52,29 +52,50 @@ describe('AdminPage reports flow', () => {
   });
 
   it('filters by status and nickname search', async () => {
-    vi.mocked(reportService.getReportsByStatus).mockImplementation(async (status: any) => {
-      if (status === 'PENDING') {
-        return [
-          {
-            id: 11,
-            reporter: { id: 1, nickname: 'alpha' },
-            reported: { id: 2, nickname: 'beta' },
-            reason: 'ABUSIVE',
-            createdAt: '2026-03-10T10:00:00',
-            status: 'PENDING',
-          },
-        ] as any;
+    vi.mocked(reportService.getAdminReports).mockImplementation(async (params: any) => {
+      if (params?.status === 'PENDING') {
+        return {
+          content: [
+            {
+              id: 11,
+              reporter: { id: 1, nickname: 'alpha' },
+              reported: { id: 2, nickname: 'beta' },
+              reason: 'ABUSIVE',
+              createdAt: '2026-03-10T10:00:00',
+              status: 'PENDING',
+            },
+          ],
+          page: 0,
+          size: 20,
+          totalElements: 1,
+          totalPages: 1,
+        } as any;
       }
-      return [
-        {
-          id: 12,
-          reporter: { id: 3, nickname: 'gamma' },
-          reported: { id: 4, nickname: 'delta' },
-          reason: 'SPAM',
-          createdAt: '2026-03-10T10:00:00',
-          status: 'RESOLVED',
-        },
-      ] as any;
+      if (params?.status === 'RESOLVED' && params?.search === 'zzz') {
+        return {
+          content: [],
+          page: 0,
+          size: 20,
+          totalElements: 0,
+          totalPages: 0,
+        } as any;
+      }
+      return {
+        content: [
+          {
+            id: 12,
+            reporter: { id: 3, nickname: 'gamma' },
+            reported: { id: 4, nickname: 'delta' },
+            reason: 'SPAM',
+            createdAt: '2026-03-10T10:00:00',
+            status: 'RESOLVED',
+          },
+        ],
+        page: 0,
+        size: 20,
+        totalElements: 1,
+        totalPages: 1,
+      } as any;
     });
 
     const user = userEvent.setup();
@@ -86,21 +107,28 @@ describe('AdminPage reports flow', () => {
 
     const searchInput = screen.getByPlaceholderText('신고자/피신고자 닉네임 검색');
     await user.type(searchInput, 'zzz');
+    await user.click(screen.getByRole('button', { name: '검색' }));
     expect(screen.getByText('조건에 맞는 신고가 없습니다.')).toBeInTheDocument();
   });
 
   it('warn action refreshes list', async () => {
     vi.spyOn(window, 'prompt').mockReturnValue('경고 메시지');
-    vi.mocked(reportService.getReportsByStatus).mockResolvedValue([
-      {
-        id: 21,
-        reporter: { id: 1, nickname: 'reporter' },
-        reported: { id: 2, nickname: 'reported' },
-        reason: 'ABUSIVE',
-        createdAt: '2026-03-10T10:00:00',
-        status: 'PENDING',
-      },
-    ] as any);
+    vi.mocked(reportService.getAdminReports).mockResolvedValue({
+      content: [
+        {
+          id: 21,
+          reporter: { id: 1, nickname: 'reporter' },
+          reported: { id: 2, nickname: 'reported' },
+          reason: 'ABUSIVE',
+          createdAt: '2026-03-10T10:00:00',
+          status: 'PENDING',
+        },
+      ],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    } as any);
     vi.mocked(reportService.warnReport).mockResolvedValue(undefined);
 
     const user = userEvent.setup();
@@ -110,7 +138,12 @@ describe('AdminPage reports flow', () => {
 
     await waitFor(() => {
       expect(reportService.warnReport).toHaveBeenCalledWith(21, '경고 메시지');
-      expect(reportService.getReportsByStatus).toHaveBeenCalledWith('PENDING');
+      expect(reportService.getAdminReports).toHaveBeenCalledWith({
+        status: 'PENDING',
+        search: undefined,
+        page: 0,
+        size: 20,
+      });
       expect(toastSuccess).toHaveBeenCalledWith('경고 처리 완료');
     });
   });

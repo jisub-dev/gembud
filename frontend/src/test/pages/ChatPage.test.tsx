@@ -113,6 +113,19 @@ const relatedRoom: Room = {
   ],
 };
 
+function createHostPrivateRoom(inviteExpiresAt: string): Room {
+  return {
+    ...relatedRoom,
+    isPrivate: true,
+    inviteCode: 'INV123',
+    inviteCodeExpiresAt: inviteExpiresAt,
+    participants: [
+      { userId: 1, nickname: 'me', isHost: true },
+      { userId: 2, nickname: 'guest', isHost: false },
+    ],
+  };
+}
+
 describe('ChatPage recommendation leave flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -148,5 +161,29 @@ describe('ChatPage recommendation leave flow', () => {
 
     expect(window.localStorage.getItem('roomRecommendations:active')).toBe('{}');
     expect(window.localStorage.getItem('roomRecommendations:excluded')).toContain('room-public-33');
+  });
+
+  it('shows invite expiry warning for host when link is expiring soon', async () => {
+    const soon = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    vi.mocked(roomService.getMyRooms).mockResolvedValue([createHostPrivateRoom(soon)]);
+    vi.mocked(roomService.buildInviteLink).mockReturnValue('https://example.com/invite');
+
+    render(<ChatPage />, { wrapper: createWrapper() });
+
+    expect(await screen.findByText('초대 링크 관리')).toBeInTheDocument();
+    expect(screen.getByText(/초대 링크 만료 임박/)).toBeInTheDocument();
+    expect(screen.getByText(/남은 시간:/)).toBeInTheDocument();
+  });
+
+  it('shows expired message for host when invite link is already expired', async () => {
+    const expired = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    vi.mocked(roomService.getMyRooms).mockResolvedValue([createHostPrivateRoom(expired)]);
+    vi.mocked(roomService.buildInviteLink).mockReturnValue('https://example.com/invite');
+
+    render(<ChatPage />, { wrapper: createWrapper() });
+
+    expect(await screen.findByText('초대 링크 관리')).toBeInTheDocument();
+    expect(screen.getByText('초대 링크가 만료되었습니다. 재발급 후 공유해주세요.')).toBeInTheDocument();
+    expect(screen.getByText(/남은 시간: 만료됨/)).toBeInTheDocument();
   });
 });

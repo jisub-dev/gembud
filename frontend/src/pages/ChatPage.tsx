@@ -10,6 +10,7 @@ import { roomService } from '@/services/roomService';
 import evaluationService from '@/services/evaluationService';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
+import { getInviteExpiryInfo } from '@/utils/inviteExpiry';
 
 const STATUS_LABELS: Record<string, string> = {
   OPEN: '모집중',
@@ -40,6 +41,7 @@ export default function ChatPage() {
   const [inviteLink, setInviteLink] = useState('');
   const [inviteExpiresAt, setInviteExpiresAt] = useState<string | undefined>(undefined);
   const [isRegeneratingInvite, setIsRegeneratingInvite] = useState(false);
+  const [inviteNowMs, setInviteNowMs] = useState(Date.now());
 
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -129,6 +131,10 @@ export default function ChatPage() {
     isEvaluatableLoading ||
     evaluatableParticipants.length === 0 ||
     !hasEvaluatableParticipants;
+  const inviteExpiryInfo = useMemo(
+    () => getInviteExpiryInfo(inviteExpiresAt, inviteNowMs),
+    [inviteExpiresAt, inviteNowMs],
+  );
 
   useEffect(() => {
     if (window.innerWidth < 1024) {
@@ -154,6 +160,17 @@ export default function ChatPage() {
       setInviteLink('');
     }
   }, [isHost, relatedRoom]);
+
+  useEffect(() => {
+    if (!inviteExpiresAt) return;
+    setInviteNowMs(Date.now());
+    const timerId = window.setInterval(() => {
+      setInviteNowMs(Date.now());
+    }, 30000);
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [inviteExpiresAt]);
 
   const handleKick = async (userId: number, nickname: string) => {
     if (!relatedRoom) return;
@@ -390,6 +407,16 @@ export default function ChatPage() {
                     {isHost && relatedRoom.isPrivate && (
                       <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 space-y-3">
                         <p className="text-sm font-semibold text-blue-200">초대 링크 관리</p>
+                        {inviteExpiryInfo.isExpiringSoon && !inviteExpiryInfo.isExpired && (
+                          <div className="rounded border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                            초대 링크 만료 임박: {inviteExpiryInfo.remainingLabel} 남았습니다.
+                          </div>
+                        )}
+                        {inviteExpiryInfo.isExpired && (
+                          <div className="rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                            초대 링크가 만료되었습니다. 재발급 후 공유해주세요.
+                          </div>
+                        )}
                         <div className="flex gap-2">
                           <input
                             readOnly
@@ -406,8 +433,8 @@ export default function ChatPage() {
                           </button>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-gray-400">
-                            만료 시각: {formatDateTime(inviteExpiresAt)}
+                          <span className={`text-xs ${inviteExpiryInfo.isExpired ? 'text-red-300' : inviteExpiryInfo.isExpiringSoon ? 'text-amber-300' : 'text-gray-400'}`}>
+                            남은 시간: {inviteExpiryInfo.remainingLabel} · 만료 시각: {inviteExpiryInfo.expiresAtLabel}
                           </span>
                           <button
                             type="button"
@@ -556,17 +583,4 @@ async function copyToClipboard(text: string): Promise<void> {
   textarea.select();
   document.execCommand('copy');
   document.body.removeChild(textarea);
-}
-
-function formatDateTime(iso?: string): string {
-  if (!iso) return '미설정';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '미설정';
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }

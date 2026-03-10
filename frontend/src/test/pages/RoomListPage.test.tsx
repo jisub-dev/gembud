@@ -308,7 +308,27 @@ describe('RoomListPage auto-join UX', () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('초대 코드가 유효하지 않거나 만료되었습니다');
     });
-    expect(screen.getByRole('button', { name: '초대코드로 입장' })).toBeInTheDocument();
+    expect(screen.getByText('초대 링크가 만료되었거나 유효하지 않습니다')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '방 목록으로 돌아가기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '새 초대 링크 요청' })).toBeInTheDocument();
+  });
+
+  it('shows invite target summary panel when entering with invite params', async () => {
+    render(<RoomListPage />, {
+      wrapper: createWrapper('/games/1/rooms?room=private-room-2&invite=INVITE123'),
+    });
+
+    expect(await screen.findByText('초대 링크로 입장 중입니다')).toBeInTheDocument();
+    expect(screen.getByText('대상 방: 비공개 방')).toBeInTheDocument();
+  });
+
+  it('shows missing target room guide when invite room does not exist', async () => {
+    render(<RoomListPage />, {
+      wrapper: createWrapper('/games/1/rooms?room=missing-room&invite=INVITE123'),
+    });
+
+    expect(await screen.findByText('초대 링크가 만료되었거나 유효하지 않습니다')).toBeInTheDocument();
+    expect(screen.getByText(/대상 방 정보를 불러오지 못했습니다/)).toBeInTheDocument();
   });
 
   it('regenerates invite code for host private room and copies invite URL', async () => {

@@ -4,6 +4,8 @@ import com.gembud.entity.Report;
 import com.gembud.entity.Report.ReportStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -77,5 +79,34 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
         @Param("reporterId") Long reporterId,
         @Param("reportedId") Long reportedId,
         @Param("after") LocalDateTime after
+    );
+
+    /**
+     * Search reports for admin list page with optional filters.
+     *
+     * @param status report status filter
+     * @param search unified nickname search (reporter/reported)
+     * @param reporterNickname reporter nickname filter
+     * @param reportedNickname reported nickname filter
+     * @param pageable page request
+     * @return paginated reports
+     */
+    @Query("""
+        SELECT r FROM Report r
+        WHERE (:status IS NULL OR r.status = :status)
+          AND (:search IS NULL
+               OR LOWER(r.reporter.nickname) LIKE LOWER(CONCAT('%', :search, '%'))
+               OR LOWER(r.reported.nickname) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (:reporterNickname IS NULL
+               OR LOWER(r.reporter.nickname) LIKE LOWER(CONCAT('%', :reporterNickname, '%')))
+          AND (:reportedNickname IS NULL
+               OR LOWER(r.reported.nickname) LIKE LOWER(CONCAT('%', :reportedNickname, '%')))
+        """)
+    Page<Report> searchAdminReports(
+        @Param("status") ReportStatus status,
+        @Param("search") String search,
+        @Param("reporterNickname") String reporterNickname,
+        @Param("reportedNickname") String reportedNickname,
+        Pageable pageable
     );
 }

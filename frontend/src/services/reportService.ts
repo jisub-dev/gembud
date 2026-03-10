@@ -38,6 +38,23 @@ export interface AdminReportItem {
   status: AdminReportStatus | string;
 }
 
+export interface AdminReportListParams {
+  status?: AdminReportStatus;
+  page?: number;
+  size?: number;
+  search?: string;
+  reporterNickname?: string;
+  reportedNickname?: string;
+}
+
+export interface AdminReportListResponse {
+  content: AdminReportItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 function toCategory(reason: ReportReason): ReportCategory {
   switch (reason) {
     case 'ABUSIVE':
@@ -70,8 +87,10 @@ export const reportService = {
     return response.data.data;
   },
 
-  async getReportsByStatus(status: AdminReportStatus): Promise<AdminReportItem[]> {
-    const response = await api.get<ApiResponse<AdminReportItem[]>>(`/reports/status/${status}`);
+  async getAdminReports(params: AdminReportListParams): Promise<AdminReportListResponse> {
+    const response = await api.get<ApiResponse<AdminReportListResponse>>('/admin/reports', {
+      params,
+    });
     return response.data.data;
   },
 
