@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { ToastContainer } from './components/common/ToastContainer';
 import { SessionExpiredModal } from './components/common/SessionExpiredModal';
+import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import { authService } from './services/authService';
 import { featureFlags, isPremiumActive } from './config/features';
 import { useNotificationSocket } from './hooks/useNotificationSocket';
@@ -95,6 +96,7 @@ function App() {
     <ToastContainer />
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <SessionExpiredHandler />
+      <PwaInstallPrompt />
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />

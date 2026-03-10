@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Gembud">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)" />
+  <path d="M73 118c0-15 12-27 27-27h56c15 0 27 12 27 27v20c0 15-12 27-27 27h-56c-15 0-27-12-27-27v-20z" fill="#ffffff" opacity="0.96"/>
+  <circle cx="108" cy="128" r="10" fill="#1d4ed8"/>
+  <circle cx="148" cy="128" r="10" fill="#1d4ed8"/>
+  <path d="M120 98h16v18h-16zM111 107h34v10h-34z" fill="#1d4ed8"/>
+  <path d="M78 68h100" stroke="#60a5fa" stroke-width="10" stroke-linecap="round" opacity="0.9"/>
+</svg>
