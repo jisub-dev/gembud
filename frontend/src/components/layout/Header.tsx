@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Bell, ChevronDown, User, LogOut, Crown } from 'lucide-react';
-import { notificationKeys, useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
+import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
 import PremiumBadge from '@/components/common/PremiumBadge';
 import { featureFlags } from '@/config/features';
 
@@ -17,7 +16,6 @@ function getTemperatureColor(temperature: number): string {
 export default function Header() {
   const { user, logout } = useAuthStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const queryClient = useQueryClient();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
   const isAdmin = !!user && (((user as { role?: string }).role === 'ADMIN') || (!!adminEmail && user.email === adminEmail));
@@ -50,15 +48,12 @@ export default function Header() {
                 {/* Notification Button */}
                 <Link
                   to="/notifications"
-                  onClick={() => {
-                    queryClient.setQueryData(notificationKeys.unreadCount(), 0);
-                  }}
                   className="relative p-2 rounded-lg hover:bg-dark-tertiary transition-colors group"
                 >
                   <Bell className="w-6 h-6 text-text-secondary group-hover:text-neon-cyan transition-colors" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-neon-pink rounded-full flex items-center justify-center text-xs font-gaming font-bold animate-glow-pulse">
-                      {unreadCount}
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </Link>

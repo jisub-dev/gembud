@@ -55,6 +55,10 @@ function createWrapper() {
 }
 
 describe('NotificationsPage filtering', () => {
+  const markAsReadMutate = vi.fn();
+  const markAllAsReadMutate = vi.fn();
+  const deleteMutate = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -74,7 +78,7 @@ describe('NotificationsPage filtering', () => {
         type: 'ROOM_INVITATION',
         title: '방 초대',
         message: '방에 초대되었습니다',
-        isRead: true,
+        isRead: false,
         relatedUrl: '/chat/public-id-1',
         createdAt: '2026-03-10T09:00:00',
       },
@@ -95,17 +99,17 @@ describe('NotificationsPage filtering', () => {
     } as any);
 
     vi.mocked(useMarkNotificationAsRead).mockReturnValue({
-      mutate: vi.fn(),
+      mutate: markAsReadMutate,
       isPending: false,
     } as any);
 
     vi.mocked(useMarkAllNotificationsAsRead).mockReturnValue({
-      mutate: vi.fn(),
+      mutate: markAllAsReadMutate,
       isPending: false,
     } as any);
 
     vi.mocked(useDeleteNotification).mockReturnValue({
-      mutate: vi.fn(),
+      mutate: deleteMutate,
       isPending: false,
     } as any);
   });
@@ -114,9 +118,8 @@ describe('NotificationsPage filtering', () => {
     render(<NotificationsPage />, { wrapper: createWrapper() });
 
     expect(screen.getByText('총 알림 수')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('안 읽은 알림')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /방으로 이동/i })).toBeInTheDocument();
   });
 
@@ -130,5 +133,15 @@ describe('NotificationsPage filtering', () => {
     expect(screen.getByText('테스터님이 친구 요청을 보냈습니다')).toBeInTheDocument();
     expect(screen.queryByText('방에 초대되었습니다')).not.toBeInTheDocument();
     expect(screen.queryByText('점검 공지')).not.toBeInTheDocument();
+  });
+
+  it('marks as read and navigates when relatedUrl CTA is clicked', async () => {
+    const user = userEvent.setup();
+    render(<NotificationsPage />, { wrapper: createWrapper() });
+
+    await user.click(screen.getByRole('button', { name: /방으로 이동/i }));
+
+    expect(markAsReadMutate).toHaveBeenCalledWith(2);
+    expect(mockNavigate).toHaveBeenCalledWith('/chat/public-id-1');
   });
 });

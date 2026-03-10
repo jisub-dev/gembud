@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-11 01:16 KST (by Codex, main terminal) — T1/T2/T3 PR squash merge 반영 준비
+> **Last updated:** 2026-03-11 01:31 KST (by Codex, main terminal) — T1/T2/T3 PR squash merge 반영 준비
 
 ---
 
@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| 마지막 main HEAD | `5648cec` room entry hotfix + regression tests pushed |
+| 마지막 main HEAD | `f0a0eac` notification center + pwa shell + chat lifecycle tests |
 | Backend tests | `./gradlew test --continue` 통과 |
 | Frontend tests | `npx vitest run --reporter=verbose` 통과 (37 passed) |
 | Frontend build | `npm run build` 통과 |
@@ -23,15 +23,18 @@
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Codex (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-notification-center` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-pwa-shell` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-chat-lifecycle-tests` | Terminal 3 |
+| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-notification-live` | Terminal 1 |
+| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-pwa-offline` | Terminal 2 |
+| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-report-admin-flow` | Terminal 3 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Codex | — | 2026-03-11 01:05 |
+| `main` | 🟢 최신 | Codex | — | 2026-03-11 01:18 |
+| `feat/t1-notification-live` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-11 01:31 |
+| `feat/t2-pwa-offline` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-11 01:31 |
+| `feat/t3-report-admin-flow` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-11 01:31 |
 | `feat/t1-notification-center` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-11 01:16 |
 | `feat/t2-pwa-shell` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-11 01:16 |
 | `feat/t3-chat-lifecycle-tests` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-11 01:16 |

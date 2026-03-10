@@ -28,15 +28,22 @@ export function ReportModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
 
+  const getErrorMessage = (error: unknown) => {
+    const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
+    if (code === 'REPORT002') return '본인은 신고할 수 없습니다';
+    if (code === 'REPORT003') return '이미 신고한 사용자입니다';
+    return '신고 접수에 실패했습니다';
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       await reportService.createReport(reportedUserId, reason, chatMessageId);
-      toast.success('신고가 접수되었습니다');
+      toast.success(`${reportedNickname}님 신고가 접수되었습니다`);
       onClose();
-    } catch {
-      toast.error('신고 접수에 실패했습니다');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -91,4 +98,3 @@ export function ReportModal({
     </div>
   );
 }
-
