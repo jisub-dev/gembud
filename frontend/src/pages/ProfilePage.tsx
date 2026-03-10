@@ -192,6 +192,12 @@ export default function ProfilePage() {
     return status;
   };
 
+  const reportSummary = useMemo(() => ({
+    pending: myReports.filter((report) => report.status === 'PENDING').length,
+    resolved: myReports.filter((report) => report.status === 'RESOLVED').length,
+    rejected: myReports.filter((report) => report.status === 'REJECTED' || report.status === 'REVIEWED').length,
+  }), [myReports]);
+
   return (
     <>
       {showEditModal && user && (
@@ -355,7 +361,22 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myReports.slice(0, 10).map((report) => (
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                      PENDING {reportSummary.pending}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                      RESOLVED {reportSummary.resolved}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-400/40">
+                      REJECTED {reportSummary.rejected}
+                    </span>
+                  </div>
+                  {myReports
+                    .slice()
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 10)
+                    .map((report) => (
                     <div key={report.id} className="rounded bg-[#0e0e10] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -363,6 +384,7 @@ export default function ProfilePage() {
                             {report.reported?.nickname ?? `사용자 ${report.reported?.id ?? ''}`}
                           </p>
                           <p className="text-sm text-gray-400 mt-1">{report.reason}</p>
+                          <p className="text-xs text-gray-500 mt-1">{formatDate(report.createdAt)}</p>
                         </div>
                         <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${reportStatusStyle(report.status)}`}>
                           {reportStatusLabel(report.status)}

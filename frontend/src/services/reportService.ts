@@ -27,6 +27,17 @@ export interface MyReport {
   };
 }
 
+export type AdminReportStatus = 'PENDING' | 'REVIEWED' | 'RESOLVED';
+
+export interface AdminReportItem {
+  id: number;
+  reporter: { id: number; nickname: string };
+  reported: { id: number; nickname: string };
+  reason: string;
+  createdAt: string;
+  status: AdminReportStatus | string;
+}
+
 function toCategory(reason: ReportReason): ReportCategory {
   switch (reason) {
     case 'ABUSIVE':
@@ -57,6 +68,21 @@ export const reportService = {
   async getMyReports(): Promise<MyReport[]> {
     const response = await api.get<ApiResponse<MyReport[]>>('/reports/my');
     return response.data.data;
+  },
+
+  async getReportsByStatus(status: AdminReportStatus): Promise<AdminReportItem[]> {
+    const response = await api.get<ApiResponse<AdminReportItem[]>>(`/reports/status/${status}`);
+    return response.data.data;
+  },
+
+  async warnReport(reportId: number, warningMessage: string): Promise<void> {
+    await api.post(`/admin/reports/${reportId}/warn`, { warningMessage });
+  },
+
+  async resolveReport(reportId: number, adminComment: string): Promise<void> {
+    await api.put(`/reports/${reportId}/resolve`, null, {
+      params: { adminComment },
+    });
   },
 };
 
