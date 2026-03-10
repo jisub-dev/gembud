@@ -3,17 +3,9 @@ import api from '@/services/api';
 import type { ApiResponse } from '@/types/api';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
+import reportService, { type AdminReportItem, type AdminReportStatus } from '@/services/reportService';
 
 type AdminTab = 'reports' | 'users' | 'security';
-
-interface ReportItem {
-  id: number;
-  reporter: { id: number; nickname: string };
-  reported: { id: number; nickname: string };
-  reason: string;
-  createdAt: string;
-  status: string;
-}
 
 interface UserSecurityStatus {
   userId: number;
@@ -36,7 +28,9 @@ export default function AdminPage() {
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('reports');
-  const [pendingReports, setPendingReports] = useState<ReportItem[]>([]);
+  const [reportItems, setReportItems] = useState<AdminReportItem[]>([]);
+  const [reportStatusFilter, setReportStatusFilter] = useState<AdminReportStatus>('PENDING');
+  const [reportSearch, setReportSearch] = useState('');
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [processingReportId, setProcessingReportId] = useState<number | null>(null);
 
@@ -55,13 +49,13 @@ export default function AdminPage() {
     return role === 'ADMIN' || (!!adminEmail && user.email === adminEmail);
   }, [user, adminEmail]);
 
-  const loadPendingReports = async () => {
+  const loadReports = async (status: AdminReportStatus = reportStatusFilter) => {
     setIsLoadingReports(true);
     try {
-      const response = await api.get<ApiResponse<ReportItem[]>>('/reports/status/PENDING');
-      setPendingReports(response.data.data);
+      const data = await reportService.getReportsByStatus(status);
+      setReportItems(data);
     } catch {
-      toast.error('대기 중 신고 목록 조회에 실패했습니다.');
+      toast.error('신고 목록 조회에 실패했습니다.');
     } finally {
       setIsLoadingReports(false);
     }
@@ -81,9 +75,14 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    loadPendingReports();
+    loadReports('PENDING');
     loadSecuritySummary();
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    loadReports(reportStatusFilter);
+  }, [reportStatusFilter]);
 
   const handleWarn = async (reportId: number) => {
     const warningMessage = window.prompt('경고 메시지를 입력하세요.', '운영 정책 위반 경고');
@@ -91,15 +90,40 @@ export default function AdminPage() {
 
     setProcessingReportId(reportId);
     try {
-      await api.post(`/admin/reports/${reportId}/warn`, { warningMessage: warningMessage.trim() });
+      await reportService.warnReport(reportId, warningMessage.trim());
       toast.success('경고 처리 완료');
-      await loadPendingReports();
+      await loadReports(reportStatusFilter);
     } catch {
       toast.error('경고 처리에 실패했습니다.');
     } finally {
       setProcessingReportId(null);
     }
   };
+
+  const handleResolve = async (reportId: number) => {
+    const adminComment = window.prompt('처리 코멘트를 입력하세요.', '처리 완료');
+    if (!adminComment || !adminComment.trim()) return;
+
+    setProcessingReportId(reportId);
+    try {
+      await reportService.resolveReport(reportId, adminComment.trim());
+      toast.success('신고를 처리 완료했습니다.');
+      await loadReports(reportStatusFilter);
+    } catch {
+      toast.error('신고 처리 완료에 실패했습니다.');
+    } finally {
+      setProcessingReportId(null);
+    }
+  };
+
+  const filteredReports = useMemo(() => {
+    const q = reportSearch.trim().toLowerCase();
+    if (!q) return reportItems;
+    return reportItems.filter((report) =>
+      report.reporter.nickname.toLowerCase().includes(q)
+      || report.reported.nickname.toLowerCase().includes(q)
+    );
+  }, [reportItems, reportSearch]);
 
   const handleLookupSecurityStatus = async () => {
     const userId = Number(lookupUserId);
@@ -158,40 +182,79 @@ export default function AdminPage() {
 
       {activeTab === 'reports' && (
         <section className="rounded-xl border border-gray-700 bg-[#18181b] p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">처리 대기 신고</h2>
-            <button
-              type="button"
-              onClick={loadPendingReports}
-              disabled={isLoadingReports}
-              className="px-3 py-1.5 rounded-md border border-gray-600 text-gray-200 hover:border-gray-400 disabled:opacity-60"
-            >
-              새로고침
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-white">신고 목록</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {(['PENDING', 'REVIEWED', 'RESOLVED'] as AdminReportStatus[]).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setReportStatusFilter(status)}
+                  className={`px-3 py-1.5 rounded-md border text-xs font-semibold transition ${
+                    reportStatusFilter === status
+                      ? 'border-purple-500/70 bg-purple-500/20 text-purple-200'
+                      : 'border-gray-600 text-gray-300 hover:border-gray-500'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => loadReports(reportStatusFilter)}
+                disabled={isLoadingReports}
+                className="px-3 py-1.5 rounded-md border border-gray-600 text-gray-200 hover:border-gray-400 disabled:opacity-60"
+              >
+                새로고침
+              </button>
+            </div>
           </div>
+          <input
+            type="text"
+            value={reportSearch}
+            onChange={(e) => setReportSearch(e.target.value)}
+            placeholder="신고자/피신고자 닉네임 검색"
+            className="w-full mb-4 px-3 py-2 rounded-md bg-[#111114] border border-gray-700 text-white text-sm focus:outline-none focus:border-purple-500"
+          />
 
           {isLoadingReports ? (
             <p className="text-gray-400 text-sm">불러오는 중...</p>
-          ) : pendingReports.length === 0 ? (
-            <p className="text-gray-400 text-sm">처리 대기 신고가 없습니다.</p>
+          ) : filteredReports.length === 0 ? (
+            <p className="text-gray-400 text-sm">조건에 맞는 신고가 없습니다.</p>
           ) : (
             <div className="space-y-3">
-              {pendingReports.map((report) => (
+              {filteredReports.map((report) => (
                 <div key={report.id} className="rounded-lg border border-gray-700 bg-[#111114] p-4 space-y-2">
-                  <div className="text-sm text-gray-300">
-                    신고자: <span className="text-white">{report.reporter.nickname}</span> / 피신고자:{' '}
-                    <span className="text-white">{report.reported.nickname}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-gray-300">
+                      신고자: <span className="text-white">{report.reporter.nickname}</span> / 피신고자:{' '}
+                      <span className="text-white">{report.reported.nickname}</span>
+                    </div>
+                    <ReportStatusBadge status={report.status} />
                   </div>
                   <div className="text-sm text-gray-300">사유: {report.reason}</div>
                   <div className="text-xs text-gray-500">접수일: {new Date(report.createdAt).toLocaleString('ko-KR')}</div>
-                  <button
-                    type="button"
-                    onClick={() => handleWarn(report.id)}
-                    disabled={processingReportId === report.id}
-                    className="mt-1 px-3 py-1.5 rounded-md bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 hover:bg-yellow-500/30 disabled:opacity-60"
-                  >
-                    {processingReportId === report.id ? '처리 중...' : '경고 처리'}
-                  </button>
+
+                  {report.status !== 'RESOLVED' && (
+                    <div className="mt-1 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleWarn(report.id)}
+                        disabled={processingReportId === report.id}
+                        className="px-3 py-1.5 rounded-md bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 hover:bg-yellow-500/30 disabled:opacity-60"
+                      >
+                        {processingReportId === report.id ? '처리 중...' : '경고 처리'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleResolve(report.id)}
+                        disabled={processingReportId === report.id}
+                        className="px-3 py-1.5 rounded-md bg-emerald-500/20 border border-emerald-500/50 text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-60"
+                      >
+                        {processingReportId === report.id ? '처리 중...' : '처리 완료'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -296,4 +359,17 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
       <p className="mt-1 text-2xl font-bold text-white">{value.toLocaleString('ko-KR')}</p>
     </div>
   );
+}
+
+function ReportStatusBadge({ status }: { status: string }) {
+  if (status === 'PENDING') {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">PENDING</span>;
+  }
+  if (status === 'REVIEWED') {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/40">REVIEWED</span>;
+  }
+  if (status === 'RESOLVED') {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">RESOLVED</span>;
+  }
+  return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-300 border border-gray-500/40">{status}</span>;
 }
