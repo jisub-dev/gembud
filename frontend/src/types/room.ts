@@ -20,6 +20,7 @@ export interface Room {
   participants?: ParticipantInfo[];
   filters?: Record<string, string>;
   inviteCode?: string;
+  inviteCodeExpiresAt?: string;
 }
 
 export interface JoinRoomResult {
