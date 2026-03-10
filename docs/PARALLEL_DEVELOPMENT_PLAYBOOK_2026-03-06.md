@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `90a198d` t1/t2/t3 병합 완료 + playbook 최종 정리 |
+| 마지막 기능 병합 HEAD | `4dba393` t1/t2/t3 병합 완료 (chat unread + onboarding + game detail) |
 | Backend tests | 확인 필요 |
 | Frontend tests | 확인 필요 |
 | Frontend build | 확인 필요 |
