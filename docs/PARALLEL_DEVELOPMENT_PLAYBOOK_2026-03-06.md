@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-11 01:00 KST (by Codex, main terminal) — 핫픽스 + 전체 검증 완료
+> **Last updated:** 2026-03-11 01:16 KST (by Codex, main terminal) — T1/T2/T3 PR squash merge 반영 준비
 
 ---
 
@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| 마지막 기능 병합 HEAD | `4dba393` t1/t2/t3 병합 완료 (chat unread + onboarding + game detail) |
+| 마지막 main HEAD | `5648cec` room entry hotfix + regression tests pushed |
 | Backend tests | `./gradlew test --continue` 통과 |
 | Frontend tests | `npx vitest run --reporter=verbose` 통과 (37 passed) |
 | Frontend build | `npm run build` 통과 |
@@ -31,10 +31,10 @@
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Codex | — | 2026-03-11 00:05 |
-| `feat/t1-notification-center` | 🔵 작업중 | Terminal 1 | — | 2026-03-11 00:05 |
-| `feat/t2-pwa-shell` | 🔵 작업중 | Terminal 2 | — | 2026-03-11 00:05 |
-| `feat/t3-chat-lifecycle-tests` | 🔵 작업중 | Terminal 3 | — | 2026-03-11 00:05 |
+| `main` | 🟢 최신 | Codex | — | 2026-03-11 01:05 |
+| `feat/t1-notification-center` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-11 01:16 |
+| `feat/t2-pwa-shell` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-11 01:16 |
+| `feat/t3-chat-lifecycle-tests` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-11 01:16 |
 | `feat/t1-chat-unread` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-10 23:45 |
 | `feat/t2-onboarding` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-10 23:45 |
 | `feat/t3-game-detail` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-10 23:45 |
