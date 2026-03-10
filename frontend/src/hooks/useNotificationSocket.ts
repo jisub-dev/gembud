@@ -36,6 +36,9 @@ export function useNotificationSocket() {
         if (!active) return;
         client.subscribe('/user/queue/notifications', () => {
           if (!active) return;
+          queryClient.setQueryData(notificationKeys.unreadCount(), (prev: number | undefined) =>
+            typeof prev === 'number' ? prev + 1 : 1
+          );
           queryClient.invalidateQueries({ queryKey: notificationKeys.list() });
           queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
         });
@@ -52,4 +55,3 @@ export function useNotificationSocket() {
     };
   }, [isAuthenticated, user, queryClient]);
 }
-
