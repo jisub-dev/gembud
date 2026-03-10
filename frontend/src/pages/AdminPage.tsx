@@ -1,27 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import api from '@/services/api';
-import type { ApiResponse } from '@/types/api';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import reportService, { type AdminReportItem, type AdminReportStatus } from '@/services/reportService';
+import adminService, {
+  type SecurityEventItem,
+  type SecuritySummary,
+  type UserSecurityStatus,
+} from '@/services/adminService';
 
 type AdminTab = 'reports' | 'users' | 'security';
 
-interface UserSecurityStatus {
-  userId: number;
-  email: string;
-  loginLocked: boolean;
-  loginLockedUntil: string | null;
-  failedLoginCountInWindow: number;
-  windowMinutes: number;
-}
+const SECURITY_EVENT_TYPES = [
+  'LOGIN_FAIL',
+  'LOGIN_LOCKED',
+  'REFRESH_REUSE_DETECTED',
+  'RATE_LIMIT_HIT',
+  'LOGIN_FAIL_BURST',
+  'REPORT_WARNED',
+] as const;
 
-interface SecuritySummary {
-  loginFailCount: number;
-  loginLockedCount: number;
-  refreshReuseCount: number;
-  rateLimitHitCount: number;
-}
+const SECURITY_RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 
 export default function AdminPage() {
   const { user } = useAuthStore();
@@ -40,7 +38,16 @@ export default function AdminPage() {
   const [isLoadingSecurityStatus, setIsLoadingSecurityStatus] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
 
+  const [securityFilters, setSecurityFilters] = useState({
+    eventType: '',
+    riskScore: '',
+    from: '',
+    to: '',
+  });
+  const [securityItems, setSecurityItems] = useState<SecurityEventItem[]>([]);
+  const [securityPageMeta, setSecurityPageMeta] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 0 });
   const [securitySummary, setSecuritySummary] = useState<SecuritySummary | null>(null);
+  const [isLoadingSecurityList, setIsLoadingSecurityList] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
@@ -77,14 +84,56 @@ export default function AdminPage() {
     }
   };
 
-  const loadSecuritySummary = async () => {
+  const toIsoOrUndefined = (value: string): string | undefined => {
+    if (!value.trim()) return undefined;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+  };
+
+  const getSummaryWindowMinutes = (from?: string, to?: string): number => {
+    if (!from || !to) return 60;
+    const diffMs = new Date(to).getTime() - new Date(from).getTime();
+    if (Number.isNaN(diffMs) || diffMs <= 0) return 60;
+    const minutes = Math.ceil(diffMs / (1000 * 60));
+    return Math.max(1, Math.min(1440, minutes));
+  };
+
+  const loadSecurityData = async (page: number = 0, sizeOverride?: number) => {
+    const fromIso = toIsoOrUndefined(securityFilters.from);
+    const toIso = toIsoOrUndefined(securityFilters.to);
+
+    if (fromIso && toIso && new Date(fromIso).getTime() > new Date(toIso).getTime()) {
+      toast.error('시작일은 종료일보다 이전이어야 합니다.');
+      return;
+    }
+
+    setIsLoadingSecurityList(true);
     setIsLoadingSummary(true);
     try {
-      const response = await api.get<ApiResponse<SecuritySummary>>('/admin/security-events/summary');
-      setSecuritySummary(response.data.data);
+      const [listData, summaryData] = await Promise.all([
+        adminService.getSecurityEvents({
+          eventType: securityFilters.eventType || undefined,
+          riskScore: securityFilters.riskScore || undefined,
+          from: fromIso,
+          to: toIso,
+          page,
+          size: sizeOverride ?? securityPageMeta.size,
+        }),
+        adminService.getSecuritySummary(getSummaryWindowMinutes(fromIso, toIso)),
+      ]);
+
+      setSecurityItems(listData.content);
+      setSecurityPageMeta({
+        page: listData.page,
+        size: listData.size,
+        totalElements: listData.totalElements,
+        totalPages: listData.totalPages,
+      });
+      setSecuritySummary(summaryData);
     } catch {
-      toast.error('보안 이벤트 요약 조회에 실패했습니다.');
+      toast.error('보안 이벤트 조회에 실패했습니다.');
     } finally {
+      setIsLoadingSecurityList(false);
       setIsLoadingSummary(false);
     }
   };
@@ -92,7 +141,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isAdmin) return;
     loadReports('PENDING');
-    loadSecuritySummary();
+    loadSecurityData(0);
   }, [isAdmin]);
 
   useEffect(() => {
@@ -138,10 +187,11 @@ export default function AdminPage() {
       toast.error('유효한 유저 ID를 입력해주세요.');
       return;
     }
+
     setIsLoadingSecurityStatus(true);
     try {
-      const response = await api.get<ApiResponse<UserSecurityStatus>>(`/admin/users/${userId}/security-status`);
-      setSecurityStatus(response.data.data);
+      const data = await adminService.getUserSecurityStatus(userId);
+      setSecurityStatus(data);
     } catch {
       toast.error('유저 보안 상태 조회에 실패했습니다.');
       setSecurityStatus(null);
@@ -154,7 +204,7 @@ export default function AdminPage() {
     if (!securityStatus) return;
     setIsUnlocking(true);
     try {
-      await api.delete(`/admin/users/${securityStatus.userId}/login-lock`);
+      await adminService.unlockUserLogin(securityStatus.userId);
       toast.success('로그인 잠금을 해제했습니다.');
       await handleLookupSecurityStatus();
     } catch {
@@ -178,7 +228,7 @@ export default function AdminPage() {
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">관리자 페이지</h1>
-        <p className="text-sm text-gray-400 mt-1">신고 처리, 유저 보안 관리, 보안 이벤트 요약</p>
+        <p className="text-sm text-gray-400 mt-1">신고 처리, 유저 보안 관리, 보안 이벤트 모니터링</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -332,21 +382,68 @@ export default function AdminPage() {
       )}
 
       {activeTab === 'security' && (
-        <section className="rounded-xl border border-gray-700 bg-[#18181b] p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">보안 이벤트 요약</h2>
+        <section className="rounded-xl border border-gray-700 bg-[#18181b] p-5 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-white">보안 이벤트</h2>
             <button
               type="button"
-              onClick={loadSecuritySummary}
-              disabled={isLoadingSummary}
+              onClick={() => loadSecurityData(securityPageMeta.page)}
+              disabled={isLoadingSecurityList || isLoadingSummary}
               className="px-3 py-1.5 rounded-md border border-gray-600 text-gray-200 hover:border-gray-400 disabled:opacity-60"
             >
               새로고침
             </button>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+            <select
+              value={securityFilters.eventType}
+              onChange={(e) => setSecurityFilters((prev) => ({ ...prev, eventType: e.target.value }))}
+              className="px-3 py-2 rounded-md bg-[#111114] border border-gray-700 text-white text-sm"
+            >
+              <option value="">전체 타입</option>
+              {SECURITY_EVENT_TYPES.map((eventType) => (
+                <option key={eventType} value={eventType}>{eventType}</option>
+              ))}
+            </select>
+
+            <select
+              value={securityFilters.riskScore}
+              onChange={(e) => setSecurityFilters((prev) => ({ ...prev, riskScore: e.target.value }))}
+              className="px-3 py-2 rounded-md bg-[#111114] border border-gray-700 text-white text-sm"
+            >
+              <option value="">전체 위험도</option>
+              {SECURITY_RISK_LEVELS.map((risk) => (
+                <option key={risk} value={risk}>{risk}</option>
+              ))}
+            </select>
+
+            <input
+              type="datetime-local"
+              value={securityFilters.from}
+              onChange={(e) => setSecurityFilters((prev) => ({ ...prev, from: e.target.value }))}
+              className="px-3 py-2 rounded-md bg-[#111114] border border-gray-700 text-white text-sm"
+            />
+
+            <input
+              type="datetime-local"
+              value={securityFilters.to}
+              onChange={(e) => setSecurityFilters((prev) => ({ ...prev, to: e.target.value }))}
+              className="px-3 py-2 rounded-md bg-[#111114] border border-gray-700 text-white text-sm"
+            />
+
+            <button
+              type="button"
+              onClick={() => loadSecurityData(0)}
+              disabled={isLoadingSecurityList || isLoadingSummary}
+              className="px-3 py-2 rounded-md bg-purple-500 hover:bg-purple-600 text-white font-medium disabled:opacity-60"
+            >
+              필터 적용
+            </button>
+          </div>
+
           {!securitySummary ? (
-            <p className="text-sm text-gray-400">{isLoadingSummary ? '불러오는 중...' : '요약 데이터가 없습니다.'}</p>
+            <p className="text-sm text-gray-400">{isLoadingSummary ? '요약 불러오는 중...' : '요약 데이터가 없습니다.'}</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <SummaryCard label="로그인 실패" value={securitySummary.loginFailCount} />
@@ -355,6 +452,83 @@ export default function AdminPage() {
               <SummaryCard label="레이트리밋 차단" value={securitySummary.rateLimitHitCount} />
             </div>
           )}
+
+          <div className="flex items-center justify-between text-xs text-gray-400">
+            <span>총 {securityPageMeta.totalElements.toLocaleString('ko-KR')}건</span>
+            <div className="flex items-center gap-2">
+              <span>페이지 크기</span>
+              <select
+                value={securityPageMeta.size}
+                onChange={(e) => {
+                  const nextSize = Number(e.target.value);
+                  setSecurityPageMeta((prev) => ({ ...prev, size: nextSize, page: 0 }));
+                  void loadSecurityData(0, nextSize);
+                }}
+                className="px-2 py-1 rounded bg-[#111114] border border-gray-700 text-white"
+              >
+                {[20, 50, 100].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {isLoadingSecurityList ? (
+            <p className="text-sm text-gray-400">보안 이벤트 불러오는 중...</p>
+          ) : securityItems.length === 0 ? (
+            <p className="text-sm text-gray-400">조건에 맞는 보안 이벤트가 없습니다.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-gray-700">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[#111114] text-gray-300">
+                  <tr>
+                    <th className="px-3 py-2 text-left">시각</th>
+                    <th className="px-3 py-2 text-left">이벤트</th>
+                    <th className="px-3 py-2 text-left">위험도</th>
+                    <th className="px-3 py-2 text-left">결과</th>
+                    <th className="px-3 py-2 text-left">유저ID</th>
+                    <th className="px-3 py-2 text-left">IP</th>
+                    <th className="px-3 py-2 text-left">엔드포인트</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {securityItems.map((item) => (
+                    <tr key={item.id} className="border-t border-gray-800 text-gray-200">
+                      <td className="px-3 py-2 whitespace-nowrap">{new Date(item.createdAt).toLocaleString('ko-KR')}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{item.eventType}</td>
+                      <td className="px-3 py-2"><RiskBadge risk={item.riskScore} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap">{item.result ?? '-'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{item.userId ?? '-'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{item.ip ?? '-'}</td>
+                      <td className="px-3 py-2">{item.endpoint ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => loadSecurityData(Math.max(securityPageMeta.page - 1, 0))}
+              disabled={securityPageMeta.page === 0 || isLoadingSecurityList}
+              className="px-3 py-1.5 rounded-md border border-gray-600 text-gray-200 disabled:opacity-60"
+            >
+              이전
+            </button>
+            <span className="text-sm text-gray-300">
+              {securityPageMeta.page + 1} / {Math.max(securityPageMeta.totalPages, 1)}
+            </span>
+            <button
+              type="button"
+              onClick={() => loadSecurityData(Math.min(securityPageMeta.page + 1, Math.max(securityPageMeta.totalPages - 1, 0)))}
+              disabled={securityPageMeta.page >= Math.max(securityPageMeta.totalPages - 1, 0) || isLoadingSecurityList}
+              className="px-3 py-1.5 rounded-md border border-gray-600 text-gray-200 disabled:opacity-60"
+            >
+              다음
+            </button>
+          </div>
         </section>
       )}
     </div>
@@ -397,4 +571,21 @@ function ReportStatusBadge({ status }: { status: string }) {
     return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">RESOLVED</span>;
   }
   return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-300 border border-gray-500/40">{status}</span>;
+}
+
+function RiskBadge({ risk }: { risk: string | null }) {
+  if (!risk) {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-300 border border-gray-500/40">-</span>;
+  }
+
+  if (risk === 'CRITICAL') {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/20 text-red-300 border border-red-500/40">CRITICAL</span>;
+  }
+  if (risk === 'HIGH') {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500/20 text-orange-300 border border-orange-500/40">HIGH</span>;
+  }
+  if (risk === 'MEDIUM') {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">MEDIUM</span>;
+  }
+  return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">LOW</span>;
 }

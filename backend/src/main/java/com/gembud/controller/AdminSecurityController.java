@@ -50,11 +50,8 @@ public class AdminSecurityController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         LocalDateTime to,
         @RequestParam(defaultValue = "0") @Min(0) int page,
-        @RequestParam(defaultValue = "20") @Max(100) int size
+        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        if (size > 100) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT, "`size` must be <= 100");
-        }
         if (from != null && to != null && from.isAfter(to)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "`from` must be before `to`");
         }

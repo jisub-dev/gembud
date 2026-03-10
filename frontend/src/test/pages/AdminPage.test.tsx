@@ -5,7 +5,7 @@ import AdminPage from '@/pages/AdminPage';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import reportService from '@/services/reportService';
-import api from '@/services/api';
+import adminService from '@/services/adminService';
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
@@ -28,10 +28,12 @@ vi.mock('@/services/reportService', () => ({
   },
 }));
 
-vi.mock('@/services/api', () => ({
+vi.mock('@/services/adminService', () => ({
   default: {
-    get: vi.fn(),
-    delete: vi.fn(),
+    getSecuritySummary: vi.fn(),
+    getSecurityEvents: vi.fn(),
+    getUserSecurityStatus: vi.fn(),
+    unlockUserLogin: vi.fn(),
   },
 }));
 
@@ -46,8 +48,18 @@ describe('AdminPage reports flow', () => {
       error: toastError,
       info: vi.fn(),
     } as any);
-    vi.mocked(api.get).mockResolvedValue({
-      data: { data: { loginFailCount: 0, loginLockedCount: 0, refreshReuseCount: 0, rateLimitHitCount: 0 } },
+    vi.mocked(adminService.getSecuritySummary).mockResolvedValue({
+      loginFailCount: 0,
+      loginLockedCount: 0,
+      refreshReuseCount: 0,
+      rateLimitHitCount: 0,
+    } as any);
+    vi.mocked(adminService.getSecurityEvents).mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
     } as any);
   });
 
@@ -146,5 +158,55 @@ describe('AdminPage reports flow', () => {
       });
       expect(toastSuccess).toHaveBeenCalledWith('경고 처리 완료');
     });
+  });
+
+  it('security tab applies filters and calls admin service with paging', async () => {
+    vi.mocked(adminService.getSecuritySummary).mockResolvedValue({
+      loginFailCount: 3,
+      loginLockedCount: 1,
+      refreshReuseCount: 2,
+      rateLimitHitCount: 4,
+    } as any);
+    vi.mocked(adminService.getSecurityEvents).mockResolvedValue({
+      content: [
+        {
+          id: 88,
+          eventType: 'LOGIN_FAIL',
+          userId: 100,
+          ip: '127.0.0.1',
+          endpoint: '/api/v1/auth/login',
+          result: 'FAIL',
+          riskScore: 'HIGH',
+          createdAt: '2026-03-10T10:00:00',
+        },
+      ],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<AdminPage />);
+
+    await user.click(screen.getByRole('button', { name: '보안 이벤트' }));
+    const [typeSelect, riskSelect] = screen.getAllByRole('combobox');
+    await user.selectOptions(typeSelect, 'LOGIN_FAIL');
+    await user.selectOptions(riskSelect, 'HIGH');
+    await user.click(screen.getByRole('button', { name: '필터 적용' }));
+
+    await waitFor(() => {
+      const calls = vi.mocked(adminService.getSecurityEvents).mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.at(-1)?.[0]).toMatchObject({
+        eventType: 'LOGIN_FAIL',
+        riskScore: 'HIGH',
+        page: 0,
+        size: 20,
+      });
+    });
+
+    expect(await screen.findByText('127.0.0.1')).toBeInTheDocument();
+    expect(screen.getByText('/api/v1/auth/login')).toBeInTheDocument();
   });
 });
