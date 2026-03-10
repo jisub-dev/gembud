@@ -1,12 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { ChevronDown, ChevronLeft, Users, MessageSquare, User } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Users, MessageSquare, User, Bell } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { roomService } from '@/services/roomService';
 import { chatService } from '@/services/chatService';
 import { useAuthStore } from '@/store/authStore';
 import { useGames } from '@/hooks/queries/useGames';
 import { useFriends } from '@/hooks/queries/useFriends';
+import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
 import type { Room } from '@/types/room';
 import type { ChatRoomInfo } from '@/types/chat';
 
@@ -102,6 +103,7 @@ export default function Sidebar() {
     refetchInterval: 15000,
   });
   const { data: friends = [] } = useFriends();
+  const { data: unreadNotificationCount = 0 } = useUnreadNotificationCount();
 
   const myWaitingRoomChat = myRoomChatRooms[0] ?? null;
 
@@ -146,6 +148,31 @@ export default function Sidebar() {
       </button>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-neon-purple/20 scrollbar-track-transparent">
+        {!isCollapsed && isAuthenticated && (
+          <div className="px-2 py-1">
+            <Link
+              to="/notifications"
+              className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-dark-tertiary transition-all group"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center">
+                  <Bell size={16} className="text-neon-cyan group-hover:text-neon-purple transition-colors" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-text-primary group-hover:text-neon-purple transition-colors">
+                    알림 센터
+                  </p>
+                  <p className="text-[11px] text-text-muted">실시간 알림 확인</p>
+                </div>
+              </div>
+              {unreadNotificationCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </span>
+              )}
+            </Link>
+          </div>
+        )}
 
         {/* 내 대기방 섹션 */}
         {!isCollapsed && isAuthenticated && (

@@ -9,6 +9,7 @@ import { roomService } from '@/services/roomService';
 import { chatService } from '@/services/chatService';
 import { useGames } from '@/hooks/queries/useGames';
 import { useFriends } from '@/hooks/queries/useFriends';
+import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
 import { useAuthStore } from '@/store/authStore';
 
 const { mockNavigate } = vi.hoisted(() => ({
@@ -41,6 +42,10 @@ vi.mock('@/hooks/queries/useGames', () => ({
 
 vi.mock('@/hooks/queries/useFriends', () => ({
   useFriends: vi.fn(),
+}));
+
+vi.mock('@/hooks/queries/useNotifications', () => ({
+  useUnreadNotificationCount: vi.fn(),
 }));
 
 vi.mock('@/store/authStore', () => ({
@@ -99,6 +104,7 @@ describe('Sidebar', () => {
     vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as any);
     vi.mocked(useGames).mockReturnValue({ data: [] } as any);
     vi.mocked(useFriends).mockReturnValue({ data: [] } as any);
+    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 3 } as any);
     vi.mocked(roomService.getMyRooms).mockResolvedValue([mockRoom] as any);
     vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
       if (type === 'ROOM_CHAT') {
@@ -226,5 +232,16 @@ describe('Sidebar', () => {
     expect(screen.queryByText('토글친구')).not.toBeInTheDocument();
     await user.click(friendSectionToggle!);
     expect(await screen.findByText('토글친구')).toBeInTheDocument();
+  });
+
+  it('shows unread notification badge in sidebar and hides when zero', async () => {
+    const { rerender } = render(<Sidebar />, { wrapper: createWrapper() });
+    expect(await screen.findByText('알림 센터')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+
+    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 0 } as any);
+    rerender(<Sidebar />);
+
+    expect(screen.queryByText('3')).not.toBeInTheDocument();
   });
 });
