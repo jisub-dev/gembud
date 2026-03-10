@@ -1,37 +1,37 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { ToastContainer } from './components/common/ToastContainer';
 import { SessionExpiredModal } from './components/common/SessionExpiredModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import { PwaUpdateBanner } from './components/common/PwaUpdateBanner';
 import { OfflineStatusBanner } from './components/common/OfflineStatusBanner';
+import RouteLoadingFallback from './components/common/RouteLoadingFallback';
 import { authService } from './services/authService';
 import { featureFlags, isPremiumActive } from './config/features';
 import { useNotificationSocket } from './hooks/useNotificationSocket';
 
-// Layout
-import MainLayout from './components/layout/MainLayout';
+const MainLayout = lazy(() => import('./components/layout/MainLayout'));
 
-// Auth Pages
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
-import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
-import OnboardingPage from './pages/OnboardingPage';
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
+const OAuth2CallbackPage = lazy(() => import('./pages/OAuth2CallbackPage'));
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
 
-// Main Pages
-import HomePage from './pages/HomePage';
-import { RoomListPage } from './pages/RoomListPage';
-import ChatPage from './pages/ChatPage';
-import ProfilePage from './pages/ProfilePage';
-import FriendListPage from './pages/FriendListPage';
-import NotificationsPage from './pages/NotificationsPage';
-import PremiumPage from './pages/PremiumPage';
-import AdminPage from './pages/AdminPage';
-import AboutPage from './pages/AboutPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import TermsPage from './pages/TermsPage';
-import ErrorPage from './pages/ErrorPage';
+const HomePage = lazy(() => import('./pages/HomePage'));
+const RoomListPage = lazy(() =>
+  import('./pages/RoomListPage').then((module) => ({ default: module.RoomListPage }))
+);
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const FriendListPage = lazy(() => import('./pages/FriendListPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const PremiumPage = lazy(() => import('./pages/PremiumPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+const ErrorPage = lazy(() => import('./pages/ErrorPage'));
 
 // Protected Route Wrapper
 interface ProtectedRouteProps {
@@ -101,126 +101,128 @@ function App() {
       <OfflineStatusBanner />
       <PwaUpdateBanner />
       <PwaInstallPrompt />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
-        <Route
-          path="/onboarding"
-          element={(
-            <ProtectedRoute>
-              <OnboardingPage />
-            </ProtectedRoute>
-          )}
-        />
-
-        {/* Public Routes with MainLayout */}
-        <Route path="/" element={<MainLayout />}>
-          {/* HomePage: 게임 목록 + 추천 방 (Public) */}
-          <Route index element={<HomePage />} />
-
-          {/* Game redirect: 상세 대신 바로 방 목록으로 이동 */}
-          <Route path="games/:id" element={<LegacyGameDetailRedirect />} />
-          <Route path="game/:id" element={<LegacyGameDetailRedirect />} />
-
-          {/* Room List: 방 목록 (Protected) */}
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
           <Route
-            path="games/:gameId/rooms"
-            element={
+            path="/onboarding"
+            element={(
               <ProtectedRoute>
-                <RoomListPage />
+                <OnboardingPage />
               </ProtectedRoute>
-            }
+            )}
           />
 
-          {/* Room Detail: deprecated — redirect to home */}
-          <Route path="rooms/:roomId" element={<Navigate to="/" replace />} />
+          {/* Public Routes with MainLayout */}
+          <Route path="/" element={<MainLayout />}>
+            {/* HomePage: 게임 목록 + 추천 방 (Public) */}
+            <Route index element={<HomePage />} />
 
-          {/* Chat: 채팅 (Protected) */}
-          <Route
-            path="chat/:roomId"
-            element={
-              <ProtectedRoute>
-                <ChatPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Game redirect: 상세 대신 바로 방 목록으로 이동 */}
+            <Route path="games/:id" element={<LegacyGameDetailRedirect />} />
+            <Route path="game/:id" element={<LegacyGameDetailRedirect />} />
 
-          {/* Profile: 프로필 (Protected) */}
-          <Route
-            path="profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/:userId"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Friends: 친구 목록 (Protected) */}
-          <Route
-            path="friends"
-            element={
-              <ProtectedRoute>
-                <FriendListPage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Notifications: 알림 (Protected) */}
-          <Route
-            path="notifications"
-            element={
-              <ProtectedRoute>
-                <NotificationsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Admin: 관리자 페이지 (Protected) */}
-          <Route
-            path="admin"
-            element={
-              <ProtectedRoute>
-                <AdminPage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Premium: 프리미엄 구독 (Protected) */}
-          <Route
-            path="premium"
-            element={
-              featureFlags.premium ? (
+            {/* Room List: 방 목록 (Protected) */}
+            <Route
+              path="games/:gameId/rooms"
+              element={
                 <ProtectedRoute>
-                  <PremiumPage />
+                  <RoomListPage />
                 </ProtectedRoute>
-              ) : (
-                <Navigate to="/error/404" replace />
-              )
-            }
-          />
+              }
+            />
 
-          {/* Static / Policy Pages (Public) */}
-          <Route path="about" element={<AboutPage />} />
-          <Route path="privacy" element={<PrivacyPolicyPage />} />
-          <Route path="terms" element={<TermsPage />} />
+            {/* Room Detail: deprecated — redirect to home */}
+            <Route path="rooms/:roomId" element={<Navigate to="/" replace />} />
 
-          {/* Error Pages */}
-          <Route path="error/:code" element={<ErrorPage />} />
-        </Route>
+            {/* Chat: 채팅 (Protected) */}
+            <Route
+              path="chat/:roomId"
+              element={
+                <ProtectedRoute>
+                  <ChatPage />
+                </ProtectedRoute>
+              }
+            />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+            {/* Profile: 프로필 (Protected) */}
+            <Route
+              path="profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="profile/:userId"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Friends: 친구 목록 (Protected) */}
+            <Route
+              path="friends"
+              element={
+                <ProtectedRoute>
+                  <FriendListPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Notifications: 알림 (Protected) */}
+            <Route
+              path="notifications"
+              element={
+                <ProtectedRoute>
+                  <NotificationsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin: 관리자 페이지 (Protected) */}
+            <Route
+              path="admin"
+              element={
+                <ProtectedRoute>
+                  <AdminPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Premium: 프리미엄 구독 (Protected) */}
+            <Route
+              path="premium"
+              element={
+                featureFlags.premium ? (
+                  <ProtectedRoute>
+                    <PremiumPage />
+                  </ProtectedRoute>
+                ) : (
+                  <Navigate to="/error/404" replace />
+                )
+              }
+            />
+
+            {/* Static / Policy Pages (Public) */}
+            <Route path="about" element={<AboutPage />} />
+            <Route path="privacy" element={<PrivacyPolicyPage />} />
+            <Route path="terms" element={<TermsPage />} />
+
+            {/* Error Pages */}
+            <Route path="error/:code" element={<ErrorPage />} />
+          </Route>
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
     </>
   );
