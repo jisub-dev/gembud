@@ -308,6 +308,30 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("POST /rooms/{publicId}/join - should return 401 when invite code is invalid or expired")
+    @WithMockUser(username = "test@example.com")
+    void joinRoomByPublicId_InvalidInviteCode() throws Exception {
+        JoinRoomRequest request = JoinRoomRequest.builder()
+            .inviteCode("expired-code")
+            .build();
+
+        when(roomService.joinRoomByPublicId(
+            eq("123e4567-e89b-12d3-a456-426614174000"),
+            any(JoinRoomRequest.class),
+            eq("test@example.com"),
+            eq("203.0.113.10")
+        )).thenThrow(new BusinessException(ErrorCode.INVALID_INVITE_CODE));
+
+        mockMvc.perform(post("/rooms/123e4567-e89b-12d3-a456-426614174000/join")
+                .header("X-Forwarded-For", "203.0.113.10")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("ROOM012"))
+            .andExpect(jsonPath("$.message").value("Invalid or expired invite code"));
+    }
+
+    @Test
     @DisplayName("POST /rooms/{roomId}/join - should return 409 when room is full")
     @WithMockUser(username = "test@example.com")
     void joinRoom_RoomFull() throws Exception {
