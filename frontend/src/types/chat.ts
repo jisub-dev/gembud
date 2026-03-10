@@ -1,6 +1,6 @@
 export interface ChatMessage {
   id: number;
-  chatRoomId: number;
+  chatRoomId: string;
   userId: number;
   username: string;
   message: string;
@@ -30,4 +30,7 @@ export interface ChatRoomInfo {
   name?: string;
   relatedRoomId?: number;
   relatedRoomTitle?: string;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount?: number;
 }

@@ -2,6 +2,7 @@ package com.gembud.service;
 
 import com.gembud.dto.request.ChatMessageRequest;
 import com.gembud.dto.response.ChatMessageResponse;
+import com.gembud.dto.response.ChatRoomResponse;
 import com.gembud.entity.ChatMessage;
 import com.gembud.entity.ChatRoom;
 import com.gembud.entity.ChatRoomMember;
@@ -15,6 +16,7 @@ import com.gembud.repository.ChatRoomRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
 import com.gembud.util.HtmlSanitizer;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -155,7 +157,7 @@ public class ChatService {
         int limit
     ) {
         ChatRoom chatRoom = resolveChatRoomByPublicId(chatPublicId);
-        return getRecentMessages(chatRoom.getId(), userId, limit);
+        return getRecentMessages(chatRoom.getPublicId(), userId, limit);
     }
 
     /**
@@ -327,6 +329,18 @@ public class ChatService {
     }
 
     /**
+     * Get chat room public ID by chat room ID.
+     *
+     * @param chatRoomId chat room ID
+     * @return chat room public ID
+     */
+    public String getPublicIdByChatRoomId(Long chatRoomId) {
+        return chatRoomRepository.findById(chatRoomId)
+            .map(ChatRoom::getPublicId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    /**
      * Check if a user is a member of a chat room.
      *
      * @param chatRoomId chat room ID
@@ -380,9 +394,23 @@ public class ChatService {
      * @param userId user ID
      * @return list of chat rooms
      */
-    public List<ChatRoom> getMyChatRooms(Long userId) {
+    public List<ChatRoomResponse> getMyChatRooms(Long userId) {
+        LocalDateTime unreadSince = LocalDateTime.now().minusHours(24);
         return chatRoomMemberRepository.findChatRoomsByUserId(userId).stream()
             .map(ChatRoomMember::getChatRoom)
+            .map(chatRoom -> {
+                Long chatRoomId = chatRoom.getId();
+                var lastMessageOpt = chatMessageRepository.findTopByChatRoomIdOrderByCreatedAtDesc(chatRoomId);
+                String lastMessage = lastMessageOpt.map(ChatMessage::getMessage)
+                    .map(this::truncateLastMessage)
+                    .orElse(null);
+                String lastMessageAt = lastMessageOpt.map(ChatMessage::getCreatedAt)
+                    .map(LocalDateTime::toString)
+                    .orElse(null);
+                int unreadCount = (int) chatMessageRepository.countByChatRoomIdAndCreatedAtAfter(chatRoomId, unreadSince);
+
+                return ChatRoomResponse.from(chatRoom, lastMessage, lastMessageAt, unreadCount);
+            })
             .collect(Collectors.toList());
     }
 
@@ -426,5 +454,10 @@ public class ChatService {
                 }
             })
             .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    private String truncateLastMessage(String message) {
+        if (message == null) return null;
+        return message.length() <= 50 ? message : message.substring(0, 50) + "...";
     }
 }

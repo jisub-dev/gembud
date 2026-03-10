@@ -23,6 +23,20 @@ const CHAT_TYPE_LABELS: Record<string, string> = {
   DIRECT_CHAT: 'DM',
 };
 
+function formatRelativeTime(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return '방금전';
+  if (diffMin < 60) return `${diffMin}분전`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}시간전`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay}일전`;
+}
+
 function SectionHeader({
   title,
   isOpen,
@@ -160,10 +174,25 @@ export default function Sidebar() {
                       <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-dark-secondary ${STATUS_COLORS.OPEN}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-purple transition-colors">
-                        {myWaitingRoomChat.relatedRoomTitle ?? myWaitingRoomChat.name ?? '내 대기방'}
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-purple transition-colors">
+                          {myWaitingRoomChat.relatedRoomTitle ?? myWaitingRoomChat.name ?? '내 대기방'}
+                        </p>
+                        {(myWaitingRoomChat.unreadCount ?? 0) > 0 && (
+                          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                            {(myWaitingRoomChat.unreadCount ?? 0) > 99 ? '99+' : myWaitingRoomChat.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-text-muted truncate mt-0.5">
+                        {myWaitingRoomChat.lastMessage ?? '메시지 없음'}
                       </p>
-                      <p className="text-xs text-text-muted">ROOM_CHAT</p>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <p className="text-xs text-text-muted">ROOM_CHAT</p>
+                        <p className="text-[10px] text-text-muted">
+                          {formatRelativeTime(myWaitingRoomChat.lastMessageAt)}
+                        </p>
+                      </div>
                     </div>
                   </button>
                 )}
@@ -200,10 +229,23 @@ export default function Sidebar() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-cyan transition-colors">
-                          {chat.name ?? `채팅 #${chat.id}`}
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-medium text-text-primary truncate group-hover:text-neon-cyan transition-colors">
+                            {chat.name ?? `채팅 #${chat.id}`}
+                          </p>
+                          {(chat.unreadCount ?? 0) > 0 && (
+                            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                              {(chat.unreadCount ?? 0) > 99 ? '99+' : chat.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-text-muted truncate mt-0.5">
+                          {chat.lastMessage ?? '메시지 없음'}
                         </p>
-                        <p className="text-xs text-text-muted">{CHAT_TYPE_LABELS[chat.type]}</p>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-xs text-text-muted">{CHAT_TYPE_LABELS[chat.type]}</p>
+                          <p className="text-[10px] text-text-muted">{formatRelativeTime(chat.lastMessageAt)}</p>
+                        </div>
                       </div>
                     </Link>
                   ))}
