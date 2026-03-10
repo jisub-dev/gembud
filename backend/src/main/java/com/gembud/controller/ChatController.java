@@ -3,7 +3,6 @@ package com.gembud.controller;
 import com.gembud.dto.ApiResponse;
 import com.gembud.dto.response.ChatMessageResponse;
 import com.gembud.dto.response.ChatRoomResponse;
-import com.gembud.entity.ChatRoom;
 import com.gembud.security.CustomUserDetails;
 import com.gembud.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,9 +53,7 @@ public class ChatController {
     public ResponseEntity<ApiResponse<List<ChatRoomResponse>>> getMyChatRooms(
         @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        List<ChatRoomResponse> rooms = chatService.getMyChatRooms(userDetails.getUserId()).stream()
-            .map(ChatRoomResponse::from)
-            .collect(java.util.stream.Collectors.toList());
+        List<ChatRoomResponse> rooms = chatService.getMyChatRooms(userDetails.getUserId());
         return ResponseEntity.ok(ApiResponse.success(rooms));
     }
 
