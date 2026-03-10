@@ -1,12 +1,17 @@
 package com.gembud.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.gembud.dto.request.ChatMessageRequest;
+import com.gembud.dto.response.ChatMessageResponse;
+import com.gembud.entity.ChatMessage;
 import com.gembud.entity.ChatRoom;
 import com.gembud.entity.ChatRoomMember;
+import com.gembud.entity.Room;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
@@ -16,6 +21,7 @@ import com.gembud.repository.ChatRoomRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
 import com.gembud.util.HtmlSanitizer;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -137,5 +143,83 @@ class ChatServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("sendMessage - 비멤버는 NOT_CHAT_MEMBER")
+    void sendMessage_NotMember_ShouldThrow() {
+        ChatRoom chatRoom = ChatRoom.builder().type(ChatRoom.ChatRoomType.ROOM_CHAT).build();
+        ReflectionTestUtils.setField(chatRoom, "id", 55L);
+        ReflectionTestUtils.setField(chatRoom, "publicId", "chat-public-55");
+
+        ChatMessageRequest request = ChatMessageRequest.builder()
+            .chatRoomId("chat-public-55")
+            .message("hello")
+            .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(chatRoomRepository.findByPublicId("chat-public-55")).thenReturn(Optional.of(chatRoom));
+        when(chatRoomMemberRepository.existsByChatRoomIdAndUserId(55L, 1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> chatService.sendMessage(1L, request))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_CHAT_MEMBER);
+    }
+
+    @Test
+    @DisplayName("getRecentMessagesByPublicId - 비멤버는 NOT_CHAT_MEMBER")
+    void getRecentMessagesByPublicId_NotMember_ShouldThrow() {
+        Room room = Room.builder().title("test").build();
+        ReflectionTestUtils.setField(room, "id", 101L);
+        ReflectionTestUtils.setField(room, "publicId", "room-public-101");
+
+        ChatRoom chatRoom = ChatRoom.builder().type(ChatRoom.ChatRoomType.ROOM_CHAT).relatedRoom(room).build();
+        ReflectionTestUtils.setField(chatRoom, "id", 201L);
+        ReflectionTestUtils.setField(chatRoom, "publicId", "chat-public-201");
+
+        when(roomRepository.findByPublicId("room-public-101")).thenReturn(Optional.of(room));
+        when(chatRoomRepository.findByRelatedRoomId(101L)).thenReturn(Optional.of(chatRoom));
+        when(chatRoomRepository.findByPublicId("chat-public-201")).thenReturn(Optional.of(chatRoom));
+        when(chatRoomMemberRepository.existsByChatRoomIdAndUserId(201L, 1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> chatService.getRecentMessagesByPublicId("room-public-101", 1L, 20))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.NOT_CHAT_MEMBER);
+    }
+
+    @Test
+    @DisplayName("getRecentMessagesByPublicId - room publicId로 정상 조회")
+    void getRecentMessagesByPublicId_RoomPublicId_ShouldReturnMessages() {
+        Room room = Room.builder().title("test").build();
+        ReflectionTestUtils.setField(room, "id", 301L);
+        ReflectionTestUtils.setField(room, "publicId", "room-public-301");
+
+        ChatRoom chatRoom = ChatRoom.builder().type(ChatRoom.ChatRoomType.ROOM_CHAT).relatedRoom(room).build();
+        ReflectionTestUtils.setField(chatRoom, "id", 401L);
+        ReflectionTestUtils.setField(chatRoom, "publicId", "chat-public-401");
+
+        ChatMessage message = ChatMessage.builder()
+            .chatRoom(chatRoom)
+            .user(user)
+            .message("history-message")
+            .build();
+        ReflectionTestUtils.setField(message, "id", 777L);
+
+        when(roomRepository.findByPublicId("room-public-301")).thenReturn(Optional.of(room));
+        when(chatRoomRepository.findByRelatedRoomId(301L)).thenReturn(Optional.of(chatRoom));
+        when(chatRoomRepository.findByPublicId("chat-public-401")).thenReturn(Optional.of(chatRoom));
+        when(chatRoomMemberRepository.existsByChatRoomIdAndUserId(401L, 1L)).thenReturn(true);
+        when(chatMessageRepository.findRecentMessages(org.mockito.ArgumentMatchers.eq(401L),
+            org.mockito.ArgumentMatchers.any())).thenReturn(List.of(message));
+
+        List<ChatMessageResponse> responses =
+            chatService.getRecentMessagesByPublicId("room-public-301", 1L, 20);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getMessage()).isEqualTo("history-message");
+        verify(chatMessageRepository).findRecentMessages(org.mockito.ArgumentMatchers.eq(401L),
+            org.mockito.ArgumentMatchers.any());
     }
 }
