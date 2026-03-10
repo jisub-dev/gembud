@@ -39,6 +39,7 @@ export function RoomListPage() {
   const [isJoining, setIsJoining] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const inviteHandledRef = useRef<string | null>(null);
+  const createHandledRef = useRef(false);
 
   const { data: rooms, isLoading: roomsLoading, error: roomsError } = useRooms(Number(gameId));
   const { game, tierOptions, positionOptions, isLoading: gameLoading } = useGameOptions(Number(gameId));
@@ -162,6 +163,17 @@ export function RoomListPage() {
     if (!joiningRoom) return;
     doJoin(joiningRoom, password, joiningInviteCode);
   };
+
+  useEffect(() => {
+    const shouldOpenCreateModal = searchParams.get('create') === 'true';
+    if (shouldOpenCreateModal && !createHandledRef.current) {
+      setShowCreateModal(true);
+      createHandledRef.current = true;
+    }
+    if (!shouldOpenCreateModal) {
+      createHandledRef.current = false;
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const inviteCode = searchParams.get('invite')?.trim();
