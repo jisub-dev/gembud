@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { notifySessionExpired } from '@/lib/sessionExpiryBridge';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
@@ -49,9 +50,8 @@ api.interceptors.response.use(
         );
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh 실패 - 세션 만료 모달 트리거 (window.location 사용 금지 → 무한루프 원인)
-        const { useAuthStore } = await import('../store/authStore');
-        useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, isSessionExpired: true });
+        // Refresh 실패 - 세션 만료 브리지 핸들러 호출
+        notifySessionExpired();
         return Promise.reject(refreshError);
       }
     }
