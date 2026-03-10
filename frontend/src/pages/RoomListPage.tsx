@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Plus } from 'lucide-react';
+import { ChevronLeft, Plus, Sparkles } from 'lucide-react';
 import { useRooms } from '@/hooks/queries/useRooms';
 import { useGameOptions } from '@/hooks/queries/useGames';
+import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import { roomKeys } from '@/hooks/queries/useRoomQueries';
 import { RoomGrid } from '@/components/room/RoomGrid';
 import { RoomFilter } from '@/components/room/RoomFilter';
@@ -18,6 +19,9 @@ import { roomService } from '@/services/roomService';
 import { chatService } from '@/services/chatService';
 import type { Room } from '@/types/room';
 import { isPremiumActive } from '@/config/features';
+
+const RECOMMENDATION_EXCLUSION_KEY = 'roomRecommendations:excluded';
+const RECOMMENDATION_ACTIVE_KEY = 'roomRecommendations:active';
 
 export function RoomListPage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -40,9 +44,12 @@ export function RoomListPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const inviteHandledRef = useRef<string | null>(null);
   const createHandledRef = useRef(false);
+  const recommendationHandledRef = useRef<string | null>(null);
 
   const { data: rooms, isLoading: roomsLoading, error: roomsError } = useRooms(Number(gameId));
   const { game, tierOptions, positionOptions, isLoading: gameLoading } = useGameOptions(Number(gameId));
+  const recommendationLimit = isPremiumActive(user?.isPremium) ? 20 : 10;
+  const { data: recommendedRooms = [] } = useRecommendedRooms(Number(gameId), recommendationLimit);
   const { data: myRooms = [] } = useQuery({
     queryKey: ['myRooms'],
     queryFn: roomService.getMyRooms,
@@ -51,6 +58,10 @@ export function RoomListPage() {
   const myJoinedRoomPublicIds = useMemo(
     () => new Set(myRooms.map((room) => room.publicId)),
     [myRooms]
+  );
+  const excludedRecommendedRoomIds = useMemo(
+    () => getExcludedRecommendedRooms(Number(gameId)),
+    [gameId, searchParams]
   );
 
   const filteredRooms = useMemo(() => {
@@ -83,14 +94,22 @@ export function RoomListPage() {
     });
   }, [rooms, selectedTiers, selectedPositions, tierOptions, positionOptions]);
 
-  const doJoin = async (room: Room, password?: string, inviteCode?: string) => {
+  const doJoin = async (
+    room: Room,
+    password?: string,
+    inviteCode?: string,
+    options?: { markAsRecommended?: boolean }
+  ) => {
     setIsJoining(true);
     try {
       const result = await roomService.joinRoom(room.publicId, password, inviteCode);
       setShowPasswordModal(false);
       setJoiningRoom(null);
       setJoiningInviteCode(undefined);
-      navigate(`/chat/${result.room.publicId}`);
+      if (options?.markAsRecommended) {
+        markRecommendedRoomActive(room.publicId, Number(gameId));
+      }
+      navigate(`/chat/${result.chatRoomId}`);
     } catch (err: unknown) {
       const errorCode = extractErrorCode(err);
       if (errorCode === 'ROOM006' || errorCode === 'ROOM012') {
@@ -131,6 +150,36 @@ export function RoomListPage() {
     } finally {
       setIsJoining(false);
     }
+  };
+
+  const getNextRecommendedRoom = (extraExcludedRoomIds?: Set<string>) => {
+    const excludedRoomIds = extraExcludedRoomIds ?? excludedRecommendedRoomIds;
+    for (const recommendation of recommendedRooms) {
+      const room = recommendation.room;
+      if (!room) continue;
+      if (room.status !== 'OPEN') continue;
+      if (room.isPrivate) continue;
+      if (myJoinedRoomPublicIds.has(room.publicId)) continue;
+      if (excludedRoomIds.has(room.publicId)) continue;
+      return room;
+    }
+    return null;
+  };
+
+  const handleRecommendedJoin = async (
+    source: 'manual' | 'auto',
+    extraExcludedRoomIds?: Set<string>
+  ) => {
+    const nextRecommendedRoom = getNextRecommendedRoom(extraExcludedRoomIds);
+    if (!nextRecommendedRoom) {
+      toast.info(source === 'auto'
+        ? '더 이상 자동으로 추천할 방이 없습니다'
+        : '지금 바로 입장 가능한 추천 방이 없습니다');
+      return;
+    }
+
+    setJoiningRoom(nextRecommendedRoom);
+    await doJoin(nextRecommendedRoom, undefined, undefined, { markAsRecommended: true });
   };
 
   const handleRoomClick = async (roomPublicId: string) => {
@@ -174,6 +223,33 @@ export function RoomListPage() {
       createHandledRef.current = false;
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const shouldAutoRecommend = searchParams.get('recommend') === 'true';
+    const excludedRoomPublicId = searchParams.get('exclude')?.trim();
+    if (!shouldAutoRecommend || roomsLoading) {
+      return;
+    }
+
+    const recommendationKey = `${searchParams.toString()}::${rooms?.length ?? 0}`;
+    if (recommendationHandledRef.current === recommendationKey) {
+      return;
+    }
+    recommendationHandledRef.current = recommendationKey;
+
+    const nextExcludedRoomIds = new Set(excludedRecommendedRoomIds);
+    if (excludedRoomPublicId) {
+      addExcludedRecommendedRoom(Number(gameId), excludedRoomPublicId);
+      nextExcludedRoomIds.add(excludedRoomPublicId);
+    }
+
+    handleRecommendedJoin('auto', nextExcludedRoomIds).finally(() => {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('recommend');
+      nextParams.delete('exclude');
+      setSearchParams(nextParams, { replace: true });
+    });
+  }, [gameId, rooms, roomsLoading, searchParams, setSearchParams]);
 
   useEffect(() => {
     const inviteCode = searchParams.get('invite')?.trim();
@@ -275,13 +351,22 @@ export function RoomListPage() {
               <h1 className="text-2xl sm:text-3xl font-bold text-white truncate">{game.name}</h1>
               <p className="text-gray-400 mt-1 text-sm sm:text-base truncate">{game.description}</p>
             </div>
-            <button
-              className="ml-3 flex-shrink-0 flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition text-sm sm:text-base"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <Plus size={18} />
-              방 만들기
-            </button>
+            <div className="ml-3 flex flex-wrap gap-2">
+              <button
+                className="flex-shrink-0 flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg transition text-sm sm:text-base"
+                onClick={() => handleRecommendedJoin('manual')}
+              >
+                <Sparkles size={18} />
+                추천 방 바로 입장
+              </button>
+              <button
+                className="flex-shrink-0 flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition text-sm sm:text-base"
+                onClick={() => setShowCreateModal(true)}
+              >
+                <Plus size={18} />
+                방 만들기
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -390,4 +475,43 @@ function extractErrorCode(err: unknown): string | null {
     return response?.data?.code ?? null;
   }
   return null;
+}
+
+function getExcludedRecommendedRooms(gameId: number) {
+  if (!gameId) return new Set<string>();
+  try {
+    const raw = localStorage.getItem(RECOMMENDATION_EXCLUSION_KEY);
+    if (!raw) return new Set<string>();
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    return new Set(parsed[String(gameId)] ?? []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function addExcludedRecommendedRoom(gameId: number, roomPublicId: string) {
+  if (!gameId || !roomPublicId) return;
+  try {
+    const raw = localStorage.getItem(RECOMMENDATION_EXCLUSION_KEY);
+    const parsed = raw ? JSON.parse(raw) as Record<string, string[]> : {};
+    const gameKey = String(gameId);
+    const nextValues = new Set(parsed[gameKey] ?? []);
+    nextValues.add(roomPublicId);
+    parsed[gameKey] = [...nextValues];
+    localStorage.setItem(RECOMMENDATION_EXCLUSION_KEY, JSON.stringify(parsed));
+  } catch {
+    // Ignore localStorage failures for non-critical recommendation history.
+  }
+}
+
+function markRecommendedRoomActive(roomPublicId: string, gameId: number) {
+  if (!roomPublicId || !gameId) return;
+  try {
+    const raw = localStorage.getItem(RECOMMENDATION_ACTIVE_KEY);
+    const parsed = raw ? JSON.parse(raw) as Record<string, { gameId: number }> : {};
+    parsed[roomPublicId] = { gameId };
+    localStorage.setItem(RECOMMENDATION_ACTIVE_KEY, JSON.stringify(parsed));
+  } catch {
+    // Ignore localStorage failures for non-critical recommendation tracking.
+  }
 }

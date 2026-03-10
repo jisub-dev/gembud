@@ -96,11 +96,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
                     String destination = accessor.getDestination();
                     if (destination != null && destination.startsWith("/topic/chat/")) {
-                        String chatRoomIdRaw = destination.substring("/topic/chat/".length());
-                        Long chatRoomId;
-                        try {
-                            chatRoomId = Long.parseLong(chatRoomIdRaw);
-                        } catch (NumberFormatException e) {
+                        String chatRoomPublicId = destination.substring("/topic/chat/".length());
+                        if (chatRoomPublicId.isBlank()) {
                             throw new org.springframework.messaging.MessageDeliveryException(
                                 message, ErrorCode.CHAT_ACCESS_DENIED.getMessage());
                         }
@@ -116,7 +113,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             .orElseThrow(() -> new org.springframework.messaging.MessageDeliveryException(
                                 message, ErrorCode.CHAT_ACCESS_DENIED.getMessage()));
 
-                        if (!chatService.isChatRoomMember(chatRoomId, userId)) {
+                        if (!chatService.isChatRoomMemberByPublicId(chatRoomPublicId, userId)) {
                             throw new org.springframework.messaging.MessageDeliveryException(
                                 message, ErrorCode.CHAT_ACCESS_DENIED.getMessage());
                         }

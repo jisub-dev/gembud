@@ -25,7 +25,7 @@ export interface Room {
 
 export interface JoinRoomResult {
   room: Room;
-  chatRoomId: number;
+  chatRoomId: string;
 }
 
 export interface CreateRoomRequest {

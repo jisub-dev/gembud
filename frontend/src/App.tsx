@@ -19,7 +19,6 @@ import OnboardingPage from './pages/OnboardingPage';
 // Main Pages
 import HomePage from './pages/HomePage';
 import { RoomListPage } from './pages/RoomListPage';
-import GameDetailPage from './pages/GameDetailPage';
 import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
 import FriendListPage from './pages/FriendListPage';
@@ -62,7 +61,7 @@ function SessionExpiredHandler() {
 
 function LegacyGameDetailRedirect() {
   const { id } = useParams<{ id: string }>();
-  return <Navigate to={id ? `/games/${id}` : '/'} replace />;
+  return <Navigate to={id ? `/games/${id}/rooms` : '/'} replace />;
 }
 
 function App() {
@@ -94,7 +93,7 @@ function App() {
   return (
     <>
     <ToastContainer />
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <SessionExpiredHandler />
       <Routes>
         {/* Public Routes */}
@@ -115,8 +114,8 @@ function App() {
           {/* HomePage: 게임 목록 + 추천 방 (Public) */}
           <Route index element={<HomePage />} />
 
-          {/* Game Detail: 게임 상세 (Public) */}
-          <Route path="games/:id" element={<GameDetailPage />} />
+          {/* Game redirect: 상세 대신 바로 방 목록으로 이동 */}
+          <Route path="games/:id" element={<LegacyGameDetailRedirect />} />
           <Route path="game/:id" element={<LegacyGameDetailRedirect />} />
 
           {/* Room List: 방 목록 (Protected) */}

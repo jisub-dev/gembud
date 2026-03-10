@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -75,11 +76,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @param pageable max rows
      * @return matched users
      */
-    List<User> findByIdNotAndNicknameContainingIgnoreCaseOrIdNotAndEmailContainingIgnoreCase(
+    @Query("""
+        select u
+        from User u
+        where u.id <> :currentUserId
+          and (
+            lower(u.nickname) like concat('%', :query, '%')
+            or lower(u.email) like concat('%', :query, '%')
+          )
+        order by u.nickname asc
+        """)
+    List<User> searchFriendCandidates(
         Long currentUserId,
-        String nicknameQuery,
-        Long currentUserIdForEmail,
-        String emailQuery,
+        String query,
         Pageable pageable
     );
 

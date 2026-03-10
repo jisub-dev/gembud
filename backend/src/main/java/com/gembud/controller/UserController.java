@@ -97,11 +97,9 @@ public class UserController {
         int safeLimit = Math.min(Math.max(limit, 1), 20);
 
         List<UserSearchResponse> response = userRepository
-            .findByIdNotAndNicknameContainingIgnoreCaseOrIdNotAndEmailContainingIgnoreCase(
+            .searchFriendCandidates(
                 currentUserId,
-                normalized,
-                currentUserId,
-                normalized,
+                normalized.toLowerCase(),
                 PageRequest.of(0, safeLimit)
             )
             .stream()

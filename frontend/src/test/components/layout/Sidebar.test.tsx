@@ -88,6 +88,7 @@ describe('Sidebar', () => {
     roomChatsLookup = [
       {
         id: 101,
+        publicId: 'chat-public-101',
         type: 'ROOM_CHAT',
         relatedRoomId: 1,
         relatedRoomTitle: '내 대기방 A',
@@ -107,14 +108,14 @@ describe('Sidebar', () => {
     });
   });
 
-  it('opens ROOM_CHAT via /chat/rooms/my?type=ROOM_CHAT and navigates to /chat/{id}', async () => {
+  it('opens ROOM_CHAT via /chat/rooms/my?type=ROOM_CHAT and navigates to /chat/{publicId}', async () => {
     const user = userEvent.setup();
     render(<Sidebar />, { wrapper: createWrapper() });
 
     await user.click(await screen.findByText('내 대기방 A'));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/chat/101');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-public-101');
       expect(chatService.getMyChatRooms).toHaveBeenCalledWith('ROOM_CHAT');
     });
   });
@@ -180,7 +181,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('친구 없음')).toBeInTheDocument();
   });
 
-  it('renders friend list and navigates to /friends on click', async () => {
+  it('renders friend list and navigates to the friend profile on click', async () => {
     vi.mocked(useFriends).mockReturnValue({
       data: [
         {
@@ -199,7 +200,7 @@ describe('Sidebar', () => {
     const friendButton = await screen.findByRole('button', { name: /친구A/i });
     await user.click(friendButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/friends');
+    expect(mockNavigate).toHaveBeenCalledWith('/profile/11');
   });
 
   it('toggles friend section open/closed', async () => {

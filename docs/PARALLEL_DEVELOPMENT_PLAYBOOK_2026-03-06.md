@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-11 00:05 KST (by Codex, main terminal) — 2026-03-11 라운드 시작
+> **Last updated:** 2026-03-11 01:00 KST (by Codex, main terminal) — 핫픽스 + 전체 검증 완료
 
 ---
 
@@ -9,9 +9,14 @@
 | 항목 | 값 |
 |------|-----|
 | 마지막 기능 병합 HEAD | `4dba393` t1/t2/t3 병합 완료 (chat unread + onboarding + game detail) |
-| Backend tests | 확인 필요 |
-| Frontend tests | 확인 필요 |
-| Frontend build | 확인 필요 |
+| Backend tests | `./gradlew test --continue` 통과 |
+| Frontend tests | `npx vitest run --reporter=verbose` 통과 (37 passed) |
+| Frontend build | `npm run build` 통과 |
+
+### Hotfix Memo
+
+- `main` 작업중: 홈 추천방 제거, `/games/:id -> /games/:id/rooms` 리다이렉트, 방 입장 후 채팅 경로 수정, 친구 검색 쿼리 보강
+- 추가 보강: WebSocket `/topic/chat/{publicId}` 구독 검증 수정, 추천 입장 후 이탈 자동 재추천 회귀 테스트 추가
 
 ### Worktree 구조
 

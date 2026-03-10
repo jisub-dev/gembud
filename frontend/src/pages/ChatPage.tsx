@@ -25,6 +25,9 @@ const STATUS_COLORS: Record<string, string> = {
   CLOSED: 'text-gray-400',
 };
 
+const RECOMMENDATION_EXCLUSION_KEY = 'roomRecommendations:excluded';
+const RECOMMENDATION_ACTIVE_KEY = 'roomRecommendations:active';
+
 export default function ChatPage() {
   const { roomId: chatPublicId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -260,7 +263,12 @@ export default function ChatPage() {
       queryClient.invalidateQueries({ queryKey: ['myRoomChatRooms'] });
       queryClient.invalidateQueries({ queryKey: ['myChatRooms'] });
       toast.success('대기방을 나갔습니다');
-      navigate('/');
+      if (consumeRecommendedRoomActive(relatedRoom.publicId, relatedRoom.gameId)) {
+        addExcludedRecommendedRoom(relatedRoom.gameId, relatedRoom.publicId);
+        navigate(`/games/${relatedRoom.gameId}/rooms?recommend=true&exclude=${encodeURIComponent(relatedRoom.publicId)}`);
+      } else {
+        navigate(`/games/${relatedRoom.gameId}/rooms`);
+      }
     } catch {
       toast.error('나가기에 실패했습니다');
     } finally {
@@ -499,6 +507,39 @@ export default function ChatPage() {
       )}
     </div>
   );
+}
+
+function consumeRecommendedRoomActive(roomPublicId: string, gameId: number) {
+  if (!roomPublicId || !gameId) return false;
+  try {
+    const raw = localStorage.getItem(RECOMMENDATION_ACTIVE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Record<string, { gameId: number }>;
+    const active = parsed[roomPublicId];
+    if (!active || active.gameId !== gameId) {
+      return false;
+    }
+    delete parsed[roomPublicId];
+    localStorage.setItem(RECOMMENDATION_ACTIVE_KEY, JSON.stringify(parsed));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function addExcludedRecommendedRoom(gameId: number, roomPublicId: string) {
+  if (!gameId || !roomPublicId) return;
+  try {
+    const raw = localStorage.getItem(RECOMMENDATION_EXCLUSION_KEY);
+    const parsed = raw ? JSON.parse(raw) as Record<string, string[]> : {};
+    const gameKey = String(gameId);
+    const nextValues = new Set(parsed[gameKey] ?? []);
+    nextValues.add(roomPublicId);
+    parsed[gameKey] = [...nextValues];
+    localStorage.setItem(RECOMMENDATION_EXCLUSION_KEY, JSON.stringify(parsed));
+  } catch {
+    // Ignore localStorage failures for non-critical recommendation history.
+  }
 }
 
 async function copyToClipboard(text: string): Promise<void> {

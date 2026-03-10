@@ -7,6 +7,7 @@ import { createElement } from 'react';
 import { RoomListPage } from '@/pages/RoomListPage';
 import { useRooms } from '@/hooks/queries/useRooms';
 import { useGameOptions } from '@/hooks/queries/useGames';
+import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import { useAds } from '@/hooks/queries/useAds';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
@@ -37,6 +38,10 @@ vi.mock('@/hooks/queries/useGames', () => ({
   useGameOptions: vi.fn(),
 }));
 
+vi.mock('@/hooks/queries/useMatching', () => ({
+  useRecommendedRooms: vi.fn(),
+}));
+
 vi.mock('@/hooks/queries/useAds', () => ({
   useAds: vi.fn(),
 }));
@@ -52,6 +57,7 @@ vi.mock('@/hooks/useToast', () => ({
 vi.mock('@/services/roomService', () => ({
   roomService: {
     joinRoom: vi.fn(),
+    getMyRooms: vi.fn(),
     getRoom: vi.fn(),
     regenerateInviteCode: vi.fn(),
   },
@@ -167,6 +173,7 @@ function createApiError(code: string) {
 describe('RoomListPage auto-join UX', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
 
     vi.mocked(useRooms).mockReturnValue({
       data: [publicRoom, privateRoom],
@@ -179,8 +186,16 @@ describe('RoomListPage auto-join UX', () => {
       positionOptions: [],
       isLoading: false,
     } as any);
+    vi.mocked(useRecommendedRooms).mockReturnValue({
+      data: [
+        { room: publicRoom, roomId: publicRoom.id, matchingScore: 95, reason: 'good' },
+        { room: privateRoom, roomId: privateRoom.id, matchingScore: 85, reason: 'private' },
+      ],
+      isLoading: false,
+    } as any);
     vi.mocked(useAds).mockReturnValue({ data: [] } as any);
     vi.mocked(useAuthStore).mockReturnValue({ user: null } as any);
+    vi.mocked(roomService.getMyRooms).mockResolvedValue([]);
     vi.mocked(useToast).mockReturnValue({
       error: toastError,
       success: toastSuccess,
@@ -198,7 +213,7 @@ describe('RoomListPage auto-join UX', () => {
   it('auto-joins public room and navigates to chat on success', async () => {
     vi.mocked(roomService.joinRoom).mockResolvedValue({
       room: publicRoom,
-      chatRoomId: 555,
+      chatRoomId: 'chat-public-555',
     } as any);
     const user = userEvent.setup();
 
@@ -207,7 +222,7 @@ describe('RoomListPage auto-join UX', () => {
 
     await waitFor(() => {
       expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-1', undefined, undefined);
-      expect(mockNavigate).toHaveBeenCalledWith('/chat/555');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-public-555');
     });
   });
 
@@ -264,7 +279,7 @@ describe('RoomListPage auto-join UX', () => {
   it('opens invite mode modal from URL params and joins with inviteCode', async () => {
     vi.mocked(roomService.joinRoom).mockResolvedValue({
       room: privateRoom,
-      chatRoomId: 777,
+      chatRoomId: 'chat-private-777',
     } as any);
     const user = userEvent.setup();
 
@@ -276,7 +291,7 @@ describe('RoomListPage auto-join UX', () => {
 
     await waitFor(() => {
       expect(roomService.joinRoom).toHaveBeenCalledWith('private-room-2', undefined, 'INVITE123');
-      expect(mockNavigate).toHaveBeenCalledWith('/chat/777');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-private-777');
     });
   });
 
@@ -327,5 +342,50 @@ describe('RoomListPage auto-join UX', () => {
     expect(await screen.findByRole('button', { name: '공개 방' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '풀방' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '게임중 방' })).not.toBeInTheDocument();
+  });
+
+  it('joins the first available public recommended room when clicking recommendation CTA', async () => {
+    vi.mocked(roomService.joinRoom).mockResolvedValue({
+      room: publicRoom,
+      chatRoomId: 'chat-public-999',
+    } as any);
+    const user = userEvent.setup();
+
+    render(<RoomListPage />, { wrapper: createWrapper() });
+    await user.click(screen.getByRole('button', { name: '추천 방 바로 입장' }));
+
+    await waitFor(() => {
+      expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-1', undefined, undefined);
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-public-999');
+    });
+  });
+
+  it('auto-recommends the next room when excluded room is provided in URL', async () => {
+    const anotherRoom: Room = {
+      ...publicRoom,
+      id: 5,
+      publicId: 'public-room-5',
+      title: '대체 추천 방',
+    };
+    vi.mocked(useRecommendedRooms).mockReturnValue({
+      data: [
+        { room: publicRoom, roomId: publicRoom.id, matchingScore: 99, reason: 'top' },
+        { room: anotherRoom, roomId: anotherRoom.id, matchingScore: 80, reason: 'next' },
+      ],
+      isLoading: false,
+    } as any);
+    vi.mocked(roomService.joinRoom).mockResolvedValue({
+      room: anotherRoom,
+      chatRoomId: 'chat-public-next',
+    } as any);
+
+    render(<RoomListPage />, {
+      wrapper: createWrapper('/games/1/rooms?recommend=true&exclude=public-room-1'),
+    });
+
+    await waitFor(() => {
+      expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-5', undefined, undefined);
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-public-next');
+    });
   });
 });
