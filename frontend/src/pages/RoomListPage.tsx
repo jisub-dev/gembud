@@ -36,6 +36,7 @@ export function RoomListPage() {
   const [selectedTiers, setSelectedTiers] = useState<number[]>([]);
   const [selectedPositions, setSelectedPositions] = useState<number[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [inviteEntryState, setInviteEntryState] = useState<InviteEntryState | null>(null);
 
   // Auto-join state
   const [joiningRoom, setJoiningRoom] = useState<Room | null>(null);
@@ -116,11 +117,30 @@ export function RoomListPage() {
         // Invalid password or invite code — keep modal open
         if (errorCode === 'ROOM012') {
           toast.error('초대 코드가 유효하지 않거나 만료되었습니다');
+          if (inviteCode) {
+            setInviteEntryState((prev) => ({
+              inviteCode,
+              roomPublicId: room.publicId,
+              targetRoom: prev?.targetRoom ?? room,
+              status: 'expired',
+            }));
+            setShowPasswordModal(false);
+            setJoiningRoom(null);
+            setJoiningInviteCode(undefined);
+          }
         } else {
           toast.error('비밀번호가 올바르지 않습니다');
         }
       } else if (errorCode === 'ROOM001') {
         toast.error('방을 찾을 수 없습니다');
+        if (inviteCode) {
+          setInviteEntryState({
+            inviteCode,
+            roomPublicId: room.publicId,
+            targetRoom: room,
+            status: 'missing',
+          });
+        }
         setShowPasswordModal(false);
         setJoiningRoom(null);
         setJoiningInviteCode(undefined);
@@ -254,6 +274,9 @@ export function RoomListPage() {
   useEffect(() => {
     const inviteCode = searchParams.get('invite')?.trim();
     const roomPublicId = searchParams.get('room')?.trim();
+    if (!inviteCode) {
+      setInviteEntryState(null);
+    }
     if (!inviteCode || roomsLoading) {
       return;
     }
@@ -280,10 +303,21 @@ export function RoomListPage() {
       }
 
       if (!targetRoom) {
-        toast.error('목록에 없는 방입니다');
-        setSearchParams({}, { replace: true });
+        setInviteEntryState({
+          inviteCode,
+          roomPublicId,
+          status: 'missing',
+        });
+        toast.error('초대 대상 방을 찾을 수 없습니다');
         return;
       }
+
+      setInviteEntryState({
+        inviteCode,
+        roomPublicId: targetRoom.publicId,
+        targetRoom,
+        status: 'ready',
+      });
 
       setJoiningRoom(targetRoom);
       setJoiningInviteCode(inviteCode);
@@ -312,6 +346,18 @@ export function RoomListPage() {
 
   const shouldShowRegenerateInviteButton = (room: Room) =>
     Boolean(room.isPrivate && user?.nickname && room.createdBy === user.nickname);
+
+  const handleClearInviteState = () => {
+    setInviteEntryState(null);
+    setShowPasswordModal(false);
+    setJoiningRoom(null);
+    setJoiningInviteCode(undefined);
+    setSearchParams({}, { replace: true });
+  };
+
+  const handleRequestNewInvite = () => {
+    toast.info('초대한 방장에게 새 초대 링크를 요청해주세요.');
+  };
 
   const handleReset = () => {
     setSelectedTiers([]);
@@ -396,6 +442,14 @@ export function RoomListPage() {
           </div>
         )}
 
+        {inviteEntryState && (
+          <InviteEntryBanner
+            state={inviteEntryState}
+            onClear={handleClearInviteState}
+            onRequestNewInvite={handleRequestNewInvite}
+          />
+        )}
+
         <RoomGrid
           rooms={filteredRooms}
           isLoading={roomsLoading || isJoining}
@@ -445,6 +499,80 @@ export function RoomListPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+type InviteEntryStatus = 'ready' | 'expired' | 'missing';
+
+interface InviteEntryState {
+  inviteCode: string;
+  roomPublicId?: string;
+  targetRoom?: Room;
+  status: InviteEntryStatus;
+}
+
+function InviteEntryBanner({
+  state,
+  onClear,
+  onRequestNewInvite,
+}: {
+  state: InviteEntryState;
+  onClear: () => void;
+  onRequestNewInvite: () => void;
+}) {
+  const isProblemState = state.status === 'expired' || state.status === 'missing';
+
+  return (
+    <div className={`mb-6 rounded-xl border p-4 ${isProblemState ? 'border-red-500/40 bg-red-500/10' : 'border-blue-500/40 bg-blue-500/10'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className={`text-sm font-semibold ${isProblemState ? 'text-red-200' : 'text-blue-200'}`}>
+            {state.status === 'ready'
+              ? '초대 링크로 입장 중입니다'
+              : '초대 링크가 만료되었거나 유효하지 않습니다'}
+          </p>
+          <p className="mt-1 text-xs text-gray-300">
+            {state.status === 'ready'
+              ? '입장 버튼을 누르면 해당 방으로 바로 연결됩니다.'
+              : '방장이 새 초대 링크를 발급한 뒤 다시 시도해주세요.'}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClear}
+            className="px-3 py-1.5 rounded border border-gray-500/60 text-xs font-semibold text-gray-200 hover:bg-gray-700/40 transition"
+          >
+            방 목록으로 돌아가기
+          </button>
+          {isProblemState && (
+            <button
+              type="button"
+              onClick={onRequestNewInvite}
+              className="px-3 py-1.5 rounded bg-red-500/80 text-xs font-semibold text-white hover:bg-red-500 transition"
+            >
+              새 초대 링크 요청
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-gray-700/70 bg-[#111115] px-3 py-2 text-sm">
+        {state.targetRoom ? (
+          <>
+            <p className="font-semibold text-white">대상 방: {state.targetRoom.title}</p>
+            <p className="mt-1 text-xs text-gray-300">
+              {state.targetRoom.gameName} · {state.targetRoom.currentParticipants}/{state.targetRoom.maxParticipants}명 · {state.targetRoom.isPrivate ? '비공개' : '공개'}
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-gray-300">
+            대상 방 정보를 불러오지 못했습니다.
+            {state.roomPublicId ? ` (room: ${state.roomPublicId})` : ''}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
