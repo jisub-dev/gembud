@@ -37,7 +37,7 @@ function SignupPage() {
         nickname: formData.nickname,
         ageRange: formData.ageRange || undefined,
       });
-      navigate('/');
+      navigate('/onboarding', { replace: true });
     } catch (error) {
       // Error is handled by the store
     }

@@ -14,6 +14,7 @@ import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
+import OnboardingPage from './pages/OnboardingPage';
 
 // Main Pages
 import HomePage from './pages/HomePage';
@@ -95,6 +96,14 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
+        <Route
+          path="/onboarding"
+          element={(
+            <ProtectedRoute>
+              <OnboardingPage />
+            </ProtectedRoute>
+          )}
+        />
 
         {/* Public Routes with MainLayout */}
         <Route path="/" element={<MainLayout />}>
