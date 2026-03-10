@@ -98,7 +98,7 @@ export default function Sidebar() {
       const roomChats = await chatService.getMyChatRooms('ROOM_CHAT');
       const roomChat = roomChats[0];
       if (roomChat) {
-        navigate(`/chat/${roomChat.id}`);
+        navigate(`/chat/${roomChat.publicId}`);
         return;
       }
 
@@ -189,7 +189,7 @@ export default function Sidebar() {
                   {filteredChatRooms.map((chat) => (
                     <Link
                       key={chat.id}
-                      to={`/chat/${chat.id}`}
+                      to={`/chat/${chat.publicId}`}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group"
                     >
                       <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center flex-shrink-0">

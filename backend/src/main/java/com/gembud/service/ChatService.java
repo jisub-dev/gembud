@@ -142,6 +142,23 @@ public class ChatService {
     }
 
     /**
+     * Get recent messages by chat room public ID (or legacy numeric ID string).
+     *
+     * @param chatPublicId chat room public ID
+     * @param userId user ID
+     * @param limit maximum number of messages
+     * @return list of messages
+     */
+    public List<ChatMessageResponse> getRecentMessagesByPublicId(
+        String chatPublicId,
+        Long userId,
+        int limit
+    ) {
+        ChatRoom chatRoom = resolveChatRoomByPublicId(chatPublicId);
+        return getRecentMessages(chatRoom.getId(), userId, limit);
+    }
+
+    /**
      * Cleanup expired chat messages (Phase 11: Evidence retention).
      * ROOM_CHAT messages older than 7 days are deleted.
      * Runs daily at 3 AM.
@@ -298,13 +315,13 @@ public class ChatService {
     }
 
     /**
-     * Get chat room public ID by numeric ID.
+     * Get chat room public ID by game room ID.
      *
-     * @param chatRoomId chat room ID
+     * @param roomId game room ID
      * @return chat room public ID
      */
-    public String getPublicIdByChatRoomId(Long chatRoomId) {
-        return chatRoomRepository.findById(chatRoomId)
+    public String getChatRoomPublicIdByGameRoomId(Long roomId) {
+        return chatRoomRepository.findByRelatedRoomId(roomId)
             .map(ChatRoom::getPublicId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
     }
@@ -396,5 +413,18 @@ public class ChatService {
     private boolean shouldDeleteChatRoomWhenEmpty(ChatRoom chatRoom) {
         return chatRoom.getType() == ChatRoom.ChatRoomType.ROOM_CHAT
             || chatRoom.getType() == ChatRoom.ChatRoomType.GROUP_CHAT;
+    }
+
+    private ChatRoom resolveChatRoomByPublicId(String chatPublicId) {
+        return roomRepository.findByPublicId(chatPublicId)
+            .flatMap(room -> chatRoomRepository.findByRelatedRoomId(room.getId()))
+            .or(() -> {
+                try {
+                    return chatRoomRepository.findById(Long.parseLong(chatPublicId));
+                } catch (NumberFormatException ignored) {
+                    return java.util.Optional.empty();
+                }
+            })
+            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
     }
 }

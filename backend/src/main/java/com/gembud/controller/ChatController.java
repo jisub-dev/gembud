@@ -64,7 +64,7 @@ public class ChatController {
      * Get recent messages from a chat room.
      *
      * @param userDetails authenticated user
-     * @param chatRoomPublicId chat room public ID
+     * @param chatPublicId chat room public ID
      * @param limit maximum number of messages (default: 50)
      * @return list of messages
      */
@@ -74,14 +74,14 @@ public class ChatController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "채팅방 접근 권한 없음")
     })
-    @GetMapping("/rooms/{chatRoomPublicId}/messages")
+    @GetMapping("/rooms/{chatPublicId}/messages")
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> getRecentMessages(
         @AuthenticationPrincipal CustomUserDetails userDetails,
-        @PathVariable String chatRoomPublicId,
+        @PathVariable String chatPublicId,
         @RequestParam(defaultValue = "50") int limit
     ) {
-        List<ChatMessageResponse> messages = chatService.getRecentMessages(
-            chatRoomPublicId,
+        List<ChatMessageResponse> messages = chatService.getRecentMessagesByPublicId(
+            chatPublicId,
             userDetails.getUserId(),
             limit
         );
@@ -104,8 +104,8 @@ public class ChatController {
     public ResponseEntity<ApiResponse<String>> getChatRoomByGameRoomId(
         @PathVariable Long roomId
     ) {
-        String chatRoomId = chatService.getChatRoomByGameRoomId(roomId);
-        return ResponseEntity.ok(ApiResponse.success(chatRoomId));
+        String chatPublicId = chatService.getChatRoomPublicIdByGameRoomId(roomId);
+        return ResponseEntity.ok(ApiResponse.success(chatPublicId));
     }
 
     /**
