@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-10 23:45 KST (by Codex, main terminal) — t1/t2/t3 병합 완료
+> **Last updated:** 2026-03-10 23:50 KST (by Codex, main terminal) — t1/t2/t3 병합 및 worktree 정리 완료
 
 ---
 
@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `4dba393` t1/t2/t3 병합 완료 (chat unread + onboarding + game detail) |
+| `main` HEAD | `70aff8b` t1/t2/t3 병합 완료 + playbook 상태 갱신 |
 | Backend tests | 확인 필요 |
 | Frontend tests | 확인 필요 |
 | Frontend build | 확인 필요 |
@@ -18,15 +18,13 @@
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Codex (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-chat-unread` | 정리 예정 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-onboarding` | 정리 예정 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-game-detail` | 정리 예정 |
+| 현재 추가 worktree 없음 | — | 정리 완료 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Codex | — | 2026-03-10 23:45 |
+| `main` | 🟢 최신 | Codex | — | 2026-03-10 23:50 |
 | `feat/t1-chat-unread` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-10 23:45 |
 | `feat/t2-onboarding` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-10 23:45 |
 | `feat/t3-game-detail` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-10 23:45 |
