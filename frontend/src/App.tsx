@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -59,6 +59,11 @@ function SessionExpiredHandler() {
   return <SessionExpiredModal isOpen={isSessionExpired} onConfirm={handleConfirm} />;
 }
 
+function LegacyGameDetailRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/games/${id}` : '/'} replace />;
+}
+
 function App() {
   useNotificationSocket();
 
@@ -102,7 +107,8 @@ function App() {
           <Route index element={<HomePage />} />
 
           {/* Game Detail: 게임 상세 (Public) */}
-          <Route path="game/:id" element={<GameDetailPage />} />
+          <Route path="games/:id" element={<GameDetailPage />} />
+          <Route path="game/:id" element={<LegacyGameDetailRedirect />} />
 
           {/* Room List: 방 목록 (Protected) */}
           <Route
