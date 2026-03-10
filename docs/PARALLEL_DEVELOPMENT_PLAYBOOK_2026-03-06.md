@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-06 23:20 KST (by Claude, main terminal) — 6라운드 완료
+> **Last updated:** 2026-03-10 23:45 KST (by Codex, main terminal) — t1/t2/t3 병합 완료
 
 ---
 
@@ -8,37 +8,34 @@
 
 | 항목 | 값 |
 |------|-----|
-| `main` HEAD | `6fc75c1` 6라운드 완료 (CI + ads cap + premium scheduler + notification cleanup) |
-| Backend tests | ✅ 확인 필요 (터미널 보고 기준 통과) |
-| Frontend tests | ✅ 27 passed (2026-03-06 23:20 KST) |
-| Frontend build | ✅ success |
+| `main` HEAD | `4dba393` t1/t2/t3 병합 완료 (chat unread + onboarding + game detail) |
+| Backend tests | 확인 필요 |
+| Frontend tests | 확인 필요 |
+| Frontend build | 확인 필요 |
 
 ### Worktree 구조
 
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
-| `/Users/gimjiseob/Projects/gembud` | `main` | Claude (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-ci-github-actions` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-ads-daily-cap` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-spec-final-check` | Terminal 3 |
+| `/Users/gimjiseob/Projects/gembud` | `main` | Codex (지휘) |
+| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-chat-unread` | 정리 예정 |
+| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-onboarding` | 정리 예정 |
+| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-game-detail` | 정리 예정 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Claude | — | 2026-03-06 23:20 |
-| `feat/t1-ci-github-actions` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 23:20 |
-| `feat/t2-ads-daily-cap` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 23:20 |
-| `feat/t3-spec-final-check` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 23:20 |
-| `feat/t1-sidebar-split` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 22:55 |
-| `feat/t3-joinroom-ratelimit` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 22:55 |
-| `feat/t1-invite-code-frontend` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 22:30 |
-| `feat/t2-auth-refresh-tests` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 22:30 |
-| `feat/t3-spec-remaining` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 22:30 |
-| `feat/t1-password-bcrypt` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-06 21:58 |
-| `feat/t2-publicid-url` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-06 21:58 |
-| `feat/t3-room-policy` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-06 21:58 |
-| `feat/t3-spec-remaining` | 🟢 PR 준비 완료 | Terminal 3 | — | 2026-03-06 22:08 (RoomServiceTest + backend test --continue 통과) |
+| `main` | 🟢 최신 | Codex | — | 2026-03-10 23:45 |
+| `feat/t1-chat-unread` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-10 23:45 |
+| `feat/t2-onboarding` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-10 23:45 |
+| `feat/t3-game-detail` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-10 23:45 |
+| `feat/t1-chat-public-id` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-10 |
+| `feat/t2-chat-access-guard` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-10 |
+| `feat/t3-invite-ui-polish` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-10 |
+| `feat/t1-admin-ui` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-10 |
+| `feat/t2-chat-enhance` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-10 |
+| `feat/t3-matching-improve` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-10 |
 
 ### 공통 파일 잠금 현황 (동시 수정 금지)
 
