@@ -357,6 +357,73 @@ class RoomServiceTest {
     }
 
     @Test
+    @DisplayName("joinRoomByPublicId - old invite should be invalid after regenerate")
+    void joinRoomByPublicId_OldInviteAfterRegenerate_ShouldThrow() {
+        User host = User.builder()
+            .email("host@example.com")
+            .nickname("Host")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(host, "id", 1L);
+
+        Room privateRoom = Room.builder()
+            .game(game)
+            .title("Private Room")
+            .maxParticipants(5)
+            .currentParticipants(1)
+            .isPrivate(true)
+            .createdBy(host)
+            .build();
+        ReflectionTestUtils.setField(privateRoom, "id", 55L);
+        ReflectionTestUtils.setField(privateRoom, "publicId", "public-55");
+        ReflectionTestUtils.setField(privateRoom, "inviteCode", "old-code");
+        ReflectionTestUtils.setField(privateRoom, "inviteCodeExpiresAt", java.time.LocalDateTime.now().plusHours(1));
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(privateRoom)
+            .user(host)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByPublicId("public-55")).thenReturn(Optional.of(privateRoom));
+        when(roomRepository.findById(55L)).thenReturn(Optional.of(privateRoom));
+        when(participantRepository.findByRoomIdAndUserId(55L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(participantRepository.findByRoomIdAndUserId(55L, 2L)).thenReturn(Optional.empty());
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(roomRepository.save(any(Room.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(participantRepository.findByRoomId(55L)).thenReturn(Collections.emptyList());
+        when(filterRepository.findByRoomId(55L)).thenReturn(Collections.emptyList());
+
+        String previousInvite = privateRoom.getInviteCode();
+        RoomResponse regenerated = roomService.regenerateInviteCode("public-55", "host@example.com");
+        assertThat(regenerated.getInviteCode()).isNotNull();
+        assertThat(regenerated.getInviteCode()).isNotEqualTo(previousInvite);
+
+        JoinRoomRequest oldInviteRequest = JoinRoomRequest.builder()
+            .inviteCode(previousInvite)
+            .build();
+
+        assertThatThrownBy(
+            () -> roomService.joinRoomByPublicId("public-55", oldInviteRequest, "joiner@example.com", "127.0.0.1")
+        )
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.INVALID_INVITE_CODE);
+
+        verify(rateLimitService).checkJoinLimit("127.0.0.1", "public-55");
+    }
+
+    @Test
     @DisplayName("joinRoomByPublicId - should throw INVALID_INVITE_CODE when invite code expired")
     void joinRoomByPublicId_ExpiredInviteCode_ShouldThrow() {
         Room privateRoom = Room.builder()
@@ -447,6 +514,7 @@ class RoomServiceTest {
         assertThat(result.room().getId()).isEqualTo(6L);
         verify(chatService).addMemberToChatRoomInternal(60L, 2L);
         verify(rateLimitService).resetJoinLimit("127.0.0.1", "public-6");
+        verify(passwordEncoder, never()).matches(any(String.class), any(String.class));
     }
 
     @Test
