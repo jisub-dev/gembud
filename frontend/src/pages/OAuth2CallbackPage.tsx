@@ -4,6 +4,20 @@ import { authService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 import { featureFlags, isPremiumActive } from '@/config/features';
 
+const ONBOARDING_DONE_KEY = 'onboarding:completedUserIds';
+
+function isCompletedUser(userId: number): boolean {
+  const stored = localStorage.getItem(ONBOARDING_DONE_KEY);
+  if (!stored) return false;
+
+  try {
+    const completedIds: number[] = JSON.parse(stored);
+    return completedIds.includes(userId);
+  } catch {
+    return false;
+  }
+}
+
 function OAuth2CallbackPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -30,6 +44,12 @@ function OAuth2CallbackPage() {
             isAuthenticated: true,
             isLoading: false,
           });
+          const isNicknameGenerated = u.nickname?.startsWith('user_');
+          const isOnboardingCompleted = isCompletedUser(u.id);
+          if (isNicknameGenerated && !isOnboardingCompleted) {
+            navigate('/onboarding', { replace: true });
+            return;
+          }
           navigate('/', { replace: true });
         })
         .catch(() => {
