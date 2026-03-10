@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-11 16:06 KST (by Codex, main terminal) — T1/T2/T3 PR 검증 완료, main 반영 대기
+> **Last updated:** 2026-03-11 16:08 KST (by Codex, main terminal) — T1/T2/T3 PR squash merge main 반영 완료
 
 ---
 
@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| 마지막 main HEAD | `868e89b` lazy routes + admin report api + invite expiry ux |
+| 마지막 main HEAD | `c30e133` authstore split + admin security events + invite policy tests |
 | Backend tests | 이전 라운드 기준 최신 |
 | Frontend tests | `npx vitest run --reporter=verbose` 통과 (44 passed) |
 | Frontend build | `npm run build` 통과 |
