@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -181,6 +183,32 @@ public class ReportService {
     }
 
     /**
+     * Search reports for admin list page with paging.
+     *
+     * @param status report status
+     * @param search reporter/reported nickname keyword
+     * @param reporterNickname reporter nickname keyword
+     * @param reportedNickname reported nickname keyword
+     * @param pageable page request
+     * @return paged reports
+     */
+    public Page<Report> searchAdminReports(
+        ReportStatus status,
+        String search,
+        String reporterNickname,
+        String reportedNickname,
+        Pageable pageable
+    ) {
+        return reportRepository.searchAdminReports(
+            status,
+            trimToNull(search),
+            trimToNull(reporterNickname),
+            trimToNull(reportedNickname),
+            pageable
+        );
+    }
+
+    /**
      * Get reports against a user.
      *
      * @param reportedId reported user ID
@@ -314,5 +342,13 @@ public class ReportService {
 
         reportRepository.deleteById(reportId);
         log.info("Report {} deleted", reportId);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
