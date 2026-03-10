@@ -10,6 +10,7 @@ import RouteLoadingFallback from './components/common/RouteLoadingFallback';
 import { authService } from './services/authService';
 import { featureFlags, isPremiumActive } from './config/features';
 import { useNotificationSocket } from './hooks/useNotificationSocket';
+import { setSessionExpiredHandler } from './lib/sessionExpiryBridge';
 
 const MainLayout = lazy(() => import('./components/layout/MainLayout'));
 
@@ -71,6 +72,10 @@ function App() {
   useNotificationSocket();
 
   useEffect(() => {
+    setSessionExpiredHandler(() => {
+      useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, isSessionExpired: true });
+    });
+
     // 새로고침 시 HTTP-only 쿠키로 세션 복원 (1회만 실행)
     authService.getCurrentUser()
       .then((user) => {
@@ -91,6 +96,10 @@ function App() {
         // 비로그인 상태 - 정상적인 경우
         useAuthStore.setState({ isLoading: false });
       });
+
+    return () => {
+      setSessionExpiredHandler(null);
+    };
   }, []);
 
   return (
