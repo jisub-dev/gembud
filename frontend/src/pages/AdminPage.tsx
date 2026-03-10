@@ -31,6 +31,7 @@ export default function AdminPage() {
   const [reportItems, setReportItems] = useState<AdminReportItem[]>([]);
   const [reportStatusFilter, setReportStatusFilter] = useState<AdminReportStatus>('PENDING');
   const [reportSearch, setReportSearch] = useState('');
+  const [reportPageMeta, setReportPageMeta] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 0 });
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [processingReportId, setProcessingReportId] = useState<number | null>(null);
 
@@ -49,11 +50,26 @@ export default function AdminPage() {
     return role === 'ADMIN' || (!!adminEmail && user.email === adminEmail);
   }, [user, adminEmail]);
 
-  const loadReports = async (status: AdminReportStatus = reportStatusFilter) => {
+  const loadReports = async (
+    status: AdminReportStatus = reportStatusFilter,
+    search: string = reportSearch,
+    page: number = 0,
+  ) => {
     setIsLoadingReports(true);
     try {
-      const data = await reportService.getReportsByStatus(status);
-      setReportItems(data);
+      const data = await reportService.getAdminReports({
+        status,
+        search: search.trim() || undefined,
+        page,
+        size: reportPageMeta.size,
+      });
+      setReportItems(data.content);
+      setReportPageMeta({
+        page: data.page,
+        size: data.size,
+        totalElements: data.totalElements,
+        totalPages: data.totalPages,
+      });
     } catch {
       toast.error('신고 목록 조회에 실패했습니다.');
     } finally {
@@ -81,7 +97,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    loadReports(reportStatusFilter);
+    loadReports(reportStatusFilter, reportSearch, 0);
   }, [reportStatusFilter]);
 
   const handleWarn = async (reportId: number) => {
@@ -115,15 +131,6 @@ export default function AdminPage() {
       setProcessingReportId(null);
     }
   };
-
-  const filteredReports = useMemo(() => {
-    const q = reportSearch.trim().toLowerCase();
-    if (!q) return reportItems;
-    return reportItems.filter((report) =>
-      report.reporter.nickname.toLowerCase().includes(q)
-      || report.reported.nickname.toLowerCase().includes(q)
-    );
-  }, [reportItems, reportSearch]);
 
   const handleLookupSecurityStatus = async () => {
     const userId = Number(lookupUserId);
@@ -201,7 +208,7 @@ export default function AdminPage() {
               ))}
               <button
                 type="button"
-                onClick={() => loadReports(reportStatusFilter)}
+                onClick={() => loadReports(reportStatusFilter, reportSearch, reportPageMeta.page)}
                 disabled={isLoadingReports}
                 className="px-3 py-1.5 rounded-md border border-gray-600 text-gray-200 hover:border-gray-400 disabled:opacity-60"
               >
@@ -209,21 +216,39 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
-          <input
-            type="text"
-            value={reportSearch}
-            onChange={(e) => setReportSearch(e.target.value)}
-            placeholder="신고자/피신고자 닉네임 검색"
-            className="w-full mb-4 px-3 py-2 rounded-md bg-[#111114] border border-gray-700 text-white text-sm focus:outline-none focus:border-purple-500"
-          />
+          <div className="mb-2 flex gap-2">
+            <input
+              type="text"
+              value={reportSearch}
+              onChange={(e) => setReportSearch(e.target.value)}
+              placeholder="신고자/피신고자 닉네임 검색"
+              className="w-full px-3 py-2 rounded-md bg-[#111114] border border-gray-700 text-white text-sm focus:outline-none focus:border-purple-500"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  void loadReports(reportStatusFilter, reportSearch, 0);
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => loadReports(reportStatusFilter, reportSearch, 0)}
+              disabled={isLoadingReports}
+              className="px-3 py-2 rounded-md border border-gray-600 text-gray-200 hover:border-gray-400 disabled:opacity-60 whitespace-nowrap"
+            >
+              검색
+            </button>
+          </div>
+          <p className="mb-4 text-xs text-gray-500">
+            총 {reportPageMeta.totalElements.toLocaleString('ko-KR')}건
+          </p>
 
           {isLoadingReports ? (
             <p className="text-gray-400 text-sm">불러오는 중...</p>
-          ) : filteredReports.length === 0 ? (
+          ) : reportItems.length === 0 ? (
             <p className="text-gray-400 text-sm">조건에 맞는 신고가 없습니다.</p>
           ) : (
             <div className="space-y-3">
-              {filteredReports.map((report) => (
+              {reportItems.map((report) => (
                 <div key={report.id} className="rounded-lg border border-gray-700 bg-[#111114] p-4 space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm text-gray-300">
