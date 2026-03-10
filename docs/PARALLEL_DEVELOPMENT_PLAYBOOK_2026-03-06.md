@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-11 01:31 KST (by Codex, main terminal) — T1/T2/T3 PR squash merge 반영 준비
+> **Last updated:** 2026-03-11 14:24 KST (by Codex, main terminal) — T1/T2/T3 PR squash merge 반영 준비
 
 ---
 
@@ -8,9 +8,9 @@
 
 | 항목 | 값 |
 |------|-----|
-| 마지막 main HEAD | `f0a0eac` notification center + pwa shell + chat lifecycle tests |
-| Backend tests | `./gradlew test --continue` 통과 |
-| Frontend tests | `npx vitest run --reporter=verbose` 통과 (37 passed) |
+| 마지막 main HEAD | `2ea69b2` live notifications + offline pwa + admin report flow |
+| Backend tests | 이전 라운드 기준 최신 |
+| Frontend tests | `npx vitest run --reporter=verbose` 통과 (44 passed) |
 | Frontend build | `npm run build` 통과 |
 
 ### Hotfix Memo
@@ -23,18 +23,21 @@
 | 경로 | 브랜치 | 담당 |
 |------|--------|------|
 | `/Users/gimjiseob/Projects/gembud` | `main` | Codex (지휘) |
-| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-notification-live` | Terminal 1 |
-| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-pwa-offline` | Terminal 2 |
-| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-report-admin-flow` | Terminal 3 |
+| `/Users/gimjiseob/Projects/gembud-t1` | `feat/t1-lazy-routes` | Terminal 1 |
+| `/Users/gimjiseob/Projects/gembud-t2` | `feat/t2-admin-report-api` | Terminal 2 |
+| `/Users/gimjiseob/Projects/gembud-t3` | `feat/t3-invite-expiry-ux` | Terminal 3 |
 
 ### 브랜치 현황
 
 | 브랜치 | 상태 | 담당 | PR | 마지막 업데이트 |
 |--------|------|------|----|----------------|
-| `main` | 🟢 최신 | Codex | — | 2026-03-11 01:18 |
-| `feat/t1-notification-live` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-11 01:31 |
-| `feat/t2-pwa-offline` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-11 01:31 |
-| `feat/t3-report-admin-flow` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-11 01:31 |
+| `main` | 🟢 최신 | Codex | — | 2026-03-11 14:09 |
+| `feat/t1-lazy-routes` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-11 14:24 |
+| `feat/t2-admin-report-api` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-11 14:24 |
+| `feat/t3-invite-expiry-ux` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-11 14:24 |
+| `feat/t1-notification-live` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-11 14:09 |
+| `feat/t2-pwa-offline` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-11 14:09 |
+| `feat/t3-report-admin-flow` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-11 14:09 |
 | `feat/t1-notification-center` | 🟢 병합 완료 | Terminal 1 | squash merged | 2026-03-11 01:16 |
 | `feat/t2-pwa-shell` | 🟢 병합 완료 | Terminal 2 | squash merged | 2026-03-11 01:16 |
 | `feat/t3-chat-lifecycle-tests` | 🟢 병합 완료 | Terminal 3 | squash merged | 2026-03-11 01:16 |
