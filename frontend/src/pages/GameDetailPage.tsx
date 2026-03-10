@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Gamepad2, ArrowRight } from 'lucide-react';
+import { ChevronLeft, Gamepad2, ArrowRight, Plus } from 'lucide-react';
 import { useGame } from '@/hooks/queries/useGames';
-import type { GameOption } from '@/types/game';
+import { useRooms } from '@/hooks/queries/useRooms';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 function parseOptionValues(json: string): string[] {
   try {
@@ -15,12 +16,20 @@ function parseOptionValues(json: string): string[] {
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: game, isLoading, error } = useGame(Number(id));
+  const gameId = Number(id);
+  const { data: game, isLoading, error } = useGame(gameId);
+  const { data: rooms = [] } = useRooms(gameId);
+
+  const tierOption = game?.options.find((option) => option.optionType === 'TIER');
+  const positionOption = game?.options.find((option) => option.optionType === 'POSITION');
+  const tiers = tierOption ? parseOptionValues(tierOption.optionValues) : [];
+  const positions = positionOption ? parseOptionValues(positionOption.optionValues) : [];
+  const openRoomCount = rooms.filter((room) => room.status === 'OPEN').length;
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <LoadingSpinner size="lg" label="게임 정보를 불러오는 중..." />
       </div>
     );
   }
@@ -60,36 +69,54 @@ export default function GameDetailPage() {
               className="w-full h-64 object-cover rounded-lg mb-6"
             />
           )}
-          <h1 className="text-4xl font-bold mb-4">{game.name}</h1>
+          <h1 className="text-4xl font-bold mb-3">{game.name}</h1>
           <p className="text-gray-400 text-lg mb-6">{game.description}</p>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <span className="px-4 py-2 bg-purple-500/20 border border-purple-500 text-purple-300 rounded-full">
               {game.genre}
+            </span>
+            <span className="px-4 py-2 bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 rounded-full">
+              OPEN 방 {openRoomCount}개
             </span>
           </div>
         </div>
 
-        {/* Game Options */}
-        {game.options && game.options.length > 0 && (
+        {/* Tier / Position Options */}
+        {(tiers.length > 0 || positions.length > 0) && (
           <div className="bg-[#18181b] border-2 border-gray-700 rounded-lg p-6 mb-6">
-            <h2 className="text-2xl font-semibold mb-4">게임 옵션</h2>
+            <h2 className="text-2xl font-semibold mb-4">추천 매칭 옵션</h2>
             <div className="space-y-4">
-              {game.options.map((option: GameOption) => (
-                <div key={option.id}>
-                  <h3 className="text-lg font-semibold text-purple-400 mb-2">{option.optionKey}</h3>
+              {tiers.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-purple-400 mb-2">티어</h3>
                   <div className="flex flex-wrap gap-2">
-                    {parseOptionValues(option.optionValues).map((value, index) => (
+                    {tiers.map((value, index) => (
                       <span
                         key={index}
-                        className="px-3 py-1 bg-[#0e0e10] border border-gray-600 rounded text-sm"
+                        className="px-3 py-1 bg-[#0e0e10] border border-purple-500/40 text-purple-200 rounded text-sm font-semibold"
                       >
                         {value}
                       </span>
                     ))}
                   </div>
                 </div>
-              ))}
+              )}
+              {positions.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-cyan-400 mb-2">포지션</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {positions.map((value, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-[#0e0e10] border border-cyan-500/40 text-cyan-200 rounded text-sm font-semibold"
+                      >
+                        {value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -101,13 +128,22 @@ export default function GameDetailPage() {
           <p className="text-gray-300 mb-6">
             {game.name}을(를) 즐기는 게이머들과 함께하세요!
           </p>
-          <button
-            onClick={() => navigate(`/games/${game.id}/rooms`)}
-            className="inline-flex items-center gap-2 px-8 py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition text-lg"
-          >
-            방 목록 보기
-            <ArrowRight size={20} />
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => navigate(`/games/${game.id}/rooms`)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition"
+            >
+              방 목록 보기
+              <ArrowRight size={18} />
+            </button>
+            <button
+              onClick={() => navigate(`/games/${game.id}/rooms?create=true`)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg transition"
+            >
+              방 만들기
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

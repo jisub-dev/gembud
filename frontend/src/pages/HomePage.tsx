@@ -147,7 +147,10 @@ const HomePage = () => {
           <GameGrid
             games={filteredGames}
             selectedGameId={selectedGameId}
-            onGameSelect={setSelectedGameId}
+            onGameSelect={(gameId) => {
+              setSelectedGameId(gameId);
+              navigate(`/games/${gameId}`);
+            }}
             emptyMessage={
               searchQuery.trim()
                 ? `'${searchQuery.trim()}'에 해당하는 게임이 없습니다`
