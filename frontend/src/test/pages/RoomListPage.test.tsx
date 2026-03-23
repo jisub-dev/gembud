@@ -78,7 +78,19 @@ vi.mock('@/components/room/RoomFilter', () => ({
 }));
 
 vi.mock('@/components/room/CreateRoomModal', () => ({
-  CreateRoomModal: () => null,
+  CreateRoomModal: ({
+    onClose,
+    onSuccess,
+  }: {
+    onClose: () => void;
+    onSuccess: () => void;
+  }) => (
+    <div>
+      <p>방 생성 모달</p>
+      <button onClick={onClose}>생성 모달 닫기</button>
+      <button onClick={onSuccess}>생성 완료</button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/common/AdBanner', () => ({
@@ -426,6 +438,27 @@ describe('RoomListPage auto-join UX', () => {
 
     expect(await screen.findByText('초대 링크가 만료되었거나 유효하지 않습니다')).toBeInTheDocument();
     expect(screen.getByText(/대상 방 정보를 불러오지 못했습니다/)).toBeInTheDocument();
+  });
+
+  it('opens create modal when create=true query param is present', async () => {
+    await renderRoomListPage('/games/1/rooms?create=true');
+
+    expect(await screen.findByText('방 생성 모달')).toBeInTheDocument();
+  });
+
+  it('opens and closes create modal from the create CTA', async () => {
+    const user = userEvent.setup();
+
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '방 만들기' }));
+
+    expect(await screen.findByText('방 생성 모달')).toBeInTheDocument();
+
+    await clickAndFlush(user, screen.getByRole('button', { name: '생성 모달 닫기' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('방 생성 모달')).not.toBeInTheDocument();
+    });
   });
 
   it('regenerates invite code for host private room and copies invite URL', async () => {

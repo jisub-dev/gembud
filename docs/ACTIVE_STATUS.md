@@ -30,6 +30,7 @@
   - Sidebar / RoomListPage now read active room from backend contract
   - `myRooms` / `myActiveRoom` query key and hook usage centralized
   - `myChatRooms` / `myRoomChatRooms` query key and hook usage centralized
+  - RoomListPage create-modal query param flow extracted into a dedicated hook
   - RoomListPage invite-entry URL flow extracted into a dedicated hook
   - RoomListPage join/password/retry orchestration extracted into `useRoomJoinFlow`
   - Recommendation localStorage state and auto-join flow centralized into a shared hook/util layer
@@ -56,6 +57,7 @@
 - Frontend:
   - `frontend/src/components/layout/Sidebar.tsx`
   - `frontend/src/hooks/queries/useChatQueries.ts`
+  - `frontend/src/hooks/useRoomCreateEntry.ts`
   - `frontend/src/hooks/useRoomInviteEntry.ts`
   - `frontend/src/hooks/useRoomJoinFlow.ts`
   - `frontend/src/hooks/useRoomRecommendations.ts`
@@ -73,7 +75,7 @@
 
 ### Known Risks / Follow-ups
 
-- `RoomListPage` join orchestration is now split out, but create-modal/query-param handling and page-level wiring are still partially concentrated there.
+- `RoomListPage` create/join/invite/recommendation 흐름은 대부분 훅으로 분리됐지만, 화면 레벨 배선과 invalidate 포인트는 여전히 페이지가 최종 조립을 맡는다.
 - Backend now serializes `create/join` by user and locks joined rooms; controller coverage improved, but broader integration coverage for the new path is still thin.
 - Worktree is dirty; changes are not yet committed or grouped into a final PR-ready unit.
 
@@ -109,6 +111,7 @@
 - Consolidated `myRooms` and `myActiveRoom` onto shared room query keys/hooks in `frontend/src/hooks/queries/useRooms.ts`.
 - Added shared chat query keys/hooks in `frontend/src/hooks/queries/useChatQueries.ts`.
 - Extracted `RoomListPage` invite-entry URL parsing, room resolution, and invite banner state into `frontend/src/hooks/useRoomInviteEntry.ts`.
+- Extracted `RoomListPage` create-modal query param handling into `frontend/src/hooks/useRoomCreateEntry.ts`.
 - Extracted `RoomListPage` join/password/retry/navigation flow into `frontend/src/hooks/useRoomJoinFlow.ts`.
 - Extracted recommendation storage rules and `recommend=true&exclude=...` auto-join flow into `frontend/src/hooks/useRoomRecommendations.ts`.
 - Added pessimistic lock repository methods for `User` / `Room` and routed `createRoom` / `joinRoom` through them to tighten active-room uniqueness and join-capacity races.
@@ -150,9 +153,9 @@
   - Command:
     - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin ./node_modules/.bin/vitest run src/test/pages/RoomListPage.test.tsx --reporter=verbose`
   - Result:
-    - `Test Files 1 passed (1), Tests 14 passed (14)`
+    - `Test Files 1 passed (1), Tests 16 passed (16)`
   - Notes:
-    - invite-entry hook 추출 후 `RoomListPage` 회귀 통과.
+    - invite-entry/create-entry hook 추출 후 `RoomListPage` 회귀 통과.
 - Frontend:
   - Command:
     - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin ./node_modules/.bin/vitest run src/test/pages/RoomListPage.test.tsx src/test/pages/ChatPage.test.tsx --reporter=verbose`

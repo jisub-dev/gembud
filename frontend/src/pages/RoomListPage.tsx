@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Plus, Sparkles } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import { roomKeys } from '@/hooks/queries/useRoomQueries';
 import { useRoomRecommendations } from '@/hooks/useRoomRecommendations';
 import { useRoomJoinFlow } from '@/hooks/useRoomJoinFlow';
+import { useRoomCreateEntry } from '@/hooks/useRoomCreateEntry';
 import { RoomGrid } from '@/components/room/RoomGrid';
 import { RoomFilter } from '@/components/room/RoomFilter';
 import { CreateRoomModal } from '@/components/room/CreateRoomModal';
@@ -34,8 +35,6 @@ export function RoomListPage() {
 
   const [selectedTiers, setSelectedTiers] = useState<number[]>([]);
   const [selectedPositions, setSelectedPositions] = useState<number[]>([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const createHandledRef = useRef(false);
 
   const { data: rooms, isLoading: roomsLoading, error: roomsError } = useRooms(Number(gameId));
   const { game, tierOptions, positionOptions, isLoading: gameLoading } = useGameOptions(Number(gameId));
@@ -84,6 +83,13 @@ export function RoomListPage() {
     onInviteMissing: markInviteMissing,
     queryClient,
     toast,
+  });
+  const {
+    closeCreateModal,
+    openCreateModal,
+    showCreateModal,
+  } = useRoomCreateEntry({
+    searchParams,
   });
   const { handleRecommendedJoin } = useRoomRecommendations({
     gameId: Number(gameId),
@@ -149,17 +155,6 @@ export function RoomListPage() {
     openInviteEntry(inviteModalRequest.room, inviteModalRequest.inviteCode);
     consumeInviteModalRequest();
   }, [consumeInviteModalRequest, inviteModalRequest, openInviteEntry]);
-
-  useEffect(() => {
-    const shouldOpenCreateModal = searchParams.get('create') === 'true';
-    if (shouldOpenCreateModal && !createHandledRef.current) {
-      setShowCreateModal(true);
-      createHandledRef.current = true;
-    }
-    if (!shouldOpenCreateModal) {
-      createHandledRef.current = false;
-    }
-  }, [searchParams]);
 
   const handleRegenerateInviteCode = async (roomPublicId: string) => {
     try {
@@ -238,7 +233,7 @@ export function RoomListPage() {
               </button>
               <button
                 className="flex-shrink-0 flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg transition text-sm sm:text-base"
-                onClick={() => setShowCreateModal(true)}
+                onClick={openCreateModal}
               >
                 <Plus size={18} />
                 방 만들기
@@ -311,10 +306,10 @@ export function RoomListPage() {
         <CreateRoomModal
           gameId={Number(gameId)}
           gameName={game.name}
-          onClose={() => setShowCreateModal(false)}
+          onClose={closeCreateModal}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
-            setShowCreateModal(false);
+            closeCreateModal();
           }}
         />
       )}
