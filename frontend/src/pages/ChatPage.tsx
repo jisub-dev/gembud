@@ -5,9 +5,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoomParticipants } from '@/components/room/RoomParticipants';
 import { EvaluateModal } from '@/components/room/EvaluateModal';
-import { chatService } from '@/services/chatService';
 import { roomService } from '@/services/roomService';
 import evaluationService from '@/services/evaluationService';
+import { chatKeys, useMyChatRooms, useMyRoomChatRooms } from '@/hooks/queries/useChatQueries';
+import { addExcludedRecommendedRoom, consumeRecommendedRoomActive } from '@/hooks/useRoomRecommendations';
+import {
+  selectChatRoomByPublicId,
+  selectRoomChatByPublicId,
+} from '@/hooks/queries/roomSelectors';
+import { roomKeys } from '@/hooks/queries/useRoomQueries';
+import { useMyActiveRoom } from '@/hooks/queries/useRooms';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { getInviteExpiryInfo } from '@/utils/inviteExpiry';
@@ -26,9 +33,6 @@ const STATUS_COLORS: Record<string, string> = {
   CLOSED: 'text-gray-400',
 };
 
-const RECOMMENDATION_EXCLUSION_KEY = 'roomRecommendations:excluded';
-const RECOMMENDATION_ACTIVE_KEY = 'roomRecommendations:active';
-
 export default function ChatPage() {
   const { roomId: chatPublicId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -36,7 +40,6 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
   const [isStartingRoom, setIsStartingRoom] = useState(false);
   const [isResettingRoom, setIsResettingRoom] = useState(false);
-  const [isClosingRoom, setIsClosingRoom] = useState(false);
   const [isEvaluateModalOpen, setIsEvaluateModalOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [inviteExpiresAt, setInviteExpiresAt] = useState<string | undefined>(undefined);
@@ -51,51 +54,29 @@ export default function ChatPage() {
   const {
     data: myChatRooms = [],
     isLoading: isMyChatRoomsLoading,
-  } = useQuery({
-    queryKey: ['myChatRooms'],
-    queryFn: () => chatService.getMyChatRooms(),
+  } = useMyChatRooms({
     enabled: hasChatPublicId,
   });
 
-  const chatRoomInfo = myChatRooms.find(
-    (chatRoom) => chatRoom.publicId === chatPublicId || String(chatRoom.id) === chatPublicId,
-  );
+  const {
+    data: myRoomChatRooms = [],
+    isLoading: isMyRoomChatRoomsLoading,
+  } = useMyRoomChatRooms({
+    enabled: hasChatPublicId,
+  });
+
+  const {
+    data: myActiveRoom = null,
+    refetch: refetchMyActiveRoom,
+  } = useMyActiveRoom({
+    enabled: hasChatPublicId,
+  });
+
+  const roomChatInfo = selectRoomChatByPublicId(myRoomChatRooms, chatPublicId);
+  const chatRoomInfo = selectChatRoomByPublicId(myChatRooms, chatPublicId) ?? roomChatInfo;
   const chatRoomId = chatRoomInfo?.id;
-  const relatedRoomIdFromChatList = chatRoomInfo?.relatedRoomId;
-  const isRoomChatByType = chatRoomInfo?.type === 'ROOM_CHAT';
-
-  const { data: myRooms = [], refetch: refetchMyRooms } = useQuery({
-    queryKey: ['myRooms'],
-    queryFn: roomService.getMyRooms,
-    enabled: hasChatPublicId,
-    refetchInterval: 10000,
-  });
-
-  const { data: inferredRelatedRoomId } = useQuery({
-    queryKey: ['chatRoomRelatedRoom', chatPublicId, myRooms.map((room) => room.id).join(',')],
-    queryFn: async () => {
-      for (const room of myRooms) {
-        try {
-          const mappedChatPublicId = await chatService.getChatRoomByGameRoom(room.id);
-          if (mappedChatPublicId === chatPublicId) {
-            return room.id;
-          }
-        } catch {
-          // Ignore per-room lookup failure and continue
-        }
-      }
-      return null;
-    },
-    enabled: hasChatPublicId && !relatedRoomIdFromChatList && myRooms.length > 0,
-    staleTime: 30000,
-  });
-
-  const resolvedRelatedRoomId = relatedRoomIdFromChatList ?? inferredRelatedRoomId ?? null;
-
-  const relatedRoom = resolvedRelatedRoomId
-    ? myRooms.find((room) => room.id === resolvedRelatedRoomId)
-    : null;
-  const isRoomChat = isRoomChatByType || !!resolvedRelatedRoomId;
+  const relatedRoom = roomChatInfo ? myActiveRoom : null;
+  const isRoomChat = chatRoomInfo?.type === 'ROOM_CHAT' || roomChatInfo?.type === 'ROOM_CHAT';
   const isHost = useMemo(() => {
     if (!relatedRoom || !user) return false;
     return relatedRoom.participants?.some((participant) => participant.userId === user.id && participant.isHost) ?? false;
@@ -104,6 +85,10 @@ export default function ChatPage() {
     if (!relatedRoom?.participants || !user) return [];
     return relatedRoom.participants.filter((participant) => participant.userId !== user.id);
   }, [relatedRoom, user]);
+  const canEvaluateRoom = useMemo(() => {
+    if (!relatedRoom) return false;
+    return relatedRoom.status === 'IN_PROGRESS' || relatedRoom.status === 'CLOSED';
+  }, [relatedRoom]);
 
   const {
     data: evaluatableUserIds = [],
@@ -112,14 +97,10 @@ export default function ChatPage() {
   } = useQuery({
     queryKey: ['roomEvaluatableUsers', relatedRoom?.id, user?.id],
     queryFn: () => evaluationService.getEvaluatable(relatedRoom!.id),
-    enabled: !!relatedRoom?.id && !!user?.id,
+    enabled: !!relatedRoom?.id && !!user?.id && canEvaluateRoom,
     staleTime: 15000,
   });
 
-  const canEvaluateRoom = useMemo(() => {
-    if (!relatedRoom) return false;
-    return relatedRoom.status === 'IN_PROGRESS' || relatedRoom.status === 'CLOSED';
-  }, [relatedRoom]);
   const isRoomClosed = relatedRoom?.status === 'CLOSED';
 
   const hasEvaluatableParticipants = evaluatableParticipants.some((participant) =>
@@ -177,7 +158,9 @@ export default function ChatPage() {
     if (!window.confirm(`${nickname}님을 강퇴하시겠습니까?`)) return;
     try {
       await roomService.kickParticipant(relatedRoom.id, userId);
-      await refetchMyRooms();
+      await refetchMyActiveRoom();
+      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
     } catch {
       window.alert('강퇴 처리에 실패했습니다.');
     }
@@ -188,7 +171,9 @@ export default function ChatPage() {
     if (!window.confirm(`${nickname}님에게 방장을 넘기시겠습니까?`)) return;
     try {
       await roomService.transferHost(relatedRoom.id, userId);
-      await refetchMyRooms();
+      await refetchMyActiveRoom();
+      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
     } catch {
       window.alert('방장 이전에 실패했습니다.');
     }
@@ -199,7 +184,9 @@ export default function ChatPage() {
     setIsStartingRoom(true);
     try {
       await roomService.startRoom(relatedRoom.id);
-      await refetchMyRooms();
+      await refetchMyActiveRoom();
+      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
     } catch {
       window.alert('게임 시작에 실패했습니다.');
     } finally {
@@ -212,27 +199,14 @@ export default function ChatPage() {
     setIsResettingRoom(true);
     try {
       await roomService.resetRoom(relatedRoom.publicId);
-      await refetchMyRooms();
+      await refetchMyActiveRoom();
+      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
       toast.success('방 상태를 대기중으로 변경했습니다.');
     } catch {
       toast.error('대기중으로 변경에 실패했습니다.');
     } finally {
       setIsResettingRoom(false);
-    }
-  };
-
-  const handleCloseRoom = async () => {
-    if (!relatedRoom) return;
-    if (!window.confirm('방을 종료하시겠습니까? 종료 후에는 되돌릴 수 없습니다.')) return;
-    setIsClosingRoom(true);
-    try {
-      await roomService.closeRoom(relatedRoom.publicId);
-      await refetchMyRooms();
-      toast.success('방을 종료했습니다. 참가자 평가를 진행해주세요.');
-    } catch {
-      toast.error('방 종료에 실패했습니다.');
-    } finally {
-      setIsClosingRoom(false);
     }
   };
 
@@ -276,9 +250,10 @@ export default function ChatPage() {
     setIsLeaving(true);
     try {
       await roomService.leaveRoom(relatedRoom.id);
-      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
-      queryClient.invalidateQueries({ queryKey: ['myRoomChatRooms'] });
-      queryClient.invalidateQueries({ queryKey: ['myChatRooms'] });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
+      queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
+      queryClient.invalidateQueries({ queryKey: chatKeys.myList() });
       toast.success('대기방을 나갔습니다');
       if (consumeRecommendedRoomActive(relatedRoom.publicId, relatedRoom.gameId)) {
         addExcludedRecommendedRoom(relatedRoom.gameId, relatedRoom.publicId);
@@ -301,7 +276,7 @@ export default function ChatPage() {
     );
   }
 
-  if (isMyChatRoomsLoading) {
+  if (isMyChatRoomsLoading || isMyRoomChatRoomsLoading) {
     return (
       <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center text-white">
         채팅방 정보를 불러오는 중입니다...
@@ -486,16 +461,6 @@ export default function ChatPage() {
                               {isResettingRoom ? '변경 중...' : '대기중으로 변경'}
                             </button>
                           )}
-                          {(relatedRoom.status === 'OPEN' || relatedRoom.status === 'IN_PROGRESS') && (
-                            <button
-                              type="button"
-                              onClick={handleCloseRoom}
-                              disabled={isClosingRoom}
-                              className="flex-1 py-2 rounded bg-red-500 hover:bg-red-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
-                            >
-                              {isClosingRoom ? '종료 중...' : '방 종료'}
-                            </button>
-                          )}
                         </div>
                       )}
                     </div>
@@ -534,39 +499,6 @@ export default function ChatPage() {
       )}
     </div>
   );
-}
-
-function consumeRecommendedRoomActive(roomPublicId: string, gameId: number) {
-  if (!roomPublicId || !gameId) return false;
-  try {
-    const raw = localStorage.getItem(RECOMMENDATION_ACTIVE_KEY);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw) as Record<string, { gameId: number }>;
-    const active = parsed[roomPublicId];
-    if (!active || active.gameId !== gameId) {
-      return false;
-    }
-    delete parsed[roomPublicId];
-    localStorage.setItem(RECOMMENDATION_ACTIVE_KEY, JSON.stringify(parsed));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function addExcludedRecommendedRoom(gameId: number, roomPublicId: string) {
-  if (!gameId || !roomPublicId) return;
-  try {
-    const raw = localStorage.getItem(RECOMMENDATION_EXCLUSION_KEY);
-    const parsed = raw ? JSON.parse(raw) as Record<string, string[]> : {};
-    const gameKey = String(gameId);
-    const nextValues = new Set(parsed[gameKey] ?? []);
-    nextValues.add(roomPublicId);
-    parsed[gameKey] = [...nextValues];
-    localStorage.setItem(RECOMMENDATION_EXCLUSION_KEY, JSON.stringify(parsed));
-  } catch {
-    // Ignore localStorage failures for non-critical recommendation history.
-  }
 }
 
 async function copyToClipboard(text: string): Promise<void> {

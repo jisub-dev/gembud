@@ -66,6 +66,19 @@ export const roomService = {
     return response.data.data;
   },
 
+  // 내가 참여 중인 현재 활성 방
+  async getMyActiveRoom(): Promise<Room | null> {
+    try {
+      const response = await api.get<ApiResponse<Room>>('/rooms/my/active');
+      return response.data.data;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
   // 참여자 강퇴 (방장만)
   async kickParticipant(roomId: number, userId: number): Promise<void> {
     await api.post(`/rooms/${roomId}/kick/${userId}`);
@@ -86,9 +99,5 @@ export const roomService = {
     await api.post(`/rooms/${publicId}/reset`);
   },
 
-  // 방 종료 (방장만, publicId 기반)
-  async closeRoom(publicId: string): Promise<void> {
-    await api.post(`/rooms/${publicId}/close`);
-  },
 };
 export default roomService;

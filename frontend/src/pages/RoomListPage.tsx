@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Plus, Sparkles } from 'lucide-react';
-import { useRooms } from '@/hooks/queries/useRooms';
+import { useMyActiveRoom, useMyRooms, useRooms } from '@/hooks/queries/useRooms';
 import { useGameOptions } from '@/hooks/queries/useGames';
 import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import { roomKeys } from '@/hooks/queries/useRoomQueries';
+import { useRoomRecommendations } from '@/hooks/useRoomRecommendations';
+import { useRoomJoinFlow } from '@/hooks/useRoomJoinFlow';
 import { RoomGrid } from '@/components/room/RoomGrid';
 import { RoomFilter } from '@/components/room/RoomFilter';
 import { CreateRoomModal } from '@/components/room/CreateRoomModal';
@@ -13,15 +15,12 @@ import { PasswordModal } from '@/components/room/PasswordModal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import AdBanner from '@/components/common/AdBanner';
 import { useAds } from '@/hooks/queries/useAds';
+import { useRoomInviteEntry, type InviteEntryState } from '@/hooks/useRoomInviteEntry';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { roomService } from '@/services/roomService';
-import { chatService } from '@/services/chatService';
 import type { Room } from '@/types/room';
 import { isPremiumActive } from '@/config/features';
-
-const RECOMMENDATION_EXCLUSION_KEY = 'roomRecommendations:excluded';
-const RECOMMENDATION_ACTIVE_KEY = 'roomRecommendations:active';
 
 export function RoomListPage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -36,34 +35,75 @@ export function RoomListPage() {
   const [selectedTiers, setSelectedTiers] = useState<number[]>([]);
   const [selectedPositions, setSelectedPositions] = useState<number[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [inviteEntryState, setInviteEntryState] = useState<InviteEntryState | null>(null);
-
-  // Auto-join state
-  const [joiningRoom, setJoiningRoom] = useState<Room | null>(null);
-  const [joiningInviteCode, setJoiningInviteCode] = useState<string | undefined>(undefined);
-  const [isJoining, setIsJoining] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const inviteHandledRef = useRef<string | null>(null);
   const createHandledRef = useRef(false);
-  const recommendationHandledRef = useRef<string | null>(null);
 
   const { data: rooms, isLoading: roomsLoading, error: roomsError } = useRooms(Number(gameId));
   const { game, tierOptions, positionOptions, isLoading: gameLoading } = useGameOptions(Number(gameId));
   const recommendationLimit = isPremiumActive(user?.isPremium) ? 20 : 10;
   const { data: recommendedRooms = [] } = useRecommendedRooms(Number(gameId), recommendationLimit);
-  const { data: myRooms = [] } = useQuery({
-    queryKey: ['myRooms'],
-    queryFn: roomService.getMyRooms,
+  const { data: myRooms = [] } = useMyRooms({
+    enabled: !!user,
+  });
+  const { data: activeRoom = null } = useMyActiveRoom({
     enabled: !!user,
   });
   const myJoinedRoomPublicIds = useMemo(
     () => new Set(myRooms.map((room) => room.publicId)),
     [myRooms]
   );
-  const excludedRecommendedRoomIds = useMemo(
-    () => getExcludedRecommendedRooms(Number(gameId)),
-    [gameId, searchParams]
-  );
+  const {
+    inviteEntryState,
+    inviteModalRequest,
+    consumeInviteModalRequest,
+    clearInviteEntry,
+    markInviteExpired,
+    markInviteMissing,
+  } = useRoomInviteEntry({
+    rooms,
+    roomsLoading,
+    searchParams,
+    setSearchParams,
+    onMissingInvite: () => toast.error('초대 대상 방을 찾을 수 없습니다'),
+  });
+  const {
+    confirmPasswordJoin,
+    isJoining,
+    joinRoom: attemptJoinRoom,
+    joiningInviteCode,
+    joiningRoom,
+    openInviteEntry,
+    requestRoomEntry,
+    resetJoinState,
+    showPasswordModal,
+  } = useRoomJoinFlow({
+    activeRoom,
+    gameId: Number(gameId),
+    myRooms,
+    navigate,
+    onInviteExpired: markInviteExpired,
+    onInviteMissing: markInviteMissing,
+    queryClient,
+    toast,
+  });
+  const { handleRecommendedJoin } = useRoomRecommendations({
+    gameId: Number(gameId),
+    rooms,
+    roomsLoading,
+    recommendedRooms,
+    myJoinedRoomPublicIds,
+    searchParams,
+    setSearchParams,
+    onJoinRoom: async (room) => {
+      await attemptJoinRoom(room, undefined, undefined, { markAsRecommended: true });
+    },
+    onNoRoom: (source) => {
+      toast.info(
+        source === 'auto'
+          ? '더 이상 자동으로 추천할 방이 없습니다'
+          : '지금 바로 입장 가능한 추천 방이 없습니다',
+      );
+    },
+  });
 
   const filteredRooms = useMemo(() => {
     if (!rooms) return [];
@@ -95,143 +135,20 @@ export function RoomListPage() {
     });
   }, [rooms, selectedTiers, selectedPositions, tierOptions, positionOptions]);
 
-  const doJoin = async (
-    room: Room,
-    password?: string,
-    inviteCode?: string,
-    options?: { markAsRecommended?: boolean }
-  ) => {
-    setIsJoining(true);
-    try {
-      const result = await roomService.joinRoom(room.publicId, password, inviteCode);
-      setShowPasswordModal(false);
-      setJoiningRoom(null);
-      setJoiningInviteCode(undefined);
-      if (options?.markAsRecommended) {
-        markRecommendedRoomActive(room.publicId, Number(gameId));
-      }
-      navigate(`/chat/${result.chatRoomId}`);
-    } catch (err: unknown) {
-      const errorCode = extractErrorCode(err);
-      if (errorCode === 'ROOM006' || errorCode === 'ROOM012') {
-        // Invalid password or invite code — keep modal open
-        if (errorCode === 'ROOM012') {
-          toast.error('초대 코드가 유효하지 않거나 만료되었습니다');
-          if (inviteCode) {
-            setInviteEntryState((prev) => ({
-              inviteCode,
-              roomPublicId: room.publicId,
-              targetRoom: prev?.targetRoom ?? room,
-              status: 'expired',
-            }));
-            setShowPasswordModal(false);
-            setJoiningRoom(null);
-            setJoiningInviteCode(undefined);
-          }
-        } else {
-          toast.error('비밀번호가 올바르지 않습니다');
-        }
-      } else if (errorCode === 'ROOM001') {
-        toast.error('방을 찾을 수 없습니다');
-        if (inviteCode) {
-          setInviteEntryState({
-            inviteCode,
-            roomPublicId: room.publicId,
-            targetRoom: room,
-            status: 'missing',
-          });
-        }
-        setShowPasswordModal(false);
-        setJoiningRoom(null);
-        setJoiningInviteCode(undefined);
-        queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
-        navigate(`/games/${gameId}/rooms`);
-      } else if (errorCode === 'ROOM002') {
-        toast.error('방이 꽉 찼습니다');
-        setShowPasswordModal(false);
-        setJoiningRoom(null);
-        setJoiningInviteCode(undefined);
-      } else if (errorCode === 'ROOM010') {
-        toast.error('이미 게임이 시작된 방입니다');
-        setShowPasswordModal(false);
-        setJoiningRoom(null);
-        setJoiningInviteCode(undefined);
-      } else if (errorCode === 'ROOM008') {
-        toast.error('이미 다른 대기방에 참가 중입니다');
-        setShowPasswordModal(false);
-        setJoiningRoom(null);
-        setJoiningInviteCode(undefined);
-      } else {
-        toast.error('방 입장에 실패했습니다');
-        setShowPasswordModal(false);
-        setJoiningRoom(null);
-        setJoiningInviteCode(undefined);
-      }
-    } finally {
-      setIsJoining(false);
-    }
-  };
-
-  const getNextRecommendedRoom = (extraExcludedRoomIds?: Set<string>) => {
-    const excludedRoomIds = extraExcludedRoomIds ?? excludedRecommendedRoomIds;
-    for (const recommendation of recommendedRooms) {
-      const room = recommendation.room;
-      if (!room) continue;
-      if (room.status !== 'OPEN') continue;
-      if (room.isPrivate) continue;
-      if (myJoinedRoomPublicIds.has(room.publicId)) continue;
-      if (excludedRoomIds.has(room.publicId)) continue;
-      return room;
-    }
-    return null;
-  };
-
-  const handleRecommendedJoin = async (
-    source: 'manual' | 'auto',
-    extraExcludedRoomIds?: Set<string>
-  ) => {
-    const nextRecommendedRoom = getNextRecommendedRoom(extraExcludedRoomIds);
-    if (!nextRecommendedRoom) {
-      toast.info(source === 'auto'
-        ? '더 이상 자동으로 추천할 방이 없습니다'
-        : '지금 바로 입장 가능한 추천 방이 없습니다');
-      return;
-    }
-
-    setJoiningRoom(nextRecommendedRoom);
-    await doJoin(nextRecommendedRoom, undefined, undefined, { markAsRecommended: true });
-  };
-
   const handleRoomClick = async (roomPublicId: string) => {
     const room = filteredRooms.find(r => r.publicId === roomPublicId);
     if (!room) return;
-
-    // 이미 참여 중인 방이면 join 없이 채팅방으로 바로 이동
-    const alreadyIn = myRooms.find(r => r.publicId === roomPublicId);
-    if (alreadyIn) {
-      try {
-        const chatPublicId = await chatService.getChatRoomByGameRoom(alreadyIn.id);
-        navigate(`/chat/${chatPublicId}`);
-        return;
-      } catch {
-        // 조회 실패 시 일반 입장 플로우로 진행
-      }
-    }
-
-    if (room.isPrivate) {
-      setJoiningRoom(room);
-      setJoiningInviteCode(undefined);
-      setShowPasswordModal(true);
-    } else {
-      setJoiningRoom(room);
-      doJoin(room);
-    }
+    await requestRoomEntry(room);
   };
 
-  const handlePasswordConfirm = (password?: string) => {
-    if (!joiningRoom) return;
-    doJoin(joiningRoom, password, joiningInviteCode);
-  };
+  useEffect(() => {
+    if (!inviteModalRequest) {
+      return;
+    }
+
+    openInviteEntry(inviteModalRequest.room, inviteModalRequest.inviteCode);
+    consumeInviteModalRequest();
+  }, [consumeInviteModalRequest, inviteModalRequest, openInviteEntry]);
 
   useEffect(() => {
     const shouldOpenCreateModal = searchParams.get('create') === 'true';
@@ -243,89 +160,6 @@ export function RoomListPage() {
       createHandledRef.current = false;
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    const shouldAutoRecommend = searchParams.get('recommend') === 'true';
-    const excludedRoomPublicId = searchParams.get('exclude')?.trim();
-    if (!shouldAutoRecommend || roomsLoading) {
-      return;
-    }
-
-    const recommendationKey = `${searchParams.toString()}::${rooms?.length ?? 0}`;
-    if (recommendationHandledRef.current === recommendationKey) {
-      return;
-    }
-    recommendationHandledRef.current = recommendationKey;
-
-    const nextExcludedRoomIds = new Set(excludedRecommendedRoomIds);
-    if (excludedRoomPublicId) {
-      addExcludedRecommendedRoom(Number(gameId), excludedRoomPublicId);
-      nextExcludedRoomIds.add(excludedRoomPublicId);
-    }
-
-    handleRecommendedJoin('auto', nextExcludedRoomIds).finally(() => {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('recommend');
-      nextParams.delete('exclude');
-      setSearchParams(nextParams, { replace: true });
-    });
-  }, [gameId, rooms, roomsLoading, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    const inviteCode = searchParams.get('invite')?.trim();
-    const roomPublicId = searchParams.get('room')?.trim();
-    if (!inviteCode) {
-      setInviteEntryState(null);
-    }
-    if (!inviteCode || roomsLoading) {
-      return;
-    }
-
-    const inviteKey = `${roomPublicId ?? 'none'}:${inviteCode}`;
-    if (inviteHandledRef.current === inviteKey) {
-      return;
-    }
-    inviteHandledRef.current = inviteKey;
-
-    const openInviteModal = async () => {
-      let targetRoom: Room | undefined;
-      if (roomPublicId) {
-        targetRoom = rooms?.find(r => r.publicId === roomPublicId);
-        if (!targetRoom) {
-          try {
-            targetRoom = await roomService.getRoom(roomPublicId);
-          } catch {
-            targetRoom = undefined;
-          }
-        }
-      } else {
-        targetRoom = rooms?.find(r => r.inviteCode === inviteCode);
-      }
-
-      if (!targetRoom) {
-        setInviteEntryState({
-          inviteCode,
-          roomPublicId,
-          status: 'missing',
-        });
-        toast.error('초대 대상 방을 찾을 수 없습니다');
-        return;
-      }
-
-      setInviteEntryState({
-        inviteCode,
-        roomPublicId: targetRoom.publicId,
-        targetRoom,
-        status: 'ready',
-      });
-
-      setJoiningRoom(targetRoom);
-      setJoiningInviteCode(inviteCode);
-      setShowPasswordModal(true);
-    };
-
-    openInviteModal();
-  }, [rooms, roomsLoading, searchParams, setSearchParams, toast]);
 
   const handleRegenerateInviteCode = async (roomPublicId: string) => {
     try {
@@ -348,11 +182,8 @@ export function RoomListPage() {
     Boolean(room.isPrivate && user?.nickname && room.createdBy === user.nickname);
 
   const handleClearInviteState = () => {
-    setInviteEntryState(null);
-    setShowPasswordModal(false);
-    setJoiningRoom(null);
-    setJoiningInviteCode(undefined);
-    setSearchParams({}, { replace: true });
+    resetJoinState();
+    clearInviteEntry();
   };
 
   const handleRequestNewInvite = () => {
@@ -490,26 +321,13 @@ export function RoomListPage() {
 
       {showPasswordModal && joiningRoom && (
         <PasswordModal
-          onConfirm={handlePasswordConfirm}
+          onConfirm={confirmPasswordJoin}
           inviteCode={joiningInviteCode}
-          onCancel={() => {
-            setShowPasswordModal(false);
-            setJoiningRoom(null);
-            setJoiningInviteCode(undefined);
-          }}
+          onCancel={resetJoinState}
         />
       )}
     </div>
   );
-}
-
-type InviteEntryStatus = 'ready' | 'expired' | 'missing';
-
-interface InviteEntryState {
-  inviteCode: string;
-  roomPublicId?: string;
-  targetRoom?: Room;
-  status: InviteEntryStatus;
 }
 
 function InviteEntryBanner({
@@ -591,55 +409,4 @@ async function copyToClipboard(text: string): Promise<void> {
   textarea.select();
   document.execCommand('copy');
   document.body.removeChild(textarea);
-}
-
-function extractErrorCode(err: unknown): string | null {
-  if (
-    err &&
-    typeof err === 'object' &&
-    'response' in err
-  ) {
-    const response = (err as { response?: { data?: { code?: string } } }).response;
-    return response?.data?.code ?? null;
-  }
-  return null;
-}
-
-function getExcludedRecommendedRooms(gameId: number) {
-  if (!gameId) return new Set<string>();
-  try {
-    const raw = localStorage.getItem(RECOMMENDATION_EXCLUSION_KEY);
-    if (!raw) return new Set<string>();
-    const parsed = JSON.parse(raw) as Record<string, string[]>;
-    return new Set(parsed[String(gameId)] ?? []);
-  } catch {
-    return new Set<string>();
-  }
-}
-
-function addExcludedRecommendedRoom(gameId: number, roomPublicId: string) {
-  if (!gameId || !roomPublicId) return;
-  try {
-    const raw = localStorage.getItem(RECOMMENDATION_EXCLUSION_KEY);
-    const parsed = raw ? JSON.parse(raw) as Record<string, string[]> : {};
-    const gameKey = String(gameId);
-    const nextValues = new Set(parsed[gameKey] ?? []);
-    nextValues.add(roomPublicId);
-    parsed[gameKey] = [...nextValues];
-    localStorage.setItem(RECOMMENDATION_EXCLUSION_KEY, JSON.stringify(parsed));
-  } catch {
-    // Ignore localStorage failures for non-critical recommendation history.
-  }
-}
-
-function markRecommendedRoomActive(roomPublicId: string, gameId: number) {
-  if (!roomPublicId || !gameId) return;
-  try {
-    const raw = localStorage.getItem(RECOMMENDATION_ACTIVE_KEY);
-    const parsed = raw ? JSON.parse(raw) as Record<string, { gameId: number }> : {};
-    parsed[roomPublicId] = { gameId };
-    localStorage.setItem(RECOMMENDATION_ACTIVE_KEY, JSON.stringify(parsed));
-  } catch {
-    // Ignore localStorage failures for non-critical recommendation tracking.
-  }
 }

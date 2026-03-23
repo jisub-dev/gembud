@@ -1,15 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { ChevronDown, ChevronLeft, Users, MessageSquare, User, Bell } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { roomService } from '@/services/roomService';
-import { chatService } from '@/services/chatService';
+import { useMyChatRooms, useMyRoomChatRooms } from '@/hooks/queries/useChatQueries';
+import { selectRoomChatByRoomId } from '@/hooks/queries/roomSelectors';
+import { useMyActiveRoom } from '@/hooks/queries/useRooms';
 import { useAuthStore } from '@/store/authStore';
 import { useGames } from '@/hooks/queries/useGames';
 import { useFriends } from '@/hooks/queries/useFriends';
 import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
-import type { Room } from '@/types/room';
-import type { ChatRoomInfo } from '@/types/chat';
 
 const STATUS_COLORS: Record<string, string> = {
   OPEN: 'bg-neon-green',
@@ -78,54 +76,40 @@ export default function Sidebar() {
   const [chatsOpen, setChatsOpen] = useState(true);
   const [friendsOpen, setFriendsOpen] = useState(true);
   const [gamesOpen, setGamesOpen] = useState(true);
-  const [isOpeningRoomChat, setIsOpeningRoomChat] = useState(false);
 
   const { data: games = [] } = useGames();
 
-  const { data: myRooms = [] } = useQuery<Room[]>({
-    queryKey: ['myRooms'],
-    queryFn: roomService.getMyRooms,
+  const { data: activeMyRoom = null } = useMyActiveRoom({
     enabled: isAuthenticated,
     refetchInterval: 15000,
   });
 
-  const { data: myRoomChatRooms = [] } = useQuery<ChatRoomInfo[]>({
-    queryKey: ['myRoomChatRooms'],
-    queryFn: () => chatService.getMyChatRooms('ROOM_CHAT'),
+  const { data: myRoomChatRooms = [] } = useMyRoomChatRooms({
     enabled: isAuthenticated,
     refetchInterval: 15000,
   });
 
-  const { data: myChatRooms = [] } = useQuery<ChatRoomInfo[]>({
-    queryKey: ['myChatRooms'],
-    queryFn: () => chatService.getMyChatRooms(),
+  const { data: myChatRooms = [] } = useMyChatRooms({
     enabled: isAuthenticated,
     refetchInterval: 15000,
   });
   const { data: friends = [] } = useFriends();
   const { data: unreadNotificationCount = 0 } = useUnreadNotificationCount();
 
-  const myWaitingRoomChat = myRoomChatRooms[0] ?? null;
+  const myWaitingRoomChat = activeMyRoom ? selectRoomChatByRoomId(myRoomChatRooms, activeMyRoom.id) : null;
 
-  const handleMyWaitingRoomClick = async () => {
-    if (isOpeningRoomChat) return;
-    setIsOpeningRoomChat(true);
-    try {
-      const roomChats = await chatService.getMyChatRooms('ROOM_CHAT');
-      const roomChat = roomChats[0];
-      if (roomChat) {
-        navigate(`/chat/${roomChat.publicId}`);
-        return;
-      }
-
-      const fallbackGameId = myRooms.find((room) => room.id === myWaitingRoomChat?.relatedRoomId)?.gameId;
-      navigate(fallbackGameId ? `/games/${fallbackGameId}/rooms` : '/');
-    } catch {
-      const fallbackGameId = myRooms.find((room) => room.id === myWaitingRoomChat?.relatedRoomId)?.gameId;
-      navigate(fallbackGameId ? `/games/${fallbackGameId}/rooms` : '/');
-    } finally {
-      setIsOpeningRoomChat(false);
+  const handleMyWaitingRoomClick = () => {
+    if (!activeMyRoom) {
+      navigate('/');
+      return;
     }
+
+    if (myWaitingRoomChat) {
+      navigate(`/chat/${myWaitingRoomChat.publicId}`);
+      return;
+    }
+
+    navigate(`/games/${activeMyRoom.gameId}/rooms`);
   };
 
   return (
@@ -185,20 +169,23 @@ export default function Sidebar() {
             />
             {roomsOpen && (
               <div className="px-2 pb-1 space-y-0.5">
-                {!myWaitingRoomChat ? (
+                {!activeMyRoom || !myWaitingRoomChat ? (
                   <p className="px-3 py-2 text-xs text-text-muted italic">대기방 없음</p>
                 ) : (
                   <button
                     type="button"
                     onClick={handleMyWaitingRoomClick}
-                    disabled={isOpeningRoomChat}
-                    className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group disabled:opacity-60"
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-tertiary transition-all group"
                   >
                     <div className="relative flex-shrink-0">
                       <div className="w-8 h-8 bg-dark-tertiary rounded-md flex items-center justify-center">
                         <Users size={16} className="text-neon-purple" />
                       </div>
-                      <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-dark-secondary ${STATUS_COLORS.OPEN}`} />
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-dark-secondary ${
+                          STATUS_COLORS[activeMyRoom.status] ?? STATUS_COLORS.OPEN
+                        }`}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">

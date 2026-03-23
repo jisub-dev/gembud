@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
@@ -36,7 +36,7 @@ vi.mock('@/services/chatService', () => ({
 
 vi.mock('@/services/roomService', () => ({
   roomService: {
-    getMyRooms: vi.fn(),
+    getMyActiveRoom: vi.fn(),
     leaveRoom: vi.fn(),
     regenerateInviteCode: vi.fn(),
     buildInviteLink: vi.fn(),
@@ -44,7 +44,6 @@ vi.mock('@/services/roomService', () => ({
     transferHost: vi.fn(),
     startRoom: vi.fn(),
     resetRoom: vi.fn(),
-    closeRoom: vi.fn(),
   },
 }));
 
@@ -86,12 +85,36 @@ function createWrapper() {
     createElement(QueryClientProvider, { client: queryClient }, children);
 }
 
+async function renderChatPage() {
+  let utils!: ReturnType<typeof render>;
+  await act(async () => {
+    utils = render(<ChatPage />, { wrapper: createWrapper() });
+    await Promise.resolve();
+  });
+  await screen.findByText('추천 방');
+  return utils;
+}
+
+async function clickAndFlush(user: ReturnType<typeof userEvent.setup>, element: Element) {
+  await act(async () => {
+    await user.click(element);
+    await Promise.resolve();
+  });
+}
+
 const chatRoomInfo: ChatRoomInfo = {
   id: 101,
   publicId: 'chat-public-101',
   type: 'ROOM_CHAT',
   name: '테스트 방 채팅',
   relatedRoomId: 33,
+};
+
+const chatRoomInfoWithoutRelatedRoomId: ChatRoomInfo = {
+  id: 101,
+  publicId: 'chat-public-101',
+  type: 'ROOM_CHAT',
+  name: '테스트 방 채팅',
 };
 
 const relatedRoom: Room = {
@@ -130,8 +153,13 @@ describe('ChatPage recommendation leave flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    vi.mocked(chatService.getMyChatRooms).mockResolvedValue([chatRoomInfo]);
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([relatedRoom]);
+    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
+      if (type === 'ROOM_CHAT') {
+        return Promise.resolve([chatRoomInfo] as any);
+      }
+      return Promise.resolve([chatRoomInfo] as any);
+    });
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(relatedRoom);
     vi.mocked(roomService.leaveRoom).mockResolvedValue(undefined);
     vi.mocked(useAuthStore).mockReturnValue({
       user: { id: 1, nickname: 'me' },
@@ -150,8 +178,8 @@ describe('ChatPage recommendation leave flow', () => {
     );
     const user = userEvent.setup();
 
-    render(<ChatPage />, { wrapper: createWrapper() });
-    await user.click(await screen.findByRole('button', { name: '대기방 나가기' }));
+    await renderChatPage();
+    await clickAndFlush(user, await screen.findByRole('button', { name: '대기방 나가기' }));
 
     await waitFor(() => {
       expect(roomService.leaveRoom).toHaveBeenCalledWith(33);
@@ -165,10 +193,10 @@ describe('ChatPage recommendation leave flow', () => {
 
   it('shows invite expiry warning for host when link is expiring soon', async () => {
     const soon = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([createHostPrivateRoom(soon)]);
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(createHostPrivateRoom(soon));
     vi.mocked(roomService.buildInviteLink).mockReturnValue('https://example.com/invite');
 
-    render(<ChatPage />, { wrapper: createWrapper() });
+    await renderChatPage();
 
     expect(await screen.findByText('초대 링크 관리')).toBeInTheDocument();
     expect(screen.getByText(/초대 링크 만료 임박/)).toBeInTheDocument();
@@ -177,13 +205,38 @@ describe('ChatPage recommendation leave flow', () => {
 
   it('shows expired message for host when invite link is already expired', async () => {
     const expired = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([createHostPrivateRoom(expired)]);
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(createHostPrivateRoom(expired));
     vi.mocked(roomService.buildInviteLink).mockReturnValue('https://example.com/invite');
 
-    render(<ChatPage />, { wrapper: createWrapper() });
+    await renderChatPage();
 
     expect(await screen.findByText('초대 링크 관리')).toBeInTheDocument();
     expect(screen.getByText('초대 링크가 만료되었습니다. 재발급 후 공유해주세요.')).toBeInTheDocument();
     expect(screen.getByText(/남은 시간: 만료됨/)).toBeInTheDocument();
+  });
+
+  it('does not render room close action for host', async () => {
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(createHostPrivateRoom(new Date(Date.now() + 3600000).toISOString()));
+    vi.mocked(roomService.buildInviteLink).mockReturnValue('https://example.com/invite');
+
+    await renderChatPage();
+
+    expect(await screen.findByText('초대 링크 관리')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '방 종료' })).not.toBeInTheDocument();
+  });
+
+  it('uses ROOM_CHAT mapping without per-room lookup when relatedRoomId is missing from the general chat payload', async () => {
+    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
+      if (type === 'ROOM_CHAT') {
+        return Promise.resolve([chatRoomInfo] as any);
+      }
+      return Promise.resolve([chatRoomInfoWithoutRelatedRoomId] as any);
+    });
+    vi.mocked(chatService.getChatRoomByGameRoom).mockResolvedValue('unused');
+
+    await renderChatPage();
+
+    expect(await screen.findByText('추천 방')).toBeInTheDocument();
+    expect(chatService.getChatRoomByGameRoom).not.toHaveBeenCalled();
   });
 });

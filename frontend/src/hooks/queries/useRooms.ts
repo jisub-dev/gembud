@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomService } from '@/services/roomService';
+import { chatKeys } from './useChatQueries';
 import { roomKeys } from './useRoomQueries';
-import type { CreateRoomRequest } from '@/types/room';
+import type { CreateRoomRequest, Room } from '@/types/room';
 
 /**
  * TanStack Query hooks for room-related API calls.
@@ -36,6 +37,30 @@ export function useRoom(roomPublicId: string) {
   });
 }
 
+export function useMyRooms(options?: {
+  enabled?: boolean;
+  refetchInterval?: number | false;
+  staleTime?: number;
+}) {
+  return useQuery({
+    queryKey: roomKeys.myList(),
+    queryFn: roomService.getMyRooms,
+    ...options,
+  });
+}
+
+export function useMyActiveRoom(options?: {
+  enabled?: boolean;
+  refetchInterval?: number | false;
+  staleTime?: number;
+}) {
+  return useQuery<Room | null>({
+    queryKey: roomKeys.myActive(),
+    queryFn: roomService.getMyActiveRoom,
+    ...options,
+  });
+}
+
 /**
  * Hook to create a new room.
  * Invalidates room list cache on success.
@@ -47,8 +72,9 @@ export function useCreateRoom() {
     mutationFn: (data: CreateRoomRequest) => roomService.createRoom(data),
     onSuccess: (newRoom) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.list(newRoom.gameId) });
-      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
-      queryClient.invalidateQueries({ queryKey: ['myChatRooms'] });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
+      queryClient.invalidateQueries({ queryKey: chatKeys.myList() });
     },
   });
 }
@@ -66,7 +92,8 @@ export function useJoinRoom() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomPublicId) });
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
     },
   });
 }
@@ -83,7 +110,8 @@ export function useLeaveRoom() {
     onSuccess: (_, roomId) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.detail(roomId) });
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: ['myRooms'] });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
     },
   });
 }
@@ -99,6 +127,7 @@ export function useKickParticipant() {
       roomService.kickParticipant(roomId, userId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomId) });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
     },
   });
 }
@@ -114,6 +143,7 @@ export function useStartRoom() {
     onSuccess: (_, roomId) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.detail(roomId) });
       queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
     },
   });
 }
@@ -129,6 +159,7 @@ export function useTransferHost() {
       roomService.transferHost(roomId, userId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.detail(variables.roomId) });
+      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
     },
   });
 }

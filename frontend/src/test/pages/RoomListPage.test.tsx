@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { createElement } from 'react';
 import { RoomListPage } from '@/pages/RoomListPage';
-import { useRooms } from '@/hooks/queries/useRooms';
+import { useMyActiveRoom, useMyRooms, useRooms } from '@/hooks/queries/useRooms';
 import { useGameOptions } from '@/hooks/queries/useGames';
 import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import { useAds } from '@/hooks/queries/useAds';
@@ -32,6 +32,8 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('@/hooks/queries/useRooms', () => ({
   useRooms: vi.fn(),
+  useMyRooms: vi.fn(),
+  useMyActiveRoom: vi.fn(),
 }));
 
 vi.mock('@/hooks/queries/useGames', () => ({
@@ -58,8 +60,16 @@ vi.mock('@/services/roomService', () => ({
   roomService: {
     joinRoom: vi.fn(),
     getMyRooms: vi.fn(),
+    getMyActiveRoom: vi.fn(),
     getRoom: vi.fn(),
     regenerateInviteCode: vi.fn(),
+    leaveRoom: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/chatService', () => ({
+  chatService: {
+    getChatRoomByGameRoom: vi.fn(),
   },
 }));
 
@@ -120,6 +130,34 @@ function createWrapper(initialPath = '/') {
     );
 }
 
+async function renderRoomListPage(initialPath = '/') {
+  let utils!: ReturnType<typeof render>;
+  await act(async () => {
+    utils = render(<RoomListPage />, { wrapper: createWrapper(initialPath) });
+    await Promise.resolve();
+  });
+  await screen.findByRole('button', { name: '공개 방' });
+  return utils;
+}
+
+async function clickAndFlush(user: ReturnType<typeof userEvent.setup>, element: Element) {
+  await act(async () => {
+    await user.click(element);
+    await Promise.resolve();
+  });
+}
+
+async function typeAndFlush(
+  user: ReturnType<typeof userEvent.setup>,
+  element: Element,
+  text: string,
+) {
+  await act(async () => {
+    await user.type(element, text);
+    await Promise.resolve();
+  });
+}
+
 const publicRoom: Room = {
   id: 1,
   publicId: 'public-room-1',
@@ -141,6 +179,13 @@ const privateRoom: Room = {
   publicId: 'private-room-2',
   title: '비공개 방',
   isPrivate: true,
+};
+
+const activeRoom: Room = {
+  ...publicRoom,
+  id: 99,
+  publicId: 'my-room-99',
+  title: '내 현재 방',
 };
 
 const fullRoom: Room = {
@@ -172,8 +217,9 @@ function createApiError(code: string) {
 
 describe('RoomListPage auto-join UX', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     window.localStorage.clear();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     vi.mocked(useRooms).mockReturnValue({
       data: [publicRoom, privateRoom],
@@ -195,7 +241,8 @@ describe('RoomListPage auto-join UX', () => {
     } as any);
     vi.mocked(useAds).mockReturnValue({ data: [] } as any);
     vi.mocked(useAuthStore).mockReturnValue({ user: null } as any);
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([]);
+    vi.mocked(useMyRooms).mockReturnValue({ data: [], isLoading: false } as any);
+    vi.mocked(useMyActiveRoom).mockReturnValue({ data: null, isLoading: false } as any);
     vi.mocked(useToast).mockReturnValue({
       error: toastError,
       success: toastSuccess,
@@ -208,6 +255,64 @@ describe('RoomListPage auto-join UX', () => {
       },
       configurable: true,
     });
+    Object.defineProperty(document, 'execCommand', {
+      value: vi.fn(() => true),
+      configurable: true,
+    });
+  });
+
+  it('leaves the current room and retries when ROOM008 is returned for another room', async () => {
+    vi.mocked(useAuthStore).mockReturnValue({ user: { id: 1, nickname: 'me' } } as any);
+    vi.mocked(useMyRooms).mockReturnValue({
+      data: [
+      {
+        ...publicRoom,
+        id: 88,
+        publicId: 'my-room-88',
+        title: '먼저 로드된 다른 방',
+      },
+      activeRoom,
+      ],
+      isLoading: false,
+    } as any);
+    vi.mocked(useMyActiveRoom).mockReturnValue({ data: activeRoom, isLoading: false } as any);
+    vi.mocked(roomService.joinRoom)
+      .mockRejectedValueOnce(createApiError('ROOM008'))
+      .mockResolvedValueOnce({
+        room: publicRoom,
+        chatRoomId: 'chat-public-555',
+      } as any);
+    vi.mocked(roomService.leaveRoom).mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '공개 방' }));
+
+    await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalled();
+      expect(roomService.leaveRoom).toHaveBeenCalledWith(99);
+      expect(roomService.joinRoom).toHaveBeenCalledTimes(2);
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-public-555');
+    });
+  });
+
+  it('does not leave or retry when ROOM008 is returned and the move is canceled', async () => {
+    vi.mocked(useAuthStore).mockReturnValue({ user: { id: 1, nickname: 'me' } } as any);
+    vi.mocked(window.confirm).mockReturnValue(false);
+    vi.mocked(useMyRooms).mockReturnValue({ data: [activeRoom], isLoading: false } as any);
+    vi.mocked(useMyActiveRoom).mockReturnValue({ data: activeRoom, isLoading: false } as any);
+    vi.mocked(roomService.joinRoom).mockRejectedValueOnce(createApiError('ROOM008'));
+
+    const user = userEvent.setup();
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '공개 방' }));
+
+    await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalled();
+      expect(roomService.leaveRoom).not.toHaveBeenCalled();
+      expect(roomService.joinRoom).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   it('auto-joins public room and navigates to chat on success', async () => {
@@ -217,8 +322,8 @@ describe('RoomListPage auto-join UX', () => {
     } as any);
     const user = userEvent.setup();
 
-    render(<RoomListPage />, { wrapper: createWrapper() });
-    await user.click(screen.getByRole('button', { name: '공개 방' }));
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '공개 방' }));
 
     await waitFor(() => {
       expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-1', undefined, undefined);
@@ -230,12 +335,12 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM006'));
     const user = userEvent.setup();
 
-    render(<RoomListPage />, { wrapper: createWrapper() });
-    await user.click(screen.getByRole('button', { name: '비공개 방' }));
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '비공개 방' }));
 
     const input = await screen.findByPlaceholderText('비밀번호를 입력하세요');
-    await user.type(input, 'secret');
-    await user.click(screen.getByRole('button', { name: '입장' }));
+    await typeAndFlush(user, input, 'secret');
+    await clickAndFlush(user, screen.getByRole('button', { name: '입장' }));
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('비밀번호가 올바르지 않습니다');
@@ -248,11 +353,11 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM002'));
     const user = userEvent.setup();
 
-    render(<RoomListPage />, { wrapper: createWrapper() });
-    await user.click(screen.getByRole('button', { name: '비공개 방' }));
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '비공개 방' }));
 
-    await user.type(await screen.findByPlaceholderText('비밀번호를 입력하세요'), 'pw');
-    await user.click(screen.getByRole('button', { name: '입장' }));
+    await typeAndFlush(user, await screen.findByPlaceholderText('비밀번호를 입력하세요'), 'pw');
+    await clickAndFlush(user, screen.getByRole('button', { name: '입장' }));
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('방이 꽉 찼습니다');
@@ -267,8 +372,8 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM001'));
     const user = userEvent.setup();
 
-    render(<RoomListPage />, { wrapper: createWrapper() });
-    await user.click(screen.getByRole('button', { name: '공개 방' }));
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '공개 방' }));
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('방을 찾을 수 없습니다');
@@ -283,11 +388,9 @@ describe('RoomListPage auto-join UX', () => {
     } as any);
     const user = userEvent.setup();
 
-    render(<RoomListPage />, {
-      wrapper: createWrapper('/games/1/rooms?room=private-room-2&invite=INVITE123'),
-    });
+    await renderRoomListPage('/games/1/rooms?room=private-room-2&invite=INVITE123');
 
-    await user.click(await screen.findByRole('button', { name: '초대코드로 입장' }));
+    await clickAndFlush(user, await screen.findByRole('button', { name: '초대코드로 입장' }));
 
     await waitFor(() => {
       expect(roomService.joinRoom).toHaveBeenCalledWith('private-room-2', undefined, 'INVITE123');
@@ -299,11 +402,9 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(roomService.joinRoom).mockRejectedValue(createApiError('ROOM012'));
     const user = userEvent.setup();
 
-    render(<RoomListPage />, {
-      wrapper: createWrapper('/games/1/rooms?room=private-room-2&invite=INVITE123'),
-    });
+    await renderRoomListPage('/games/1/rooms?room=private-room-2&invite=INVITE123');
 
-    await user.click(await screen.findByRole('button', { name: '초대코드로 입장' }));
+    await clickAndFlush(user, await screen.findByRole('button', { name: '초대코드로 입장' }));
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('초대 코드가 유효하지 않거나 만료되었습니다');
@@ -314,18 +415,14 @@ describe('RoomListPage auto-join UX', () => {
   });
 
   it('shows invite target summary panel when entering with invite params', async () => {
-    render(<RoomListPage />, {
-      wrapper: createWrapper('/games/1/rooms?room=private-room-2&invite=INVITE123'),
-    });
+    await renderRoomListPage('/games/1/rooms?room=private-room-2&invite=INVITE123');
 
     expect(await screen.findByText('초대 링크로 입장 중입니다')).toBeInTheDocument();
     expect(screen.getByText('대상 방: 비공개 방')).toBeInTheDocument();
   });
 
   it('shows missing target room guide when invite room does not exist', async () => {
-    render(<RoomListPage />, {
-      wrapper: createWrapper('/games/1/rooms?room=missing-room&invite=INVITE123'),
-    });
+    await renderRoomListPage('/games/1/rooms?room=missing-room&invite=INVITE123');
 
     expect(await screen.findByText('초대 링크가 만료되었거나 유효하지 않습니다')).toBeInTheDocument();
     expect(screen.getByText(/대상 방 정보를 불러오지 못했습니다/)).toBeInTheDocument();
@@ -341,8 +438,8 @@ describe('RoomListPage auto-join UX', () => {
     } as any);
     const user = userEvent.setup();
 
-    render(<RoomListPage />, { wrapper: createWrapper() });
-    await user.click(screen.getByRole('button', { name: '비공개 방 재발급' }));
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '비공개 방 재발급' }));
 
     await waitFor(() => {
       expect(roomService.regenerateInviteCode).toHaveBeenCalledWith('private-room-2');
@@ -357,7 +454,7 @@ describe('RoomListPage auto-join UX', () => {
       error: null,
     } as any);
 
-    render(<RoomListPage />, { wrapper: createWrapper() });
+    await renderRoomListPage();
 
     expect(await screen.findByRole('button', { name: '공개 방' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '풀방' })).toBeInTheDocument();
@@ -371,8 +468,8 @@ describe('RoomListPage auto-join UX', () => {
     } as any);
     const user = userEvent.setup();
 
-    render(<RoomListPage />, { wrapper: createWrapper() });
-    await user.click(screen.getByRole('button', { name: '추천 방 바로 입장' }));
+    await renderRoomListPage();
+    await clickAndFlush(user, screen.getByRole('button', { name: '추천 방 바로 입장' }));
 
     await waitFor(() => {
       expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-1', undefined, undefined);
@@ -399,9 +496,7 @@ describe('RoomListPage auto-join UX', () => {
       chatRoomId: 'chat-public-next',
     } as any);
 
-    render(<RoomListPage />, {
-      wrapper: createWrapper('/games/1/rooms?recommend=true&exclude=public-room-1'),
-    });
+    await renderRoomListPage('/games/1/rooms?recommend=true&exclude=public-room-1');
 
     await waitFor(() => {
       expect(roomService.joinRoom).toHaveBeenCalledWith('public-room-5', undefined, undefined);
