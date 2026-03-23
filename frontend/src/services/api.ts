@@ -76,7 +76,7 @@ async function ensureCsrfToken(): Promise<void> {
     return;
   }
 
-  await axios.get(`${API_BASE_URL}/games`, {
+  await axios.get(`${API_BASE_URL}/auth/csrf`, {
     withCredentials: true,
   });
 }

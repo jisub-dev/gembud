@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `d2e9116` |
+| Base HEAD | `0b9abd9` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + frontend active-room/query/test stabilization |
 | Worktree state | modified files present, not committed |
@@ -25,6 +25,7 @@
   - `createRoom` / `joinRoom` now lock the user row before active-room checks
   - `joinRoom` now locks the room row before capacity-sensitive joins
   - CSRF cookie path now uses `/` so frontend routes can read `XSRF-TOKEN`
+  - Added `GET /auth/csrf` as a lightweight CSRF bootstrap endpoint that does not depend on game catalog queries
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
@@ -32,6 +33,7 @@
   - `myRooms` / `myActiveRoom` query key and hook usage centralized
   - `myChatRooms` / `myRoomChatRooms` query key and hook usage centralized
   - API client now prefetches a CSRF cookie before the first non-GET request when needed
+  - CSRF bootstrap now uses `GET /api/auth/csrf` instead of `GET /api/games`
   - App now redirects immediately to `/login` when the session-expired bridge fires
   - Chat socket session-expired events now use the same global session-expired bridge
   - Session-expiry bridge now falls back to `location.replace('/login')` even before the App-level handler is registered
@@ -129,6 +131,8 @@
 - Replaced the session-expired confirm modal flow with an immediate redirect to `/login`.
 - Routed chat socket `session-expired` events through the shared session-expiry bridge so HTTP and socket expiry follow the same redirect path.
 - Added a bridge-level fallback redirect so early session-expired notifications still land on `/login` before the App handler mounts.
+- Added `GET /auth/csrf` so login/signup CSRF bootstrap no longer depends on `GET /games`.
+- Switched frontend CSRF prefetch from `GET /api/games` to `GET /api/auth/csrf`.
 - Updated `Sidebar`, `RoomListPage`, and `ChatPage` to consume the shared room hooks and shared room query keys instead of inline raw keys.
 - Updated `Sidebar` and `ChatPage` to consume shared chat hooks and shared chat query keys instead of inline raw keys.
 - Updated `ChatPage` and `RoomListPage` to share the same recommendation localStorage contract.
@@ -210,11 +214,25 @@
     - 브리지 핸들러 경유와 handler 미등록 fallback redirect를 함께 고정.
 - Frontend:
   - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin ./node_modules/.bin/vitest run src/test/services/api.test.ts --reporter=verbose`
+  - Result:
+    - `Test Files 1 passed (1), Tests 2 passed (2)`
+  - Notes:
+    - 로그인 전 CSRF bootstrap 경로를 `GET /api/auth/csrf`로 바꾼 뒤 인터셉터 회귀 통과.
+- Frontend:
+  - Command:
     - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npm run build`
   - Result:
     - `BUILD SUCCESSFUL`
   - Notes:
     - 세션 만료 시 즉시 로그인 리다이렉트로 바꾼 뒤 프론트 타입체크와 번들 빌드 통과.
+- Backend:
+  - Command:
+    - `./gradlew test --tests "com.gembud.controller.AuthControllerTest"`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - `GET /auth/csrf` bootstrap endpoint의 컨트롤러 계약을 고정.
 - Backend:
   - Command:
     - `./gradlew compileJava`

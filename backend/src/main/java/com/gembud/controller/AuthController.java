@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,6 +53,24 @@ public class AuthController {
 
     @Value("${app.cookie.same-site:Lax}")
     private String cookieSameSite;
+
+    /**
+     * Bootsraps a CSRF token for anonymous clients before the first POST.
+     *
+     * @param csrfToken resolved csrf token
+     * @return token metadata (cookie carries the actual token value)
+     */
+    @Operation(summary = "Bootstrap CSRF token", description = "비로그인 상태에서 첫 POST 전에 CSRF 쿠키를 발급받습니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "CSRF 토큰 부트스트랩 성공")
+    })
+    @GetMapping("/csrf")
+    public ResponseEntity<ApiResponse<Map<String, String>>> bootstrapCsrf(CsrfToken csrfToken) {
+        return ResponseEntity.ok(ApiResponse.success(Map.of(
+            "headerName", csrfToken.getHeaderName(),
+            "parameterName", csrfToken.getParameterName()
+        )));
+    }
 
     /**
      * Registers a new user.

@@ -45,7 +45,7 @@ describe('api csrf request interceptor', () => {
       headers: {},
     });
 
-    expect(axiosGet).toHaveBeenCalledWith('http://localhost:8080/api/games', {
+    expect(axiosGet).toHaveBeenCalledWith('http://localhost:8080/api/auth/csrf', {
       withCredentials: true,
     });
     expect(config.headers['X-XSRF-TOKEN']).toBe('prefetched-token');
