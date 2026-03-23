@@ -82,6 +82,25 @@ public class RoomController {
     }
 
     /**
+     * Get the current active room for the authenticated user.
+     *
+     * @param userDetails authenticated user
+     * @return active room
+     */
+    @Operation(summary = "Get my active room", description = "내 현재 활성 방 조회")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "활성 방 조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "활성 방 없음")
+    })
+    @GetMapping("/my/active")
+    public ResponseEntity<ApiResponse<RoomResponse>> getMyActiveRoom(
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(roomService.getMyActiveRoom(userDetails.getUsername())));
+    }
+
+    /**
      * Get rooms by game.
      *
      * @param gameId game ID
@@ -252,20 +271,6 @@ public class RoomController {
     ) {
         RoomResponse room = roomService.getRoomByPublicId(publicId);
         roomService.resetRoom(room.getId(), userDetails.getUsername());
-        return ResponseEntity.ok(ApiResponse.noContent());
-    }
-
-    /**
-     * Close a room (host only). Changes status to CLOSED.
-     */
-    @Operation(summary = "Close room", description = "방 종료 (방장만 가능)")
-    @PostMapping("/{publicId}/close")
-    public ResponseEntity<ApiResponse<Void>> closeRoom(
-        @PathVariable String publicId,
-        @AuthenticationPrincipal UserDetails userDetails
-    ) {
-        RoomResponse room = roomService.getRoomByPublicId(publicId);
-        roomService.closeRoom(room.getId(), userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 

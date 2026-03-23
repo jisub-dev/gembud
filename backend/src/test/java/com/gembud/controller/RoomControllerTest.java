@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Disabled;
@@ -185,6 +186,49 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("GET /rooms/my/active - should return my active room")
+    @WithMockUser(username = "test@example.com")
+    void getMyActiveRoom_Success() throws Exception {
+        RoomResponse response = RoomResponse.builder()
+            .id(1L)
+            .publicId("123e4567-e89b-12d3-a456-426614174000")
+            .gameId(1L)
+            .title("내 활성 방")
+            .createdBy("테스트유저")
+            .currentParticipants(2)
+            .maxParticipants(5)
+            .status("OPEN")
+            .build();
+
+        when(roomService.getMyActiveRoom("test@example.com")).thenReturn(response);
+
+        mockMvc.perform(get("/rooms/my/active"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(200))
+            .andExpect(jsonPath("$.data.id").value(1))
+            .andExpect(jsonPath("$.data.publicId").value("123e4567-e89b-12d3-a456-426614174000"))
+            .andExpect(jsonPath("$.data.title").value("내 활성 방"))
+            .andExpect(jsonPath("$.data.status").value("OPEN"));
+
+        verify(roomService).getMyActiveRoom("test@example.com");
+    }
+
+    @Test
+    @DisplayName("GET /rooms/my/active - should return 404 when there is no active room")
+    @WithMockUser(username = "test@example.com")
+    void getMyActiveRoom_NotFound() throws Exception {
+        when(roomService.getMyActiveRoom("test@example.com"))
+            .thenThrow(new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        mockMvc.perform(get("/rooms/my/active"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ROOM001"))
+            .andExpect(jsonPath("$.message").value("Room not found"));
+
+        verify(roomService).getMyActiveRoom("test@example.com");
+    }
+
+    @Test
     @DisplayName("GET /rooms/{roomId} - should return room details")
     @WithMockUser
     void getRoomById_Success() throws Exception {
@@ -329,6 +373,28 @@ class RoomControllerTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("ROOM012"))
             .andExpect(jsonPath("$.message").value("Invalid or expired invite code"));
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{publicId}/join - should return 409 when already in another active room")
+    @WithMockUser(username = "test@example.com")
+    void joinRoomByPublicId_AlreadyInOtherRoom() throws Exception {
+        JoinRoomRequest request = new JoinRoomRequest();
+
+        when(roomService.joinRoomByPublicId(
+            eq("123e4567-e89b-12d3-a456-426614174000"),
+            any(JoinRoomRequest.class),
+            eq("test@example.com"),
+            eq("203.0.113.10")
+        )).thenThrow(new BusinessException(ErrorCode.ALREADY_IN_OTHER_ROOM));
+
+        mockMvc.perform(post("/rooms/123e4567-e89b-12d3-a456-426614174000/join")
+                .header("X-Forwarded-For", "203.0.113.10")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("ROOM008"))
+            .andExpect(jsonPath("$.message").value("이미 다른 대기방에 참가 중입니다."));
     }
 
     @Test

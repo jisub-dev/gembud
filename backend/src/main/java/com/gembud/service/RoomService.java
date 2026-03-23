@@ -17,6 +17,7 @@ import com.gembud.repository.RoomFilterRepository;
 import com.gembud.repository.RoomParticipantRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -57,8 +58,7 @@ public class RoomService {
      */
     @Transactional
     public RoomResponse createRoom(CreateRoomRequest request, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = findUserForRoomMutation(userEmail);
 
         // Phase 11: Check if user is suspended
         if (user.isSuspended()) {
@@ -123,10 +123,9 @@ public class RoomService {
             filterRepository.saveAll(filters);
         }
 
-        // Create chat room for this game room
-        Long chatRoomId = chatService.createChatRoomForGameRoom(room.getId());
-        // Add creator as chat room member (internal, no auth check)
-        chatService.addMemberToChatRoomInternal(chatRoomId, user.getId());
+        // Ensure the room-chat invariant is established in one place.
+        ChatRoomMapping chatRoom = ensureRoomChat(room.getId());
+        chatService.addMemberToChatRoomInternal(chatRoom.id(), user.getId());
 
         return buildRoomResponse(room);
     }
@@ -147,6 +146,26 @@ public class RoomService {
     }
 
     /**
+     * Get the current active room for the user.
+     *
+     * <p>The active room is defined as the most recently joined non-closed room.
+     * This preserves the existing ordering contract from {@link #getMyRooms(String)}
+     * while giving callers a single-room endpoint.</p>
+     *
+     * @param userEmail current user email
+     * @return active room response
+     */
+    @Transactional(readOnly = true)
+    public RoomResponse getMyActiveRoom(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return participantRepository.findActiveRoomsByUserId(user.getId()).stream()
+            .findFirst()
+            .map(rp -> buildRoomResponse(rp.getRoom()))
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+    }
+
+    /**
      * Get rooms by game.
      *
      * @param gameId game ID
@@ -154,7 +173,10 @@ public class RoomService {
      */
     @Transactional(readOnly = true)
     public List<RoomResponse> getRoomsByGame(Long gameId) {
-        return roomRepository.findByGameIdAndStatusAndDeletedAtIsNull(gameId, Room.RoomStatus.OPEN).stream()
+        return roomRepository.findByGameIdAndStatusInAndDeletedAtIsNull(
+                gameId,
+                EnumSet.of(Room.RoomStatus.OPEN, Room.RoomStatus.FULL, Room.RoomStatus.IN_PROGRESS)
+            ).stream()
             .map(this::buildRoomResponse)
             .collect(Collectors.toList());
     }
@@ -201,16 +223,18 @@ public class RoomService {
      */
     @Transactional
     public RoomResponse joinRoom(Long roomId, JoinRoomRequest request, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = findUserForRoomMutation(userEmail);
 
         // Phase 11: Check if user is suspended
         if (user.isSuspended()) {
             throw new BusinessException(ErrorCode.USER_SUSPENDED);
         }
 
-        Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+        Room room = findRoomForJoin(roomId);
+
+        if (room.getStatus() == Room.RoomStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.ROOM_ALREADY_IN_PROGRESS);
+        }
 
         // Guard by both status and count to prevent over-capacity joins on stale status.
         if (room.getStatus() == Room.RoomStatus.FULL
@@ -267,12 +291,11 @@ public class RoomService {
         roomRepository.save(room);
 
         // Add user to chat room (internal, no auth check)
-        Long chatRoomId = chatService.getChatRoomIdByGameRoomId(roomId);
-        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
-        chatService.addMemberToChatRoomInternal(chatRoomId, user.getId());
+        ChatRoomMapping chatRoom = ensureRoomChat(roomId);
+        chatService.addMemberToChatRoomInternal(chatRoom.id(), user.getId());
 
         notifyHostOnJoin(roomId, user, room);
-        broadcastRoomUpdate(chatRoomPublicId);
+        broadcastRoomUpdate(chatRoom.publicId());
 
         return buildRoomResponse(room);
     }
@@ -300,16 +323,15 @@ public class RoomService {
         participantRepository.delete(participant);
         room.decrementParticipants();
 
-        // Remove user from chat room
-        Long chatRoomId = chatService.getChatRoomIdByGameRoomId(roomId);
-        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
-        chatService.removeMemberFromChatRoom(chatRoomId, user.getId());
+        // Resolve the chat room once so the room/chat invariant stays centralized.
+        ChatRoomMapping chatRoom = ensureRoomChat(roomId);
+        chatService.removeMemberFromChatRoom(chatRoom.id(), user.getId());
 
         // If no participants left, soft-delete room
         if (room.getCurrentParticipants() == 0) {
             room.softDelete();
             roomRepository.save(room);
-            broadcastRoomUpdate(chatRoomPublicId);
+            broadcastRoomUpdate(chatRoom.publicId());
             return;
         }
 
@@ -332,7 +354,7 @@ public class RoomService {
         }
 
         roomRepository.save(room);
-        broadcastRoomUpdate(chatRoomPublicId);
+        broadcastRoomUpdate(chatRoom.publicId());
     }
 
     /**
@@ -368,10 +390,9 @@ public class RoomService {
         room.decrementParticipants();
         roomRepository.save(room);
 
-        Long chatRoomId = chatService.getChatRoomIdByGameRoomId(roomId);
-        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
-        chatService.removeMemberFromChatRoom(chatRoomId, targetUserId);
-        broadcastRoomUpdate(chatRoomPublicId);
+        ChatRoomMapping chatRoom = ensureRoomChat(roomId);
+        chatService.removeMemberFromChatRoom(chatRoom.id(), targetUserId);
+        broadcastRoomUpdate(chatRoom.publicId());
     }
 
     /**
@@ -427,8 +448,7 @@ public class RoomService {
             .build();
         participantRepository.save(newHost);
 
-        String chatRoomPublicId = chatService.getChatRoomByGameRoomId(roomId);
-        broadcastRoomUpdate(chatRoomPublicId);
+        broadcastRoomUpdate(ensureRoomChat(roomId).publicId());
     }
 
     /**
@@ -458,6 +478,7 @@ public class RoomService {
 
         room.start();
         roomRepository.save(room);
+        broadcastRoomUpdate(ensureRoomChat(roomId).publicId());
     }
 
     /**
@@ -487,35 +508,7 @@ public class RoomService {
 
         room.resetToOpen();
         roomRepository.save(room);
-    }
-
-    /**
-     * Close a room (host only). Changes status to CLOSED.
-     *
-     * @param roomId room ID
-     * @param hostEmail current user email (must be host)
-     */
-    @Transactional
-    public void closeRoom(Long roomId, String hostEmail) {
-        User host = userRepository.findByEmail(hostEmail)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
-
-        RoomParticipant hostParticipant = participantRepository.findByRoomIdAndUserId(roomId, host.getId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_IN_ROOM));
-
-        if (!hostParticipant.getIsHost()) {
-            throw new BusinessException(ErrorCode.NOT_HOST);
-        }
-
-        if (room.getStatus() == Room.RoomStatus.CLOSED) {
-            throw new BusinessException(ErrorCode.ROOM_ALREADY_CLOSED);
-        }
-
-        room.close();
-        roomRepository.save(room);
+        broadcastRoomUpdate(ensureRoomChat(roomId).publicId());
     }
 
     /**
@@ -551,8 +544,8 @@ public class RoomService {
         }
 
         rateLimitService.resetJoinLimit(ip, publicId);
-        String chatRoomId = chatService.getChatRoomByGameRoomId(room.getId());
-        return new JoinRoomResult(roomResponse, chatRoomId);
+        ChatRoomMapping chatRoom = ensureRoomChat(room.getId());
+        return new JoinRoomResult(roomResponse, chatRoom.publicId());
     }
 
     /**
@@ -586,6 +579,50 @@ public class RoomService {
      * Result object for joinRoomByPublicId.
      */
     public record JoinRoomResult(RoomResponse room, String chatRoomId) {}
+
+    /**
+     * Resolve the chat room for a game room, recreating it only when the mapping is missing.
+     *
+     * <p>This centralizes the legacy recovery path for room/chat invariants so the rest of the
+     * service can treat the mapping as required.</p>
+     */
+    private ChatRoomMapping ensureRoomChat(Long roomId) {
+        try {
+            return new ChatRoomMapping(
+                chatService.getChatRoomIdByGameRoomId(roomId),
+                chatService.getChatRoomByGameRoomId(roomId)
+            );
+        } catch (BusinessException e) {
+            if (e.getErrorCode() != ErrorCode.CHAT_ROOM_NOT_FOUND) {
+                throw e;
+            }
+
+            Long chatRoomId = chatService.createChatRoomForGameRoom(roomId);
+            return new ChatRoomMapping(chatRoomId, chatService.getPublicIdByChatRoomId(chatRoomId));
+        }
+    }
+
+    private record ChatRoomMapping(Long id, String publicId) {}
+
+    private User findUserForRoomMutation(String userEmail) {
+        var lockedUser = userRepository.findByEmailForUpdate(userEmail);
+        if (lockedUser != null && lockedUser.isPresent()) {
+            return lockedUser.get();
+        }
+
+        return userRepository.findByEmail(userEmail)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    private Room findRoomForJoin(Long roomId) {
+        var lockedRoom = roomRepository.findByIdForUpdate(roomId);
+        if (lockedRoom != null && lockedRoom.isPresent()) {
+            return lockedRoom.get();
+        }
+
+        return roomRepository.findById(roomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+    }
 
     private void notifyHostOnJoin(Long roomId, User joiner, Room room) {
         participantRepository.findByRoomId(roomId).stream()
