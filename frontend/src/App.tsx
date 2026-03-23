@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from '
 import { lazy, Suspense, useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 import { ToastContainer } from './components/common/ToastContainer';
-import { SessionExpiredModal } from './components/common/SessionExpiredModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import { PwaUpdateBanner } from './components/common/PwaUpdateBanner';
 import { OfflineStatusBanner } from './components/common/OfflineStatusBanner';
@@ -55,12 +54,14 @@ function SessionExpiredHandler() {
   const isSessionExpired = useAuthStore((s) => s.isSessionExpired);
   const navigate = useNavigate();
 
-  const handleConfirm = () => {
+  useEffect(() => {
+    if (!isSessionExpired) return;
+
     useAuthStore.setState({ isSessionExpired: false });
     navigate('/login', { replace: true });
-  };
+  }, [isSessionExpired, navigate]);
 
-  return <SessionExpiredModal isOpen={isSessionExpired} onConfirm={handleConfirm} />;
+  return null;
 }
 
 function LegacyGameDetailRedirect() {

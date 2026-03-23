@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `14dfeb9` |
+| Base HEAD | `d2e9116` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + frontend active-room/query/test stabilization |
 | Worktree state | modified files present, not committed |
@@ -32,6 +32,9 @@
   - `myRooms` / `myActiveRoom` query key and hook usage centralized
   - `myChatRooms` / `myRoomChatRooms` query key and hook usage centralized
   - API client now prefetches a CSRF cookie before the first non-GET request when needed
+  - App now redirects immediately to `/login` when the session-expired bridge fires
+  - Chat socket session-expired events now use the same global session-expired bridge
+  - Session-expiry bridge now falls back to `location.replace('/login')` even before the App-level handler is registered
   - RoomListPage create-modal query param flow extracted into a dedicated hook
   - RoomListPage invite-entry URL flow extracted into a dedicated hook
   - RoomListPage join/password/retry orchestration extracted into `useRoomJoinFlow`
@@ -123,6 +126,9 @@
 - Updated `RoomServiceTest` so the `ALREADY_IN_OTHER_ROOM` create-room failure path also verifies `findByEmailForUpdate`, not just the happy path.
 - Updated `RoomServiceTest` so representative `joinRoom` failure paths (`ROOM008`, `ROOM_FULL`, `ROOM_ALREADY_IN_PROGRESS`) also verify `findByEmailForUpdate` and `findByIdForUpdate`.
 - Updated backend CSRF cookie path to `/` and frontend API bootstrap logic so login/signup can obtain and send `X-XSRF-TOKEN` from a public preflight GET instead of failing on the first POST.
+- Replaced the session-expired confirm modal flow with an immediate redirect to `/login`.
+- Routed chat socket `session-expired` events through the shared session-expiry bridge so HTTP and socket expiry follow the same redirect path.
+- Added a bridge-level fallback redirect so early session-expired notifications still land on `/login` before the App handler mounts.
 - Updated `Sidebar`, `RoomListPage`, and `ChatPage` to consume the shared room hooks and shared room query keys instead of inline raw keys.
 - Updated `Sidebar` and `ChatPage` to consume shared chat hooks and shared chat query keys instead of inline raw keys.
 - Updated `ChatPage` and `RoomListPage` to share the same recommendation localStorage contract.
@@ -188,6 +194,27 @@
     - `Test Files 1 passed (1), Tests 2 passed (2)`
   - Notes:
     - 비-GET 요청 전 CSRF 쿠키 시드와 기존 토큰 재사용 로직을 고정.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin ./node_modules/.bin/vitest run src/test/pages/ChatPage.test.tsx --reporter=verbose`
+  - Result:
+    - `Test Files 1 passed (1), Tests 5 passed (5)`
+  - Notes:
+    - 소켓 경유 session-expired 브리지 정리 후 `ChatPage` 타깃 회귀 통과.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin ./node_modules/.bin/vitest run src/test/lib/sessionExpiryBridge.test.ts src/test/pages/ChatPage.test.tsx --reporter=verbose`
+  - Result:
+    - `Test Files 2 passed (2), Tests 7 passed (7)`
+  - Notes:
+    - 브리지 핸들러 경유와 handler 미등록 fallback redirect를 함께 고정.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npm run build`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - 세션 만료 시 즉시 로그인 리다이렉트로 바꾼 뒤 프론트 타입체크와 번들 빌드 통과.
 - Backend:
   - Command:
     - `./gradlew compileJava`

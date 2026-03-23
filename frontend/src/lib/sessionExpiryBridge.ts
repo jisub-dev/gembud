@@ -7,5 +7,12 @@ export function setSessionExpiredHandler(handler: SessionExpiredHandler | null) 
 }
 
 export function notifySessionExpired() {
-  sessionExpiredHandler?.();
+  if (sessionExpiredHandler) {
+    sessionExpiredHandler();
+    return;
+  }
+
+  if (typeof location !== 'undefined') {
+    location.replace('/login');
+  }
 }
