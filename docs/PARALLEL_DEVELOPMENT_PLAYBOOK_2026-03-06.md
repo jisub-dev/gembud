@@ -1,6 +1,6 @@
 # Gembud 병렬 개발 운영 플레이북 - 2026-03-06
 
-> **Last updated:** 2026-03-11 16:08 KST (by Codex, main terminal) — T1/T2/T3 PR squash merge main 반영 완료
+> **Last updated:** 2026-03-11 16:32 KST (by Codex, main terminal) — room lifecycle hotfix 적용 및 전체 검증 완료
 
 ---
 
@@ -8,15 +8,17 @@
 
 | 항목 | 값 |
 |------|-----|
-| 마지막 main HEAD | `c30e133` authstore split + admin security events + invite policy tests |
-| Backend tests | 이전 라운드 기준 최신 |
-| Frontend tests | `npx vitest run --reporter=verbose` 통과 (44 passed) |
+| 마지막 main HEAD | `14dfeb9` authstore split + admin security events + invite policy tests |
+| Backend tests | `./gradlew test --tests "*RoomServiceTest" --tests "*RoomControllerTest" --continue` 통과 |
+| Frontend tests | `npx vitest run --reporter=verbose` 통과 (52 passed) |
 | Frontend build | `npm run build` 통과 |
 
 ### Hotfix Memo
 
 - `main` 작업중: 홈 추천방 제거, `/games/:id -> /games/:id/rooms` 리다이렉트, 방 입장 후 채팅 경로 수정, 친구 검색 쿼리 보강
 - 추가 보강: WebSocket `/topic/chat/{publicId}` 구독 검증 수정, 추천 입장 후 이탈 자동 재추천 회귀 테스트 추가
+- room lifecycle hotfix: `방 종료` UI/API 제거, `ROOM008` 발생 시 기존 대기방 leave 후 타겟 방 재입장 UX 추가
+- room lifecycle hotfix: stale `내 대기방` ROOM_CHAT 숨김, 누락된 ROOM_CHAT 자동 생성, `OPEN/FULL/IN_PROGRESS` 목록/상태 동기화 보강
 
 ### Worktree 구조
 
