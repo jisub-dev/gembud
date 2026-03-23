@@ -280,8 +280,8 @@ class RoomServiceTest {
             .build();
         ReflectionTestUtils.setField(joiner, "id", 2L);
 
-        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(userRepository.findByEmailForUpdate("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(true);
 
         // When / Then
@@ -289,6 +289,9 @@ class RoomServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.ALREADY_IN_OTHER_ROOM);
+
+        verify(userRepository).findByEmailForUpdate("joiner@example.com");
+        verify(roomRepository).findByIdForUpdate(1L);
     }
 
     @Test
@@ -328,13 +331,16 @@ class RoomServiceTest {
             .build();
         ReflectionTestUtils.setField(joiner, "id", 2L);
 
-        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
-        when(roomRepository.findById(2L)).thenReturn(Optional.of(fullRoom));
+        when(userRepository.findByEmailForUpdate("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(fullRoom));
 
         assertThatThrownBy(() -> roomService.joinRoom(2L, new JoinRoomRequest(), "joiner@example.com"))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.ROOM_FULL);
+
+        verify(userRepository).findByEmailForUpdate("joiner@example.com");
+        verify(roomRepository).findByIdForUpdate(2L);
     }
 
     @Test
@@ -358,13 +364,16 @@ class RoomServiceTest {
             .build();
         ReflectionTestUtils.setField(joiner, "id", 2L);
 
-        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
-        when(roomRepository.findById(15L)).thenReturn(Optional.of(inProgressRoom));
+        when(userRepository.findByEmailForUpdate("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(inProgressRoom));
 
         assertThatThrownBy(() -> roomService.joinRoom(15L, new JoinRoomRequest(), "joiner@example.com"))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.ROOM_ALREADY_IN_PROGRESS);
+
+        verify(userRepository).findByEmailForUpdate("joiner@example.com");
+        verify(roomRepository).findByIdForUpdate(15L);
     }
 
     @Test

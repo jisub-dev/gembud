@@ -115,6 +115,7 @@
 - Added `RoomControllerTest` coverage for `GET /rooms/my/active` success and no-active-room paths to lock the controller contract around the new endpoint.
 - Added `RoomControllerTest` coverage for `POST /rooms/{publicId}/join` returning `ROOM008` so the publicId join contract matches the frontend leave-then-rejoin flow.
 - Updated `RoomServiceTest` so the `ALREADY_IN_OTHER_ROOM` create-room failure path also verifies `findByEmailForUpdate`, not just the happy path.
+- Updated `RoomServiceTest` so representative `joinRoom` failure paths (`ROOM008`, `ROOM_FULL`, `ROOM_ALREADY_IN_PROGRESS`) also verify `findByEmailForUpdate` and `findByIdForUpdate`.
 - Updated `Sidebar`, `RoomListPage`, and `ChatPage` to consume the shared room hooks and shared room query keys instead of inline raw keys.
 - Updated `Sidebar` and `ChatPage` to consume shared chat hooks and shared chat query keys instead of inline raw keys.
 - Updated `ChatPage` and `RoomListPage` to share the same recommendation localStorage contract.
