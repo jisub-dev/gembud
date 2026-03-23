@@ -47,10 +47,13 @@ public class SecurityConfig {
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setCookiePath("/");
+
         http
             // CSRF: cookie-based token (frontend reads XSRF-TOKEN cookie, sends X-XSRF-TOKEN header)
             .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRepository(csrfTokenRepository)
                 .ignoringRequestMatchers("/ws/**", "/api/auth/oauth2/**", "/auth/oauth2/**")
             )
             .cors(cors -> cors.configurationSource(corsConfigurationSource))

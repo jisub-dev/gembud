@@ -24,12 +24,14 @@
   - `OPEN`, `FULL`, `IN_PROGRESS` room list policy covered by test
   - `createRoom` / `joinRoom` now lock the user row before active-room checks
   - `joinRoom` now locks the room row before capacity-sensitive joins
+  - CSRF cookie path now uses `/` so frontend routes can read `XSRF-TOKEN`
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
   - Sidebar / RoomListPage now read active room from backend contract
   - `myRooms` / `myActiveRoom` query key and hook usage centralized
   - `myChatRooms` / `myRoomChatRooms` query key and hook usage centralized
+  - API client now prefetches a CSRF cookie before the first non-GET request when needed
   - RoomListPage create-modal query param flow extracted into a dedicated hook
   - RoomListPage invite-entry URL flow extracted into a dedicated hook
   - RoomListPage join/password/retry orchestration extracted into `useRoomJoinFlow`
@@ -40,6 +42,7 @@
 - Tests:
   - backend `RoomServiceTest` updated
   - backend `RoomControllerTest` now covers `GET /rooms/my/active` and `POST /rooms/{publicId}/join` `ROOM008`
+  - frontend `api` interceptor now has CSRF bootstrap coverage
   - frontend room/chat/sidebar targeted tests updated
   - RoomListPage test mocks aligned to the new hook layer
   - targeted room/chat/sidebar suites now run without `act(...)` warnings
@@ -119,6 +122,7 @@
 - Added `RoomControllerTest` coverage for `POST /rooms/{publicId}/join` returning `ROOM008` so the publicId join contract matches the frontend leave-then-rejoin flow.
 - Updated `RoomServiceTest` so the `ALREADY_IN_OTHER_ROOM` create-room failure path also verifies `findByEmailForUpdate`, not just the happy path.
 - Updated `RoomServiceTest` so representative `joinRoom` failure paths (`ROOM008`, `ROOM_FULL`, `ROOM_ALREADY_IN_PROGRESS`) also verify `findByEmailForUpdate` and `findByIdForUpdate`.
+- Updated backend CSRF cookie path to `/` and frontend API bootstrap logic so login/signup can obtain and send `X-XSRF-TOKEN` from a public preflight GET instead of failing on the first POST.
 - Updated `Sidebar`, `RoomListPage`, and `ChatPage` to consume the shared room hooks and shared room query keys instead of inline raw keys.
 - Updated `Sidebar` and `ChatPage` to consume shared chat hooks and shared chat query keys instead of inline raw keys.
 - Updated `ChatPage` and `RoomListPage` to share the same recommendation localStorage contract.
@@ -177,6 +181,20 @@
     - `BUILD SUCCESSFUL`
   - Notes:
     - `useRoomJoinFlow` 추출 후 타입체크와 프로덕션 번들 빌드까지 통과.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin ./node_modules/.bin/vitest run src/test/services/api.test.ts --reporter=verbose`
+  - Result:
+    - `Test Files 1 passed (1), Tests 2 passed (2)`
+  - Notes:
+    - 비-GET 요청 전 CSRF 쿠키 시드와 기존 토큰 재사용 로직을 고정.
+- Backend:
+  - Command:
+    - `./gradlew compileJava`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - `SecurityConfig`의 CSRF cookie path 변경이 컴파일 기준으로 유효함을 확인.
 - Backend:
   - Command:
     - `./gradlew test --tests "com.gembud.service.RoomServiceTest"`

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { notifySessionExpired } from '@/lib/sessionExpiryBridge';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,15 +15,16 @@ const api = axios.create({
 
 // Phase 12: Cookie-based authentication + CSRF protection
 api.interceptors.request.use(
-  (config) => {
-    // Add CSRF token from cookie to header
-    const csrfToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('XSRF-TOKEN='))
-      ?.split('=')[1];
+  async (config) => {
+    const method = config.method?.toLowerCase();
 
-    if (csrfToken && config.method !== 'get') {
-      config.headers['X-XSRF-TOKEN'] = decodeURIComponent(csrfToken);
+    if (method && method !== 'get') {
+      await ensureCsrfToken();
+      const csrfToken = getCsrfTokenFromCookie();
+
+      if (csrfToken) {
+        config.headers['X-XSRF-TOKEN'] = decodeURIComponent(csrfToken);
+      }
     }
 
     return config;
@@ -61,3 +63,20 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+function getCsrfTokenFromCookie(): string | null {
+  return document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${CSRF_COOKIE_NAME}=`))
+    ?.split('=')[1] ?? null;
+}
+
+async function ensureCsrfToken(): Promise<void> {
+  if (getCsrfTokenFromCookie()) {
+    return;
+  }
+
+  await axios.get(`${API_BASE_URL}/games`, {
+    withCredentials: true,
+  });
+}
