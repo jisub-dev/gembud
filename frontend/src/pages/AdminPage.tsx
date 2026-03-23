@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import reportService, { type AdminReportItem, type AdminReportStatus } from '@/services/reportService';
@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [securitySummary, setSecuritySummary] = useState<SecuritySummary | null>(null);
   const [isLoadingSecurityList, setIsLoadingSecurityList] = useState(false);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const didSkipInitialReportFilterLoadRef = useRef(false);
 
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
   const isAdmin = useMemo(() => {
@@ -146,8 +147,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) return;
+    if (!didSkipInitialReportFilterLoadRef.current) {
+      didSkipInitialReportFilterLoadRef.current = true;
+      return;
+    }
     loadReports(reportStatusFilter, reportSearch, 0);
-  }, [reportStatusFilter]);
+  }, [isAdmin, reportStatusFilter, reportSearch]);
 
   const handleWarn = async (reportId: number) => {
     const warningMessage = window.prompt('경고 메시지를 입력하세요.', '운영 정책 위반 경고');

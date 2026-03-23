@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AdminPage from '@/pages/AdminPage';
 import { useAuthStore } from '@/store/authStore';
@@ -36,6 +36,14 @@ vi.mock('@/services/adminService', () => ({
     unlockUserLogin: vi.fn(),
   },
 }));
+
+async function renderAdminPage() {
+  await act(async () => {
+    render(<AdminPage />);
+    await Promise.resolve();
+  });
+  await screen.findByText('관리자 페이지');
+}
 
 describe('AdminPage reports flow', () => {
   beforeEach(() => {
@@ -111,15 +119,19 @@ describe('AdminPage reports flow', () => {
     });
 
     const user = userEvent.setup();
-    render(<AdminPage />);
+    await renderAdminPage();
 
     expect(await screen.findByText('alpha')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'RESOLVED' }));
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: 'RESOLVED' }));
+    });
     expect(await screen.findByText('gamma')).toBeInTheDocument();
 
     const searchInput = screen.getByPlaceholderText('신고자/피신고자 닉네임 검색');
-    await user.type(searchInput, 'zzz');
-    await user.click(screen.getByRole('button', { name: '검색' }));
+    await act(async () => {
+      await user.type(searchInput, 'zzz');
+      await user.click(screen.getByRole('button', { name: '검색' }));
+    });
     expect(screen.getByText('조건에 맞는 신고가 없습니다.')).toBeInTheDocument();
   });
 
@@ -144,9 +156,11 @@ describe('AdminPage reports flow', () => {
     vi.mocked(reportService.warnReport).mockResolvedValue(undefined);
 
     const user = userEvent.setup();
-    render(<AdminPage />);
+    await renderAdminPage();
 
-    await user.click(await screen.findByRole('button', { name: '경고 처리' }));
+    await act(async () => {
+      await user.click(await screen.findByRole('button', { name: '경고 처리' }));
+    });
 
     await waitFor(() => {
       expect(reportService.warnReport).toHaveBeenCalledWith(21, '경고 메시지');
@@ -187,13 +201,17 @@ describe('AdminPage reports flow', () => {
     } as any);
 
     const user = userEvent.setup();
-    render(<AdminPage />);
+    await renderAdminPage();
 
-    await user.click(screen.getByRole('button', { name: '보안 이벤트' }));
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: '보안 이벤트' }));
+    });
     const [typeSelect, riskSelect] = screen.getAllByRole('combobox');
-    await user.selectOptions(typeSelect, 'LOGIN_FAIL');
-    await user.selectOptions(riskSelect, 'HIGH');
-    await user.click(screen.getByRole('button', { name: '필터 적용' }));
+    await act(async () => {
+      await user.selectOptions(typeSelect, 'LOGIN_FAIL');
+      await user.selectOptions(riskSelect, 'HIGH');
+      await user.click(screen.getByRole('button', { name: '필터 적용' }));
+    });
 
     await waitFor(() => {
       const calls = vi.mocked(adminService.getSecurityEvents).mock.calls;
