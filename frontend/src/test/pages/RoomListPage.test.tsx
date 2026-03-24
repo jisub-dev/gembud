@@ -5,7 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { createElement } from 'react';
 import { RoomListPage } from '@/pages/RoomListPage';
-import { useMyActiveRoom, useMyRooms, useRooms } from '@/hooks/queries/useRooms';
+import {
+  useJoinRoom,
+  useLeaveRoom,
+  useMyActiveRoom,
+  useMyRooms,
+  useRegenerateInviteCode,
+  useRooms,
+} from '@/hooks/queries/useRooms';
 import { useGameOptions } from '@/hooks/queries/useGames';
 import { useRecommendedRooms } from '@/hooks/queries/useMatching';
 import { useAds } from '@/hooks/queries/useAds';
@@ -14,11 +21,22 @@ import { useToast } from '@/hooks/useToast';
 import { roomService } from '@/services/roomService';
 import type { Room } from '@/types/room';
 
-const { mockNavigate, toastError, toastSuccess, clipboardWriteText } = vi.hoisted(() => ({
+const {
+  clipboardWriteText,
+  joinRoomMutateAsync,
+  leaveRoomMutateAsync,
+  mockNavigate,
+  regenerateInviteMutateAsync,
+  toastError,
+  toastSuccess,
+} = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   clipboardWriteText: vi.fn(),
+  joinRoomMutateAsync: vi.fn(),
+  leaveRoomMutateAsync: vi.fn(),
+  regenerateInviteMutateAsync: vi.fn(),
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -34,6 +52,18 @@ vi.mock('@/hooks/queries/useRooms', () => ({
   useRooms: vi.fn(),
   useMyRooms: vi.fn(),
   useMyActiveRoom: vi.fn(),
+  useJoinRoom: vi.fn(() => ({
+    isPending: false,
+    mutateAsync: joinRoomMutateAsync,
+  })),
+  useLeaveRoom: vi.fn(() => ({
+    isPending: false,
+    mutateAsync: leaveRoomMutateAsync,
+  })),
+  useRegenerateInviteCode: vi.fn(() => ({
+    isPending: false,
+    mutateAsync: regenerateInviteMutateAsync,
+  })),
   syncClientAfterLeavingRoom: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -59,6 +89,7 @@ vi.mock('@/hooks/useToast', () => ({
 
 vi.mock('@/services/roomService', () => ({
   roomService: {
+    buildInviteLink: vi.fn(),
     joinRoom: vi.fn(),
     getMyRooms: vi.fn(),
     getMyActiveRoom: vi.fn(),
@@ -233,6 +264,30 @@ describe('RoomListPage auto-join UX', () => {
     vi.resetAllMocks();
     window.localStorage.clear();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(useJoinRoom).mockReturnValue({
+      isPending: false,
+      mutateAsync: joinRoomMutateAsync,
+    } as any);
+    vi.mocked(useLeaveRoom).mockReturnValue({
+      isPending: false,
+      mutateAsync: leaveRoomMutateAsync,
+    } as any);
+    vi.mocked(useRegenerateInviteCode).mockReturnValue({
+      isPending: false,
+      mutateAsync: regenerateInviteMutateAsync,
+    } as any);
+    joinRoomMutateAsync.mockImplementation(({ inviteCode, password, roomPublicId }) =>
+      roomService.joinRoom(roomPublicId, password, inviteCode) as any,
+    );
+    leaveRoomMutateAsync.mockImplementation(({ room }) =>
+      roomService.leaveRoom(room.id) as any,
+    );
+    regenerateInviteMutateAsync.mockImplementation(({ room }) =>
+      roomService.regenerateInviteCode(room.publicId) as any,
+    );
+    vi.mocked(roomService.buildInviteLink).mockImplementation(
+      (room) => `https://example.com/invite/${room.inviteCode ?? 'missing'}`,
+    );
 
     vi.mocked(useRooms).mockReturnValue({
       data: [publicRoom, privateRoom],

@@ -1,11 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Plus, Sparkles } from 'lucide-react';
 import { useMyActiveRoom, useMyRooms, useRooms } from '@/hooks/queries/useRooms';
 import { useGameOptions } from '@/hooks/queries/useGames';
 import { useRecommendedRooms } from '@/hooks/queries/useMatching';
-import { roomKeys } from '@/hooks/queries/useRoomQueries';
+import { useRoomInviteActions } from '@/hooks/useRoomInviteActions';
 import { useRoomRecommendations } from '@/hooks/useRoomRecommendations';
 import { useRoomJoinFlow } from '@/hooks/useRoomJoinFlow';
 import { useRoomCreateEntry } from '@/hooks/useRoomCreateEntry';
@@ -19,7 +18,6 @@ import { useAds } from '@/hooks/queries/useAds';
 import { useRoomInviteEntry, type InviteEntryState } from '@/hooks/useRoomInviteEntry';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
-import { roomService } from '@/services/roomService';
 import type { Room } from '@/types/room';
 import { isPremiumActive } from '@/config/features';
 
@@ -27,7 +25,6 @@ export function RoomListPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { data: ads = [] } = useAds();
   const showAds = !isPremiumActive(user?.isPremium);
@@ -81,9 +78,9 @@ export function RoomListPage() {
     navigate,
     onInviteExpired: markInviteExpired,
     onInviteMissing: markInviteMissing,
-    queryClient,
     toast,
   });
+  const { regenerateInviteLink } = useRoomInviteActions({ toast });
   const {
     closeCreateModal,
     openCreateModal,
@@ -157,20 +154,18 @@ export function RoomListPage() {
   }, [consumeInviteModalRequest, inviteModalRequest, openInviteEntry]);
 
   const handleRegenerateInviteCode = async (roomPublicId: string) => {
-    try {
-      const updatedRoom = await roomService.regenerateInviteCode(roomPublicId);
-      if (!updatedRoom.inviteCode) {
-        toast.error('초대코드 생성에 실패했습니다');
-        return;
-      }
+    const room = filteredRooms.find((candidateRoom) => candidateRoom.publicId === roomPublicId);
+    if (!room) return;
 
-      const inviteUrl = `${window.location.origin}/games/${gameId}/rooms?room=${updatedRoom.publicId}&invite=${encodeURIComponent(updatedRoom.inviteCode)}`;
-      await copyToClipboard(inviteUrl);
-      toast.success('초대 링크가 클립보드에 복사되었습니다');
-      queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
-    } catch {
-      toast.error('초대코드 재발급에 실패했습니다');
-    }
+    await regenerateInviteLink({
+      copyAfterRegenerate: true,
+      copyMessages: {
+        error: '초대 링크 복사에 실패했습니다',
+        success: '초대 링크가 클립보드에 복사되었습니다',
+      },
+      regenerateErrorMessage: '초대코드 재발급에 실패했습니다',
+      room,
+    });
   };
 
   const shouldShowRegenerateInviteButton = (room: Room) =>
@@ -307,10 +302,7 @@ export function RoomListPage() {
           gameId={Number(gameId)}
           gameName={game.name}
           onClose={closeCreateModal}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: roomKeys.list(Number(gameId)) });
-            closeCreateModal();
-          }}
+          onSuccess={closeCreateModal}
         />
       )}
 
@@ -388,20 +380,4 @@ function InviteEntryBanner({
       </div>
     </div>
   );
-}
-
-async function copyToClipboard(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.left = '-9999px';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  document.body.removeChild(textarea);
 }

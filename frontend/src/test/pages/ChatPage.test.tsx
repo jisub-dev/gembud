@@ -13,7 +13,8 @@ import { useToast } from '@/hooks/useToast';
 import type { ChatRoomInfo } from '@/types/chat';
 import type { Room } from '@/types/room';
 
-const { mockNavigate, toastSuccess, toastError } = vi.hoisted(() => ({
+const { clipboardWriteText, mockNavigate, toastSuccess, toastError } = vi.hoisted(() => ({
+  clipboardWriteText: vi.fn(),
   mockNavigate: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -62,7 +63,33 @@ vi.mock('@/components/chat/ChatPanel', () => ({
 }));
 
 vi.mock('@/components/room/RoomParticipants', () => ({
-  RoomParticipants: () => <div>RoomParticipants</div>,
+  RoomParticipants: ({
+    onKick,
+    onTransferHost,
+    participants = [],
+  }: {
+    onKick?: (userId: number, nickname: string) => void;
+    onTransferHost?: (userId: number, nickname: string) => void;
+    participants?: Array<{ nickname: string; userId: number }>;
+  }) => {
+    const targetParticipant = participants.find((participant) => participant.userId === 2);
+
+    return (
+      <div>
+        <div>RoomParticipants</div>
+        {targetParticipant && onKick && (
+          <button onClick={() => onKick(targetParticipant.userId, targetParticipant.nickname)}>
+            강퇴 실행
+          </button>
+        )}
+        {targetParticipant && onTransferHost && (
+          <button onClick={() => onTransferHost(targetParticipant.userId, targetParticipant.nickname)}>
+            방장 이전 실행
+          </button>
+        )}
+      </div>
+    );
+  },
 }));
 
 vi.mock('@/components/room/EvaluateModal', () => ({
@@ -141,16 +168,23 @@ const relatedRoom: Room = {
   ],
 };
 
-function createHostPrivateRoom(inviteExpiresAt: string): Room {
+function createHostRoom(status: Room['status'] = 'OPEN'): Room {
   return {
     ...relatedRoom,
-    isPrivate: true,
-    inviteCode: 'INV123',
-    inviteCodeExpiresAt: inviteExpiresAt,
+    status,
     participants: [
       { userId: 1, nickname: 'me', isHost: true },
       { userId: 2, nickname: 'guest', isHost: false },
     ],
+  };
+}
+
+function createHostPrivateRoom(inviteExpiresAt: string): Room {
+  return {
+    ...createHostRoom('OPEN'),
+    isPrivate: true,
+    inviteCode: 'INV123',
+    inviteCodeExpiresAt: inviteExpiresAt,
   };
 }
 
@@ -162,6 +196,8 @@ describe('ChatPage recommendation leave flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(window, 'alert').mockImplementation(() => undefined);
     currentActiveRoom = relatedRoom;
     roomChatRoomsState = [chatRoomInfo];
     myChatRoomsState = [chatRoomInfo];
@@ -177,6 +213,52 @@ describe('ChatPage recommendation leave flow', () => {
       roomChatRoomsState = [];
       myChatRoomsState = [];
     });
+    vi.mocked(roomService.kickParticipant).mockImplementation(async (_roomId, userId) => {
+      if (!currentActiveRoom) return;
+      currentActiveRoom = {
+        ...currentActiveRoom,
+        currentParticipants: Math.max(0, currentActiveRoom.currentParticipants - 1),
+        participants: currentActiveRoom.participants?.filter((participant) => participant.userId !== userId),
+      };
+    });
+    vi.mocked(roomService.transferHost).mockImplementation(async (_roomId, userId) => {
+      if (!currentActiveRoom) return;
+      currentActiveRoom = {
+        ...currentActiveRoom,
+        participants: currentActiveRoom.participants?.map((participant) => ({
+          ...participant,
+          isHost: participant.userId === userId,
+        })),
+      };
+    });
+    vi.mocked(roomService.startRoom).mockImplementation(async () => {
+      if (!currentActiveRoom) return;
+      currentActiveRoom = {
+        ...currentActiveRoom,
+        status: 'IN_PROGRESS',
+      };
+    });
+    vi.mocked(roomService.resetRoom).mockImplementation(async () => {
+      if (!currentActiveRoom) return;
+      currentActiveRoom = {
+        ...currentActiveRoom,
+        status: 'OPEN',
+      };
+    });
+    vi.mocked(roomService.regenerateInviteCode).mockImplementation(async () => {
+      if (!currentActiveRoom) {
+        throw new Error('No active room');
+      }
+      currentActiveRoom = {
+        ...currentActiveRoom,
+        inviteCode: 'NEWCODE123',
+        inviteCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      };
+      return currentActiveRoom as any;
+    });
+    vi.mocked(roomService.buildInviteLink).mockImplementation((room: any) =>
+      `https://example.com/invite/${room.inviteCode ?? 'missing'}`,
+    );
     vi.mocked(useAuthStore).mockReturnValue({
       user: { id: 1, nickname: 'me' },
     } as any);
@@ -185,6 +267,12 @@ describe('ChatPage recommendation leave flow', () => {
       error: toastError,
       info: vi.fn(),
     } as any);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: clipboardWriteText.mockResolvedValue(undefined),
+      },
+      configurable: true,
+    });
   });
 
   it('navigates to next recommendation flow when leaving a recommended room', async () => {
@@ -218,6 +306,77 @@ describe('ChatPage recommendation leave flow', () => {
       expect(queryClient.getQueryData(roomKeys.myActive())).toBeNull();
       expect(queryClient.getQueryData(chatKeys.myRoomChats())).toEqual([]);
       expect(queryClient.getQueryData(chatKeys.myList())).toEqual([]);
+    });
+  });
+
+  it('updates active room cache when host starts the room', async () => {
+    currentActiveRoom = createHostRoom('OPEN');
+    const user = userEvent.setup();
+    const { queryClient } = await renderChatPage();
+
+    await clickAndFlush(user, await screen.findByRole('button', { name: '게임 시작' }));
+
+    await waitFor(() => {
+      expect(roomService.startRoom).toHaveBeenCalledWith(33);
+      expect((queryClient.getQueryData(roomKeys.myActive()) as Room | null)?.status).toBe('IN_PROGRESS');
+    });
+  });
+
+  it('updates active room cache when host resets the room to OPEN', async () => {
+    currentActiveRoom = createHostRoom('IN_PROGRESS');
+    const user = userEvent.setup();
+    const { queryClient } = await renderChatPage();
+
+    await clickAndFlush(user, await screen.findByRole('button', { name: '대기중으로 변경' }));
+
+    await waitFor(() => {
+      expect(roomService.resetRoom).toHaveBeenCalledWith('room-public-33');
+      expect((queryClient.getQueryData(roomKeys.myActive()) as Room | null)?.status).toBe('OPEN');
+      expect(toastSuccess).toHaveBeenCalledWith('방 상태를 대기중으로 변경했습니다.');
+    });
+  });
+
+  it('updates participants cache when host transfers the host role', async () => {
+    currentActiveRoom = createHostRoom('OPEN');
+    const user = userEvent.setup();
+    const { queryClient } = await renderChatPage();
+
+    await clickAndFlush(user, await screen.findByRole('button', { name: '방장 이전 실행' }));
+
+    await waitFor(() => {
+      expect(roomService.transferHost).toHaveBeenCalledWith(33, 2);
+      const activeRoom = queryClient.getQueryData(roomKeys.myActive()) as Room | null;
+      expect(activeRoom?.participants?.find((participant) => participant.userId === 1)?.isHost).toBe(false);
+      expect(activeRoom?.participants?.find((participant) => participant.userId === 2)?.isHost).toBe(true);
+    });
+  });
+
+  it('updates participants cache when host kicks a participant', async () => {
+    currentActiveRoom = createHostRoom('OPEN');
+    const user = userEvent.setup();
+    const { queryClient } = await renderChatPage();
+
+    await clickAndFlush(user, await screen.findByRole('button', { name: '강퇴 실행' }));
+
+    await waitFor(() => {
+      expect(roomService.kickParticipant).toHaveBeenCalledWith(33, 2);
+      const activeRoom = queryClient.getQueryData(roomKeys.myActive()) as Room | null;
+      expect(activeRoom?.currentParticipants).toBe(1);
+      expect(activeRoom?.participants).toEqual([{ userId: 1, nickname: 'me', isHost: true }]);
+    });
+  });
+
+  it('regenerates invite link through the shared invite action hook', async () => {
+    currentActiveRoom = createHostPrivateRoom(new Date(Date.now() + 5 * 60 * 1000).toISOString());
+    const user = userEvent.setup();
+
+    await renderChatPage();
+    await clickAndFlush(user, await screen.findByRole('button', { name: '초대 링크 재발급' }));
+
+    await waitFor(() => {
+      expect(roomService.regenerateInviteCode).toHaveBeenCalledWith('room-public-33');
+      expect(toastSuccess).toHaveBeenCalledWith('초대 링크를 재발급했습니다');
+      expect(screen.getByDisplayValue('https://example.com/invite/NEWCODE123')).toBeInTheDocument();
     });
   });
 

@@ -1,20 +1,27 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, LogOut } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { RoomParticipants } from '@/components/room/RoomParticipants';
 import { EvaluateModal } from '@/components/room/EvaluateModal';
 import { roomService } from '@/services/roomService';
 import evaluationService from '@/services/evaluationService';
-import { chatKeys, useMyChatRooms, useMyRoomChatRooms } from '@/hooks/queries/useChatQueries';
+import { useMyChatRooms, useMyRoomChatRooms } from '@/hooks/queries/useChatQueries';
 import { addExcludedRecommendedRoom, consumeRecommendedRoomActive } from '@/hooks/useRoomRecommendations';
 import {
   selectChatRoomByPublicId,
   selectRoomChatByPublicId,
 } from '@/hooks/queries/roomSelectors';
-import { roomKeys } from '@/hooks/queries/useRoomQueries';
-import { syncClientAfterLeavingRoom, useMyActiveRoom } from '@/hooks/queries/useRooms';
+import {
+  useKickParticipant,
+  useLeaveRoom,
+  useMyActiveRoom,
+  useResetRoom,
+  useStartRoom,
+  useTransferHost,
+} from '@/hooks/queries/useRooms';
+import { useRoomInviteActions } from '@/hooks/useRoomInviteActions';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { getInviteExpiryInfo } from '@/utils/inviteExpiry';
@@ -38,17 +45,20 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'info' | 'chat'>('info');
-  const [isStartingRoom, setIsStartingRoom] = useState(false);
-  const [isResettingRoom, setIsResettingRoom] = useState(false);
   const [isEvaluateModalOpen, setIsEvaluateModalOpen] = useState(false);
-  const [inviteLink, setInviteLink] = useState('');
-  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | undefined>(undefined);
-  const [isRegeneratingInvite, setIsRegeneratingInvite] = useState(false);
   const [inviteNowMs, setInviteNowMs] = useState(Date.now());
 
-  const queryClient = useQueryClient();
   const toast = useToast();
-  const [isLeaving, setIsLeaving] = useState(false);
+  const kickParticipantMutation = useKickParticipant();
+  const leaveRoomMutation = useLeaveRoom();
+  const resetRoomMutation = useResetRoom();
+  const startRoomMutation = useStartRoom();
+  const transferHostMutation = useTransferHost();
+  const {
+    copyInviteLink,
+    isRegeneratingInvite,
+    regenerateInviteLink,
+  } = useRoomInviteActions({ toast });
   const hasChatPublicId = !!chatPublicId;
 
   const {
@@ -67,7 +77,6 @@ export default function ChatPage() {
 
   const {
     data: myActiveRoom = null,
-    refetch: refetchMyActiveRoom,
   } = useMyActiveRoom({
     enabled: hasChatPublicId,
   });
@@ -112,6 +121,18 @@ export default function ChatPage() {
     isEvaluatableLoading ||
     evaluatableParticipants.length === 0 ||
     !hasEvaluatableParticipants;
+  const inviteLink = useMemo(() => {
+    if (!isHost || !relatedRoom?.isPrivate || !relatedRoom.inviteCode) {
+      return '';
+    }
+
+    try {
+      return roomService.buildInviteLink(relatedRoom);
+    } catch {
+      return '';
+    }
+  }, [isHost, relatedRoom]);
+  const inviteExpiresAt = relatedRoom?.inviteCodeExpiresAt;
   const inviteExpiryInfo = useMemo(
     () => getInviteExpiryInfo(inviteExpiresAt, inviteNowMs),
     [inviteExpiresAt, inviteNowMs],
@@ -122,25 +143,6 @@ export default function ChatPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [activeTab]);
-
-  useEffect(() => {
-    if (!isHost || !relatedRoom?.isPrivate) {
-      setInviteLink('');
-      setInviteExpiresAt(undefined);
-      return;
-    }
-
-    setInviteExpiresAt(relatedRoom.inviteCodeExpiresAt);
-    if (relatedRoom.inviteCode) {
-      try {
-        setInviteLink(roomService.buildInviteLink(relatedRoom));
-      } catch {
-        setInviteLink('');
-      }
-    } else {
-      setInviteLink('');
-    }
-  }, [isHost, relatedRoom]);
 
   useEffect(() => {
     if (!inviteExpiresAt) return;
@@ -157,10 +159,7 @@ export default function ChatPage() {
     if (!relatedRoom) return;
     if (!window.confirm(`${nickname}님을 강퇴하시겠습니까?`)) return;
     try {
-      await roomService.kickParticipant(relatedRoom.id, userId);
-      await refetchMyActiveRoom();
-      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
-      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
+      await kickParticipantMutation.mutateAsync({ room: relatedRoom, userId });
     } catch {
       window.alert('강퇴 처리에 실패했습니다.');
     }
@@ -170,10 +169,7 @@ export default function ChatPage() {
     if (!relatedRoom) return;
     if (!window.confirm(`${nickname}님에게 방장을 넘기시겠습니까?`)) return;
     try {
-      await roomService.transferHost(relatedRoom.id, userId);
-      await refetchMyActiveRoom();
-      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
-      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
+      await transferHostMutation.mutateAsync({ room: relatedRoom, userId });
     } catch {
       window.alert('방장 이전에 실패했습니다.');
     }
@@ -181,79 +177,45 @@ export default function ChatPage() {
 
   const handleStartRoom = async () => {
     if (!relatedRoom) return;
-    setIsStartingRoom(true);
     try {
-      await roomService.startRoom(relatedRoom.id);
-      await refetchMyActiveRoom();
-      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
-      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
+      await startRoomMutation.mutateAsync({ room: relatedRoom });
     } catch {
       window.alert('게임 시작에 실패했습니다.');
-    } finally {
-      setIsStartingRoom(false);
     }
   };
 
   const handleResetRoom = async () => {
     if (!relatedRoom) return;
-    setIsResettingRoom(true);
     try {
-      await roomService.resetRoom(relatedRoom.publicId);
-      await refetchMyActiveRoom();
-      await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
-      await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
+      await resetRoomMutation.mutateAsync({ room: relatedRoom });
       toast.success('방 상태를 대기중으로 변경했습니다.');
     } catch {
       toast.error('대기중으로 변경에 실패했습니다.');
-    } finally {
-      setIsResettingRoom(false);
     }
   };
 
   const handleCopyInviteLink = async () => {
-    if (!inviteLink) {
-      toast.error('현재 사용할 수 있는 초대 링크가 없습니다');
-      return;
-    }
-    try {
-      await copyToClipboard(inviteLink);
-      toast.success('초대 링크가 복사되었습니다');
-    } catch {
-      toast.error('초대 링크 복사에 실패했습니다');
-    }
+    await copyInviteLink(relatedRoom, {
+      error: '초대 링크 복사에 실패했습니다',
+      missing: '현재 사용할 수 있는 초대 링크가 없습니다',
+      success: '초대 링크가 복사되었습니다',
+    });
   };
 
   const handleRegenerateInviteLink = async () => {
     if (!relatedRoom?.publicId) return;
-    if (!window.confirm('재발급하면 이전 링크가 무효화됩니다')) return;
-
-    setIsRegeneratingInvite(true);
-    try {
-      const updatedRoom = await roomService.regenerateInviteCode(relatedRoom.publicId);
-      if (!updatedRoom.inviteCode) {
-        toast.error('초대 링크 재발급에 실패했습니다');
-        return;
-      }
-
-      setInviteLink(roomService.buildInviteLink(updatedRoom));
-      setInviteExpiresAt(updatedRoom.inviteCodeExpiresAt);
-      toast.success('초대 링크를 재발급했습니다');
-    } catch {
-      toast.error('초대 링크 재발급에 실패했습니다');
-    } finally {
-      setIsRegeneratingInvite(false);
-    }
+    await regenerateInviteLink({
+      confirmMessage: '재발급하면 이전 링크가 무효화됩니다',
+      regenerateErrorMessage: '초대 링크 재발급에 실패했습니다',
+      regenerateSuccessMessage: '초대 링크를 재발급했습니다',
+      room: relatedRoom,
+    });
   };
 
   const handleLeave = async () => {
     if (!relatedRoom) return;
-    setIsLeaving(true);
     try {
-      await roomService.leaveRoom(relatedRoom.id);
-      await syncClientAfterLeavingRoom(queryClient, relatedRoom.id, {
-        gameId: relatedRoom.gameId,
-        roomPublicId: relatedRoom.publicId,
-      });
+      await leaveRoomMutation.mutateAsync({ room: relatedRoom });
       toast.success('대기방을 나갔습니다');
       if (consumeRecommendedRoomActive(relatedRoom.publicId, relatedRoom.gameId)) {
         addExcludedRecommendedRoom(relatedRoom.gameId, relatedRoom.publicId);
@@ -263,8 +225,6 @@ export default function ChatPage() {
       }
     } catch {
       toast.error('나가기에 실패했습니다');
-    } finally {
-      setIsLeaving(false);
     }
   };
 
@@ -307,11 +267,11 @@ export default function ChatPage() {
           {relatedRoom && (
             <button
               onClick={handleLeave}
-              disabled={isLeaving}
+              disabled={leaveRoomMutation.isPending}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:text-white hover:bg-red-500/20 border border-red-500/40 rounded transition disabled:opacity-50"
             >
               <LogOut size={15} />
-              {isLeaving ? '나가는 중...' : '대기방 나가기'}
+              {leaveRoomMutation.isPending ? '나가는 중...' : '대기방 나가기'}
             </button>
           )}
         </div>
@@ -443,22 +403,22 @@ export default function ChatPage() {
                         <div className="flex gap-2">
                           {relatedRoom.status === 'OPEN' && (
                             <button
-                              type="button"
-                              onClick={handleStartRoom}
-                              disabled={isStartingRoom}
-                              className="flex-1 py-2 rounded bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
-                            >
-                              {isStartingRoom ? '시작 중...' : '게임 시작'}
+                            type="button"
+                            onClick={handleStartRoom}
+                            disabled={startRoomMutation.isPending}
+                            className="flex-1 py-2 rounded bg-purple-500 hover:bg-purple-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
+                          >
+                              {startRoomMutation.isPending ? '시작 중...' : '게임 시작'}
                             </button>
                           )}
                           {relatedRoom.status === 'IN_PROGRESS' && (
                             <button
                               type="button"
                               onClick={handleResetRoom}
-                              disabled={isResettingRoom}
+                              disabled={resetRoomMutation.isPending}
                               className="flex-1 py-2 rounded bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed font-semibold transition"
                             >
-                              {isResettingRoom ? '변경 중...' : '대기중으로 변경'}
+                              {resetRoomMutation.isPending ? '변경 중...' : '대기중으로 변경'}
                             </button>
                           )}
                         </div>
@@ -499,20 +459,4 @@ export default function ChatPage() {
       )}
     </div>
   );
-}
-
-async function copyToClipboard(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.left = '-9999px';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  document.body.removeChild(textarea);
 }

@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import type { QueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import type { NavigateFunction } from 'react-router-dom';
 import { roomKeys } from '@/hooks/queries/useRoomQueries';
-import { syncClientAfterLeavingRoom } from '@/hooks/queries/useRooms';
+import { useJoinRoom, useLeaveRoom } from '@/hooks/queries/useRooms';
 import { markRecommendedRoomActive } from '@/hooks/useRoomRecommendations';
 import { chatService } from '@/services/chatService';
-import { roomService } from '@/services/roomService';
 import type { JoinRoomResult, Room } from '@/types/room';
 
 interface ToastHandlers {
@@ -20,7 +19,6 @@ interface UseRoomJoinFlowParams {
   navigate: NavigateFunction;
   onInviteExpired: (inviteCode: string, room: Room) => void;
   onInviteMissing: (inviteCode: string, room: Room) => void;
-  queryClient: QueryClient;
   toast: ToastHandlers;
 }
 
@@ -36,9 +34,11 @@ export function useRoomJoinFlow({
   navigate,
   onInviteExpired,
   onInviteMissing,
-  queryClient,
   toast,
 }: UseRoomJoinFlowParams) {
+  const queryClient = useQueryClient();
+  const joinRoomMutation = useJoinRoom();
+  const leaveRoomMutation = useLeaveRoom();
   const [joiningRoom, setJoiningRoom] = useState<Room | null>(null);
   const [joiningInviteCode, setJoiningInviteCode] = useState<string | undefined>(undefined);
   const [isJoining, setIsJoining] = useState(false);
@@ -65,7 +65,11 @@ export function useRoomJoinFlow({
     setIsJoining(true);
 
     try {
-      const result = await roomService.joinRoom(room.publicId, password, inviteCode);
+      const result = await joinRoomMutation.mutateAsync({
+        inviteCode,
+        password,
+        roomPublicId: room.publicId,
+      });
       handleJoinSuccess({
         gameId,
         navigate,
@@ -104,11 +108,12 @@ export function useRoomJoinFlow({
       } else if (errorCode === 'ROOM008') {
         const resolved = await resolveAlreadyInOtherRoom({
           activeRoom,
-          gameId,
           inviteCode,
+          leaveRoom: async (roomToLeave) => {
+            await leaveRoomMutation.mutateAsync({ room: roomToLeave });
+          },
           options,
           password,
-          queryClient,
           retryJoin: joinRoom,
           room,
           toast,
@@ -189,21 +194,19 @@ function handleJoinSuccess({
 
 async function resolveAlreadyInOtherRoom({
   activeRoom,
-  gameId,
   inviteCode,
+  leaveRoom,
   options,
   password,
-  queryClient,
   retryJoin,
   room,
   toast,
 }: {
   activeRoom: Room | null;
-  gameId: number;
   inviteCode?: string;
+  leaveRoom: (room: Room) => Promise<void>;
   options?: JoinRoomOptions;
   password?: string;
-  queryClient: QueryClient;
   retryJoin: (
     room: Room,
     password?: string,
@@ -239,11 +242,7 @@ async function resolveAlreadyInOtherRoom({
   }
 
   try {
-    await roomService.leaveRoom(currentActiveRoom.id);
-    await syncClientAfterLeavingRoom(queryClient, currentActiveRoom.id, {
-      gameId,
-      roomPublicId: currentActiveRoom.publicId,
-    });
+    await leaveRoom(currentActiveRoom);
     toast.success('이전 대기방을 나가고 새 방에 입장합니다');
     await retryJoin(room, password, inviteCode, {
       ...options,
