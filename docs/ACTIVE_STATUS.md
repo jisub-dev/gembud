@@ -9,11 +9,11 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `9369b84` |
+| Base HEAD | `c510936` |
 | Active branch | `main` |
-| Current focus | room/chat lifecycle stabilization + frontend active-room/query/test stabilization |
+| Current focus | room/chat lifecycle stabilization + room action mutation ownership consolidation |
 | Worktree state | modified files present, not committed |
-| Verification | backend targeted test passed, frontend full suite passed |
+| Verification | backend full suite passed, frontend full suite passed |
 | Default execution mode | main agent orchestrates, sub-agents used aggressively for separable work |
 
 ### Active Work Summary
@@ -46,6 +46,10 @@
   - RoomListPage invite-entry URL flow extracted into a dedicated hook
   - RoomListPage join/password/retry orchestration extracted into `useRoomJoinFlow`
   - Recommendation localStorage state and auto-join flow centralized into a shared hook/util layer
+  - room action mutation ownership now lives in shared query hooks for `join`, `leave`, `kick`, `transferHost`, `start`, `reset`, `invite regenerate`
+  - `ChatPage` / `RoomListPage` now use shared room mutation hooks instead of direct room action API calls
+  - invite regenerate/copy flow is shared via `useRoomInviteActions`
+  - clipboard fallback logic is shared via `frontend/src/utils/clipboard.ts`
   - ROOM_CHAT mapping logic separated into shared selector helper
   - Auth mutations now force a fresh `/api/auth/csrf` bootstrap before POST so legacy CSRF cookies are cleaned up before login/signup/refresh
   - leave 후 `myActiveRoom` / `myRoomChatRooms` / `myChatRooms` cache를 즉시 정리해 Sidebar waiting-room 잔상을 제거
@@ -57,9 +61,11 @@
   - backend `RoomControllerTest` now covers `GET /rooms/my/active` and `POST /rooms/{publicId}/join` `ROOM008`
   - frontend `api` interceptor now has CSRF bootstrap coverage
   - frontend room/chat/sidebar targeted tests updated
+  - frontend room action cache synchronization now has host-action regression coverage in `ChatPage.test.tsx`
   - RoomListPage test mocks aligned to the new hook layer
   - targeted room/chat/sidebar suites now run without `act(...)` warnings
   - full frontend vitest suite passes without `act(...)` warning output
+  - backend full `./gradlew test --continue` passes with lifecycle service/controller coverage in place
   - live login verification now passes against `http://localhost:8080/api` once Redis is running
 
 ### Current Modified Areas
@@ -78,12 +84,12 @@
   - `frontend/src/services/api.ts`
   - `frontend/src/hooks/queries/useChatQueries.ts`
   - `frontend/src/hooks/useRoomCreateEntry.ts`
+  - `frontend/src/hooks/useRoomInviteActions.ts`
   - `frontend/src/hooks/useRoomInviteEntry.ts`
   - `frontend/src/hooks/useRoomJoinFlow.ts`
   - `frontend/src/hooks/useRoomRecommendations.ts`
   - `frontend/src/hooks/queries/roomSelectors.ts`
   - `frontend/src/hooks/queries/useRooms.ts`
-  - `frontend/src/hooks/useRoomJoinFlow.ts`
   - `frontend/src/pages/ChatPage.tsx`
   - `frontend/public/sw.js`
   - `frontend/src/pages/RoomListPage.tsx`
@@ -91,6 +97,7 @@
   - `frontend/src/test/components/layout/Sidebar.test.tsx`
   - `frontend/src/test/pages/ChatPage.test.tsx`
   - `frontend/src/test/pages/RoomListPage.test.tsx`
+  - `frontend/src/utils/clipboard.ts`
 - Misc:
   - `docs/PARALLEL_DEVELOPMENT_PLAYBOOK_2026-03-06.md`
   - untracked local artifact: `.vite/`
@@ -98,6 +105,7 @@
 ### Known Risks / Follow-ups
 
 - `RoomListPage` create/join/invite/recommendation 흐름은 대부분 훅으로 분리됐지만, 화면 레벨 배선과 invalidate 포인트는 여전히 페이지가 최종 조립을 맡는다.
+- `ChatPage` is no longer calling direct room action APIs, but it still derives the visible invite URL locally from the current room snapshot.
 - Backend now serializes `create/join` by user and locks joined rooms; controller coverage improved, but broader integration coverage for the new path is still thin.
 - Worktree is dirty; changes are not yet committed or grouped into a final PR-ready unit.
 - The frontend registers a PWA service worker in production, but localhost development now intentionally disables and clears it to avoid stale cached modules.
@@ -152,6 +160,14 @@
 - Added a shared leave-room cache reset path in `frontend/src/hooks/queries/useRooms.ts`.
 - Updated `frontend/src/pages/ChatPage.tsx` and `frontend/src/hooks/useRoomJoinFlow.ts` to use the shared leave cache reset so leaving or switching rooms clears active-room/chat caches immediately.
 - Added targeted frontend regression coverage to ensure leave clears the active room + ROOM_CHAT cache and that ROOM008 rejoin still succeeds.
+- Centralized frontend room action ownership into shared mutation hooks in `frontend/src/hooks/queries/useRooms.ts`.
+- Updated `frontend/src/hooks/useRoomJoinFlow.ts` so ROOM008 resolution uses shared `join` / `leave` mutations instead of direct service calls.
+- Updated `frontend/src/pages/ChatPage.tsx` so `kick`, `transferHost`, `start`, `reset`, `leave`, and invite regeneration all go through shared mutation/hook paths.
+- Updated `frontend/src/pages/RoomListPage.tsx` so invite regeneration uses the shared invite action hook and no longer calls room action APIs directly.
+- Added `frontend/src/hooks/useRoomInviteActions.ts` to unify invite regenerate/copy/toast behavior across room list and chat pages.
+- Added `frontend/src/utils/clipboard.ts` to consolidate clipboard fallback behavior.
+- Expanded `frontend/src/test/pages/ChatPage.test.tsx` to cover host actions updating active room/participant caches without stale Sidebar or ROOM_CHAT state.
+- Expanded `frontend/src/test/pages/RoomListPage.test.tsx` to align mutation-layer mocks with the shared hook ownership model.
 
 #### Verification
 
@@ -195,9 +211,30 @@
   - Command:
     - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run src/test/pages/ChatPage.test.tsx src/test/pages/RoomListPage.test.tsx src/test/components/layout/Sidebar.test.tsx --reporter=verbose`
   - Result:
-    - `Test Files 3 passed (3), Tests 32 passed (32)`
+    - `Test Files 3 passed (3), Tests 37 passed (37)`
   - Notes:
-    - leave 후 Sidebar waiting-room 잔상 제거와 ROOM008 rejoin 흐름을 함께 고정.
+    - leave 후 Sidebar waiting-room 잔상 제거, ROOM008 rejoin, host action cache sync, invite regenerate 흐름을 함께 고정.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run`
+  - Result:
+    - `Test Files 12 passed (12), Tests 67 passed (67)`
+  - Notes:
+    - full frontend suite remains green after room action mutation consolidation.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npm run build`
+  - Result:
+    - `vite build` succeeded
+  - Notes:
+    - RoomListPage / ChatPage refactor compiles cleanly in production build mode.
+- Backend:
+  - Command:
+    - `./gradlew test --continue`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - service/controller lifecycle coverage remains green after the room action ownership refactor on the frontend side.
 - Backend:
   - Command:
     - `curl` duplicate-cookie replay against temporary `http://localhost:8081/api`
