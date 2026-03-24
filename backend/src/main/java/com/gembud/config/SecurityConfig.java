@@ -3,6 +3,9 @@ package com.gembud.config;
 import com.gembud.security.JwtAuthenticationFilter;
 import com.gembud.security.OAuth2SuccessHandler;
 import com.gembud.security.CustomAuthenticationEntryPoint;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,11 +15,16 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
+import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
@@ -49,11 +57,13 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokenRepository.setCookiePath("/");
+        SpaCsrfTokenRequestHandler csrfTokenRequestHandler = new SpaCsrfTokenRequestHandler();
 
         http
             // CSRF: cookie-based token (frontend reads XSRF-TOKEN cookie, sends X-XSRF-TOKEN header)
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfTokenRepository)
+                .csrfTokenRequestHandler(csrfTokenRequestHandler)
                 .ignoringRequestMatchers("/ws/**", "/api/auth/oauth2/**", "/auth/oauth2/**")
             )
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -64,6 +74,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/auth/**",  // Auth endpoints (signup, login)
                     "/auth/**",
+                    "/api/error",
+                    "/error",
                     "/public/**",
                     "/oauth2/**",
                     "/login/oauth2/**",
@@ -109,5 +121,33 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
             throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    /**
+     * Supports SPA clients that read the raw CSRF token from a cookie and send it back via header.
+     * Spring Security 6 defaults to XOR-masked tokens for request attributes, so we switch to the
+     * plain handler when a header is present while still forcing token rendering into the cookie.
+     */
+    private static final class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
+
+        private final CsrfTokenRequestHandler plain = new CsrfTokenRequestAttributeHandler();
+        private final CsrfTokenRequestHandler xor = new XorCsrfTokenRequestAttributeHandler();
+
+        @Override
+        public void handle(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Supplier<CsrfToken> csrfToken
+        ) {
+            this.xor.handle(request, response, csrfToken);
+            csrfToken.get();
+        }
+
+        @Override
+        public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+            String headerValue = request.getHeader(csrfToken.getHeaderName());
+            return (StringUtils.hasText(headerValue) ? this.plain : this.xor)
+                .resolveCsrfTokenValue(request, csrfToken);
+        }
     }
 }

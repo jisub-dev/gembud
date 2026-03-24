@@ -1,6 +1,6 @@
 # Gembud Active Status
 
-> Last updated: 2026-03-23 KST
+> Last updated: 2026-03-24 KST
 > Maintainer: Codex
 
 ---
@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `0b9abd9` |
+| Base HEAD | `b822a90` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + frontend active-room/query/test stabilization |
 | Worktree state | modified files present, not committed |
@@ -26,6 +26,8 @@
   - `joinRoom` now locks the room row before capacity-sensitive joins
   - CSRF cookie path now uses `/` so frontend routes can read `XSRF-TOKEN`
   - Added `GET /auth/csrf` as a lightweight CSRF bootstrap endpoint that does not depend on game catalog queries
+  - Added SPA-aware CSRF token request handling so raw `XSRF-TOKEN` cookies can be echoed back via `X-XSRF-TOKEN`
+  - Permitted `/error` so backend exceptions are not masked as auth failures during dispatch
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
@@ -52,6 +54,7 @@
   - RoomListPage test mocks aligned to the new hook layer
   - targeted room/chat/sidebar suites now run without `act(...)` warnings
   - full frontend vitest suite passes without `act(...)` warning output
+  - live login verification now passes against `http://localhost:8080/api` once Redis is running
 
 ### Current Modified Areas
 
@@ -104,6 +107,45 @@
 ---
 
 ## Change Log
+
+### 2026-03-24
+
+#### Status
+
+- In progress
+
+#### Performed
+
+- Traced the remaining `Authentication required` login failure to two separate causes:
+  - Spring Security CSRF validation was rejecting the raw cookie token echoed by the SPA client.
+  - Redis was not running, so login rate limiting/session storage failed before token issuance.
+- Updated `backend/src/main/java/com/gembud/config/SecurityConfig.java` to:
+  - allow `/error` and `/api/error`
+  - install an SPA-aware CSRF request handler that accepts the raw `X-XSRF-TOKEN` header while still rendering the CSRF cookie
+- Verified the hidden login failure on a temporary `8081` backend and confirmed the Redis dependency through live request logs.
+- Started the repo Redis service with `docker compose up -d redis`.
+- Restarted the active backend on `8080` with the updated code.
+- Replayed the full login flow for the local test account against `http://localhost:8080/api` and confirmed:
+  - `POST /auth/login` returns `200`
+  - `GET /users/me` returns `200`
+
+#### Verification
+
+- Backend:
+  - Command:
+    - `docker compose up -d redis`
+  - Result:
+    - `Container gembud-redis Started`
+  - Notes:
+    - local Redis dependency restored on `localhost:6379`.
+- Backend:
+  - Command:
+    - `curl` login replay against `http://localhost:8080/api/auth/csrf`, `POST /auth/login`, `GET /users/me` with cookie jar + `Origin: http://localhost:5173`
+  - Result:
+    - `POST /auth/login -> 200`
+    - `GET /users/me -> 200`
+  - Notes:
+    - verified successful cookie issuance for `accessToken` / `refreshToken` and authenticated user lookup.
 
 ### 2026-03-23
 
