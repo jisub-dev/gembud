@@ -42,6 +42,7 @@ describe('api csrf request interceptor', () => {
 
     const config = await requestInterceptor({
       method: 'post',
+      url: '/rooms',
       headers: {},
     });
 
@@ -51,15 +52,35 @@ describe('api csrf request interceptor', () => {
     expect(config.headers['X-XSRF-TOKEN']).toBe('prefetched-token');
   });
 
-  it('reuses the existing csrf cookie without prefetching again', async () => {
+  it('reuses the existing csrf cookie for non-auth mutations without prefetching again', async () => {
     document.cookie = 'XSRF-TOKEN=existing-token; path=/';
 
     const config = await requestInterceptor({
       method: 'post',
+      url: '/rooms/123/join',
       headers: {},
     });
 
     expect(axiosGet).not.toHaveBeenCalled();
     expect(config.headers['X-XSRF-TOKEN']).toBe('existing-token');
+  });
+
+  it('forces csrf bootstrap for auth mutations even when a cookie already exists', async () => {
+    document.cookie = 'XSRF-TOKEN=existing-token; path=/';
+    axiosGet.mockImplementation(async () => {
+      document.cookie = 'XSRF-TOKEN=refreshed-token; path=/';
+      return { data: [] };
+    });
+
+    const config = await requestInterceptor({
+      method: 'post',
+      url: '/auth/login',
+      headers: {},
+    });
+
+    expect(axiosGet).toHaveBeenCalledWith('http://localhost:8080/api/auth/csrf', {
+      withCredentials: true,
+    });
+    expect(config.headers['X-XSRF-TOKEN']).toBe('refreshed-token');
   });
 });

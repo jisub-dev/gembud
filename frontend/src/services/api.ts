@@ -17,9 +17,11 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     const method = config.method?.toLowerCase();
+    const url = config.url ?? '';
+    const isAuthMutation = typeof url === 'string' && url.startsWith('/auth/');
 
     if (method && method !== 'get') {
-      await ensureCsrfToken();
+      await ensureCsrfToken({ force: isAuthMutation });
       const csrfToken = getCsrfTokenFromCookie();
 
       if (csrfToken) {
@@ -71,8 +73,8 @@ function getCsrfTokenFromCookie(): string | null {
     ?.split('=')[1] ?? null;
 }
 
-async function ensureCsrfToken(): Promise<void> {
-  if (getCsrfTokenFromCookie()) {
+async function ensureCsrfToken(options?: { force?: boolean }): Promise<void> {
+  if (!options?.force && getCsrfTokenFromCookie()) {
     return;
   }
 
