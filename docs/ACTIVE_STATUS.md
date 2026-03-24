@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `b822a90` |
+| Base HEAD | `5d31eeb` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + frontend active-room/query/test stabilization |
 | Worktree state | modified files present, not committed |
@@ -39,6 +39,8 @@
   - App now redirects immediately to `/login` when the session-expired bridge fires
   - Chat socket session-expired events now use the same global session-expired bridge
   - Session-expiry bridge now falls back to `location.replace('/login')` even before the App-level handler is registered
+  - Service worker registration is now production-only; development startup unregisters stale workers and clears `gembud-` caches
+  - `public/sw.js` now self-unregisters on localhost so old cached dev bundles do not keep serving stale login code
   - RoomListPage create-modal query param flow extracted into a dedicated hook
   - RoomListPage invite-entry URL flow extracted into a dedicated hook
   - RoomListPage join/password/retry orchestration extracted into `useRoomJoinFlow`
@@ -67,6 +69,7 @@
   - `backend/src/test/java/com/gembud/service/RoomServiceTest.java`
 - Frontend:
   - `frontend/src/components/layout/Sidebar.tsx`
+  - `frontend/src/main.tsx`
   - `frontend/src/hooks/queries/useChatQueries.ts`
   - `frontend/src/hooks/useRoomCreateEntry.ts`
   - `frontend/src/hooks/useRoomInviteEntry.ts`
@@ -75,6 +78,7 @@
   - `frontend/src/hooks/queries/roomSelectors.ts`
   - `frontend/src/hooks/queries/useRooms.ts`
   - `frontend/src/pages/ChatPage.tsx`
+  - `frontend/public/sw.js`
   - `frontend/src/pages/RoomListPage.tsx`
   - `frontend/src/services/roomService.ts`
   - `frontend/src/test/components/layout/Sidebar.test.tsx`
@@ -89,6 +93,7 @@
 - `RoomListPage` create/join/invite/recommendation 흐름은 대부분 훅으로 분리됐지만, 화면 레벨 배선과 invalidate 포인트는 여전히 페이지가 최종 조립을 맡는다.
 - Backend now serializes `create/join` by user and locks joined rooms; controller coverage improved, but broader integration coverage for the new path is still thin.
 - Worktree is dirty; changes are not yet committed or grouped into a final PR-ready unit.
+- The frontend registers a PWA service worker in production, but localhost development now intentionally disables and clears it to avoid stale cached modules.
 
 ### Working Preference
 
@@ -128,6 +133,9 @@
 - Replayed the full login flow for the local test account against `http://localhost:8080/api` and confirmed:
   - `POST /auth/login` returns `200`
   - `GET /users/me` returns `200`
+- Traced the browser-only `403` login regression to stale service worker caching on the frontend dev origin.
+- Updated `frontend/src/main.tsx` so service worker registration only happens in production, while development unregisters existing workers, clears `gembud-` caches, and reloads once.
+- Updated `frontend/public/sw.js` so any already-installed localhost worker self-unregisters and clears cached assets on activation.
 
 #### Verification
 
@@ -146,6 +154,13 @@
     - `GET /users/me -> 200`
   - Notes:
     - verified successful cookie issuance for `accessToken` / `refreshToken` and authenticated user lookup.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npm run build`
+  - Result:
+    - `vite build` succeeded after the development service-worker cleanup changes
+  - Notes:
+    - confirms the dev-only unregister path in `src/main.tsx` and the localhost self-unregister path in `public/sw.js` compile cleanly.
 
 ### 2026-03-23
 
