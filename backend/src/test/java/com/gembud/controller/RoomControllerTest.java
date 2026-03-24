@@ -467,6 +467,77 @@ class RoomControllerTest {
         mockMvc.perform(post("/rooms/1/leave"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).leaveRoom(1L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{roomId}/transfer/{userId} - should transfer host successfully")
+    @WithMockUser(username = "test@example.com")
+    void transferHost_Success() throws Exception {
+        doNothing().when(roomService).transferHost(1L, 2L, "test@example.com");
+
+        mockMvc.perform(post("/rooms/1/transfer/2"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).transferHost(1L, 2L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{roomId}/start - should start room successfully")
+    @WithMockUser(username = "test@example.com")
+    void startRoom_Success() throws Exception {
+        doNothing().when(roomService).startRoom(1L, "test@example.com");
+
+        mockMvc.perform(post("/rooms/1/start"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).startRoom(1L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{publicId}/reset - should reset room successfully")
+    @WithMockUser(username = "test@example.com")
+    void resetRoom_Success() throws Exception {
+        RoomResponse room = RoomResponse.builder()
+            .id(11L)
+            .publicId("public-11")
+            .title("Lifecycle Room")
+            .build();
+
+        doNothing().when(roomService).resetRoom(11L, "test@example.com");
+        when(roomService.getRoomByPublicId("public-11")).thenReturn(room);
+
+        mockMvc.perform(post("/rooms/public-11/reset"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).getRoomByPublicId("public-11");
+        verify(roomService).resetRoom(11L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{publicId}/invite/regenerate - should regenerate invite successfully")
+    @WithMockUser(username = "test@example.com")
+    void regenerateInviteCode_Success() throws Exception {
+        RoomResponse response = RoomResponse.builder()
+            .id(1L)
+            .publicId("public-1")
+            .title("Private Room")
+            .inviteCode("new-invite-code")
+            .build();
+
+        when(roomService.regenerateInviteCode("public-1", "test@example.com")).thenReturn(response);
+
+        mockMvc.perform(post("/rooms/public-1/invite/regenerate"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(200))
+            .andExpect(jsonPath("$.data.publicId").value("public-1"))
+            .andExpect(jsonPath("$.data.inviteCode").value("new-invite-code"));
+
+        verify(roomService).regenerateInviteCode("public-1", "test@example.com");
     }
 
     @Test

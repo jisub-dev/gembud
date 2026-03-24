@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import com.gembud.dto.request.CreateRoomRequest;
@@ -28,6 +30,7 @@ import com.gembud.repository.RoomParticipantRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -793,13 +797,19 @@ class RoomServiceTest {
 
         RoomParticipant hostParticipant = RoomParticipant.builder()
             .room(singleRoom).user(user).isHost(true).joinOrder(1).build();
+        List<RoomParticipant> activeRooms = new ArrayList<>(List.of(hostParticipant));
 
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(roomRepository.findById(3L)).thenReturn(Optional.of(singleRoom));
         when(participantRepository.findByRoomIdAndUserId(3L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(participantRepository.findActiveRoomsByUserId(1L)).thenAnswer(invocation -> new ArrayList<>(activeRooms));
         when(chatService.getChatRoomIdByGameRoomId(3L)).thenReturn(10L);
         when(chatService.getChatRoomByGameRoomId(3L)).thenReturn("chat-public-10");
         when(roomRepository.save(any(Room.class))).thenReturn(singleRoom);
+        doAnswer(invocation -> {
+            activeRooms.clear();
+            return null;
+        }).when(participantRepository).delete(hostParticipant);
 
         // When
         roomService.leaveRoom(3L, "user@example.com");
@@ -808,6 +818,113 @@ class RoomServiceTest {
         verify(roomRepository).save(singleRoom);
         assertThat(singleRoom.getStatus()).isEqualTo(Room.RoomStatus.CLOSED);
         assertThat(singleRoom.getDeletedAt()).isNotNull();
+        assertThatThrownBy(() -> roomService.getMyActiveRoom("user@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.ROOM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("leaveRoom - host leaving should transfer host to next participant")
+    void leaveRoom_HostLeaving_ShouldTransferHost() {
+        // Given
+        User member = User.builder()
+            .email("member@example.com")
+            .nickname("Member")
+            .build();
+        ReflectionTestUtils.setField(member, "id", 2L);
+
+        Room transferRoom = Room.builder()
+            .game(game)
+            .title("Transfer Room")
+            .maxParticipants(5)
+            .currentParticipants(2)
+            .isPrivate(false)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(transferRoom, "id", 1L);
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(transferRoom)
+            .user(user)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+        RoomParticipant nextHostCandidate = RoomParticipant.builder()
+            .room(transferRoom)
+            .user(member)
+            .isHost(false)
+            .joinOrder(2)
+            .build();
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(transferRoom));
+        when(participantRepository.findByRoomIdAndUserId(1L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(participantRepository.findNextHostCandidates(1L)).thenReturn(List.of(nextHostCandidate));
+        when(chatService.getChatRoomIdByGameRoomId(1L)).thenReturn(10L);
+        when(chatService.getChatRoomByGameRoomId(1L)).thenReturn("chat-public-10");
+        when(roomRepository.save(any(Room.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ArgumentCaptor<RoomParticipant> hostCaptor = ArgumentCaptor.forClass(RoomParticipant.class);
+
+        // When
+        roomService.leaveRoom(1L, "user@example.com");
+
+        // Then
+        verify(participantRepository).delete(hostParticipant);
+        verify(participantRepository).delete(nextHostCandidate);
+        verify(participantRepository).save(hostCaptor.capture());
+        assertThat(hostCaptor.getValue().getIsHost()).isTrue();
+        assertThat(hostCaptor.getValue().getUser().getId()).isEqualTo(2L);
+        assertThat(transferRoom.getCurrentParticipants()).isEqualTo(1);
+        assertThat(transferRoom.getStatus()).isEqualTo(Room.RoomStatus.OPEN);
+        verify(roomRepository, times(1)).save(transferRoom);
+        verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-public-10"), any(ChatMessageResponse.class));
+    }
+
+    @Test
+    @DisplayName("startRoom then resetRoom should round-trip room status")
+    void startAndResetRoom_ShouldRoundTripStatus() {
+        // Given
+        User host = User.builder()
+            .email("host@example.com")
+            .nickname("Host")
+            .build();
+        ReflectionTestUtils.setField(host, "id", 1L);
+
+        Room lifecycleRoom = Room.builder()
+            .game(game)
+            .title("Lifecycle Room")
+            .maxParticipants(5)
+            .currentParticipants(2)
+            .isPrivate(false)
+            .createdBy(host)
+            .build();
+        ReflectionTestUtils.setField(lifecycleRoom, "id", 11L);
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(lifecycleRoom)
+            .user(host)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
+        when(roomRepository.findById(11L)).thenReturn(Optional.of(lifecycleRoom));
+        when(participantRepository.findByRoomIdAndUserId(11L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(chatService.getChatRoomIdByGameRoomId(11L)).thenReturn(88L);
+        when(chatService.getChatRoomByGameRoomId(11L)).thenReturn("chat-public-88");
+        when(roomRepository.save(any(Room.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        roomService.startRoom(11L, "host@example.com");
+        roomService.resetRoom(11L, "host@example.com");
+
+        // Then
+        assertThat(lifecycleRoom.getStatus()).isEqualTo(Room.RoomStatus.OPEN);
+        verify(roomRepository, times(2)).save(lifecycleRoom);
+        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/chat/chat-public-88"), any(ChatMessageResponse.class));
     }
 
     @Test
