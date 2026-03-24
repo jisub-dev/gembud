@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `7ba3e02` |
+| Base HEAD | `9369b84` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + frontend active-room/query/test stabilization |
 | Worktree state | modified files present, not committed |
@@ -48,6 +48,8 @@
   - Recommendation localStorage state and auto-join flow centralized into a shared hook/util layer
   - ROOM_CHAT mapping logic separated into shared selector helper
   - Auth mutations now force a fresh `/api/auth/csrf` bootstrap before POST so legacy CSRF cookies are cleaned up before login/signup/refresh
+  - leave 후 `myActiveRoom` / `myRoomChatRooms` / `myChatRooms` cache를 즉시 정리해 Sidebar waiting-room 잔상을 제거
+  - ROOM008 기존 방 이탈 경로도 같은 leave cache reset helper를 사용하도록 정리
   - ChatPage evaluatable query now only runs for `IN_PROGRESS` / `CLOSED` rooms
   - Sidebar waiting-room navigation no longer toggles unnecessary async local state
 - Tests:
@@ -81,6 +83,7 @@
   - `frontend/src/hooks/useRoomRecommendations.ts`
   - `frontend/src/hooks/queries/roomSelectors.ts`
   - `frontend/src/hooks/queries/useRooms.ts`
+  - `frontend/src/hooks/useRoomJoinFlow.ts`
   - `frontend/src/pages/ChatPage.tsx`
   - `frontend/public/sw.js`
   - `frontend/src/pages/RoomListPage.tsx`
@@ -145,6 +148,10 @@
 - Updated `backend/src/main/java/com/gembud/controller/AuthController.java` so `GET /auth/csrf` expires the legacy `Path=/api` CSRF cookie.
 - Updated `frontend/src/services/api.ts` so auth mutations always re-bootstrap CSRF before POST, guaranteeing legacy cookie cleanup runs before login/signup/refresh.
 - Verified on a temporary `8081` backend that the duplicate-cookie scenario now collapses to a single root cookie and `POST /auth/login` returns `200`.
+- Traced a stale Sidebar waiting-room chip after leave to query invalidation without immediate cache reset.
+- Added a shared leave-room cache reset path in `frontend/src/hooks/queries/useRooms.ts`.
+- Updated `frontend/src/pages/ChatPage.tsx` and `frontend/src/hooks/useRoomJoinFlow.ts` to use the shared leave cache reset so leaving or switching rooms clears active-room/chat caches immediately.
+- Added targeted frontend regression coverage to ensure leave clears the active room + ROOM_CHAT cache and that ROOM008 rejoin still succeeds.
 
 #### Verification
 
@@ -184,6 +191,13 @@
     - `Test Files 1 passed (1), Tests 3 passed (3)`
   - Notes:
     - auth POSTs now force `/api/auth/csrf` even when a root CSRF cookie already exists.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run src/test/pages/ChatPage.test.tsx src/test/pages/RoomListPage.test.tsx src/test/components/layout/Sidebar.test.tsx --reporter=verbose`
+  - Result:
+    - `Test Files 3 passed (3), Tests 32 passed (32)`
+  - Notes:
+    - leave 후 Sidebar waiting-room 잔상 제거와 ROOM008 rejoin 흐름을 함께 고정.
 - Backend:
   - Command:
     - `curl` duplicate-cookie replay against temporary `http://localhost:8081/api`
