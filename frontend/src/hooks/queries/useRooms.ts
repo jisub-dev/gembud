@@ -1,7 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { roomService } from '@/services/roomService';
 import { chatKeys } from './useChatQueries';
 import { roomKeys } from './useRoomQueries';
+import type { ChatRoomInfo } from '@/types/chat';
 import type { CreateRoomRequest, Room } from '@/types/room';
 
 /**
@@ -108,10 +109,7 @@ export function useLeaveRoom() {
   return useMutation({
     mutationFn: (roomId: number) => roomService.leaveRoom(roomId),
     onSuccess: (_, roomId) => {
-      queryClient.invalidateQueries({ queryKey: roomKeys.detail(roomId) });
-      queryClient.invalidateQueries({ queryKey: roomKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
-      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
+      syncClientAfterLeavingRoom(queryClient, roomId);
     },
   });
 }
@@ -162,4 +160,51 @@ export function useTransferHost() {
       queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
     },
   });
+}
+
+export async function syncClientAfterLeavingRoom(
+  queryClient: QueryClient,
+  roomId: number,
+  options?: {
+    gameId?: number;
+    roomPublicId?: string;
+  },
+) {
+  queryClient.setQueryData<Room | null>(roomKeys.myActive(), null);
+  queryClient.setQueryData<Room[] | undefined>(roomKeys.myList(), (currentRooms: Room[] | undefined) => {
+    if (!currentRooms) return currentRooms;
+    return currentRooms.filter((room) => room.id !== roomId);
+  });
+  queryClient.setQueryData<ChatRoomInfo[] | undefined>(chatKeys.myRoomChats(), (currentChats: ChatRoomInfo[] | undefined) => {
+    if (!currentChats) return currentChats;
+    return currentChats.filter((chat) => chat.relatedRoomId !== roomId);
+  });
+  queryClient.setQueryData<ChatRoomInfo[] | undefined>(chatKeys.myList(), (currentChats: ChatRoomInfo[] | undefined) => {
+    if (!currentChats) return currentChats;
+    return currentChats.filter(
+      (chat) => !(chat.type === 'ROOM_CHAT' && chat.relatedRoomId === roomId),
+    );
+  });
+
+  const invalidations: Promise<unknown>[] = [
+    queryClient.invalidateQueries({ queryKey: roomKeys.lists() }),
+    queryClient.invalidateQueries({ queryKey: roomKeys.myList() }),
+    queryClient.invalidateQueries({ queryKey: roomKeys.myActive() }),
+    queryClient.invalidateQueries({ queryKey: chatKeys.myList() }),
+    queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() }),
+  ];
+
+  if (options?.gameId !== undefined) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: roomKeys.list(options.gameId) }),
+    );
+  }
+
+  if (options?.roomPublicId) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: roomKeys.detail(options.roomPublicId) }),
+    );
+  }
+
+  await Promise.all(invalidations);
 }

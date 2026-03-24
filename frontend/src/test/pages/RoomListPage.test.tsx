@@ -34,6 +34,7 @@ vi.mock('@/hooks/queries/useRooms', () => ({
   useRooms: vi.fn(),
   useMyRooms: vi.fn(),
   useMyActiveRoom: vi.fn(),
+  syncClientAfterLeavingRoom: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/hooks/queries/useGames', () => ({

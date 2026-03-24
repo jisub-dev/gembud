@@ -14,7 +14,7 @@ import {
   selectRoomChatByPublicId,
 } from '@/hooks/queries/roomSelectors';
 import { roomKeys } from '@/hooks/queries/useRoomQueries';
-import { useMyActiveRoom } from '@/hooks/queries/useRooms';
+import { syncClientAfterLeavingRoom, useMyActiveRoom } from '@/hooks/queries/useRooms';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { getInviteExpiryInfo } from '@/utils/inviteExpiry';
@@ -250,10 +250,10 @@ export default function ChatPage() {
     setIsLeaving(true);
     try {
       await roomService.leaveRoom(relatedRoom.id);
-      queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
-      queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
-      queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
-      queryClient.invalidateQueries({ queryKey: chatKeys.myList() });
+      await syncClientAfterLeavingRoom(queryClient, relatedRoom.id, {
+        gameId: relatedRoom.gameId,
+        roomPublicId: relatedRoom.publicId,
+      });
       toast.success('대기방을 나갔습니다');
       if (consumeRecommendedRoomActive(relatedRoom.publicId, relatedRoom.gameId)) {
         addExcludedRecommendedRoom(relatedRoom.gameId, relatedRoom.publicId);

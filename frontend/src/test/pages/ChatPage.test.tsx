@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import ChatPage from '@/pages/ChatPage';
+import { chatKeys } from '@/hooks/queries/useChatQueries';
+import { roomKeys } from '@/hooks/queries/useRoomQueries';
 import { chatService } from '@/services/chatService';
 import { roomService } from '@/services/roomService';
 import { useAuthStore } from '@/store/authStore';
@@ -81,18 +83,21 @@ function createWrapper() {
     },
   });
 
-  return ({ children }: { children: React.ReactNode }) =>
+  const wrapper = ({ children }: { children: React.ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
+
+  return { queryClient, wrapper };
 }
 
 async function renderChatPage() {
+  const { queryClient, wrapper } = createWrapper();
   let utils!: ReturnType<typeof render>;
   await act(async () => {
-    utils = render(<ChatPage />, { wrapper: createWrapper() });
+    utils = render(<ChatPage />, { wrapper });
     await Promise.resolve();
   });
   await screen.findByText('추천 방');
-  return utils;
+  return { queryClient, ...utils };
 }
 
 async function clickAndFlush(user: ReturnType<typeof userEvent.setup>, element: Element) {
@@ -150,17 +155,28 @@ function createHostPrivateRoom(inviteExpiresAt: string): Room {
 }
 
 describe('ChatPage recommendation leave flow', () => {
+  let currentActiveRoom: Room | null;
+  let roomChatRoomsState: ChatRoomInfo[];
+  let myChatRoomsState: ChatRoomInfo[];
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    currentActiveRoom = relatedRoom;
+    roomChatRoomsState = [chatRoomInfo];
+    myChatRoomsState = [chatRoomInfo];
     vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
       if (type === 'ROOM_CHAT') {
-        return Promise.resolve([chatRoomInfo] as any);
+        return Promise.resolve(roomChatRoomsState as any);
       }
-      return Promise.resolve([chatRoomInfo] as any);
+      return Promise.resolve(myChatRoomsState as any);
     });
-    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(relatedRoom);
-    vi.mocked(roomService.leaveRoom).mockResolvedValue(undefined);
+    vi.mocked(roomService.getMyActiveRoom).mockImplementation(async () => currentActiveRoom as any);
+    vi.mocked(roomService.leaveRoom).mockImplementation(async () => {
+      currentActiveRoom = null;
+      roomChatRoomsState = [];
+      myChatRoomsState = [];
+    });
     vi.mocked(useAuthStore).mockReturnValue({
       user: { id: 1, nickname: 'me' },
     } as any);
@@ -189,6 +205,20 @@ describe('ChatPage recommendation leave flow', () => {
 
     expect(window.localStorage.getItem('roomRecommendations:active')).toBe('{}');
     expect(window.localStorage.getItem('roomRecommendations:excluded')).toContain('room-public-33');
+  });
+
+  it('clears active room and room chat caches immediately after leaving', async () => {
+    const user = userEvent.setup();
+    const { queryClient } = await renderChatPage();
+
+    await clickAndFlush(user, await screen.findByRole('button', { name: '대기방 나가기' }));
+
+    await waitFor(() => {
+      expect(roomService.leaveRoom).toHaveBeenCalledWith(33);
+      expect(queryClient.getQueryData(roomKeys.myActive())).toBeNull();
+      expect(queryClient.getQueryData(chatKeys.myRoomChats())).toEqual([]);
+      expect(queryClient.getQueryData(chatKeys.myList())).toEqual([]);
+    });
   });
 
   it('shows invite expiry warning for host when link is expiring soon', async () => {

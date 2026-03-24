@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { NavigateFunction } from 'react-router-dom';
-import { chatKeys } from '@/hooks/queries/useChatQueries';
 import { roomKeys } from '@/hooks/queries/useRoomQueries';
+import { syncClientAfterLeavingRoom } from '@/hooks/queries/useRooms';
 import { markRecommendedRoomActive } from '@/hooks/useRoomRecommendations';
 import { chatService } from '@/services/chatService';
 import { roomService } from '@/services/roomService';
@@ -240,7 +240,10 @@ async function resolveAlreadyInOtherRoom({
 
   try {
     await roomService.leaveRoom(currentActiveRoom.id);
-    await invalidateActiveRoomQueries(queryClient, gameId);
+    await syncClientAfterLeavingRoom(queryClient, currentActiveRoom.id, {
+      gameId,
+      roomPublicId: currentActiveRoom.publicId,
+    });
     toast.success('이전 대기방을 나가고 새 방에 입장합니다');
     await retryJoin(room, password, inviteCode, {
       ...options,
@@ -251,14 +254,6 @@ async function resolveAlreadyInOtherRoom({
     toast.error('기존 대기방 정리에 실패했습니다');
     return false;
   }
-}
-
-async function invalidateActiveRoomQueries(queryClient: QueryClient, gameId: number) {
-  await queryClient.invalidateQueries({ queryKey: roomKeys.list(gameId) });
-  await queryClient.invalidateQueries({ queryKey: roomKeys.myList() });
-  await queryClient.invalidateQueries({ queryKey: roomKeys.myActive() });
-  await queryClient.invalidateQueries({ queryKey: chatKeys.myList() });
-  await queryClient.invalidateQueries({ queryKey: chatKeys.myRoomChats() });
 }
 
 function extractErrorCode(err: unknown): string | null {
