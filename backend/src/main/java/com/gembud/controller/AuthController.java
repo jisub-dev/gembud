@@ -65,7 +65,12 @@ public class AuthController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "CSRF 토큰 부트스트랩 성공")
     })
     @GetMapping("/csrf")
-    public ResponseEntity<ApiResponse<Map<String, String>>> bootstrapCsrf(CsrfToken csrfToken) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> bootstrapCsrf(
+        CsrfToken csrfToken,
+        HttpServletResponse response
+    ) {
+        clearLegacyCsrfCookie(response);
+
         return ResponseEntity.ok(ApiResponse.success(Map.of(
             "headerName", csrfToken.getHeaderName(),
             "parameterName", csrfToken.getParameterName()
@@ -258,5 +263,17 @@ public class AuthController {
 
         response.addHeader("Set-Cookie", accessCookie.toString());
         response.addHeader("Set-Cookie", refreshCookie.toString());
+    }
+
+    private void clearLegacyCsrfCookie(HttpServletResponse response) {
+        ResponseCookie legacyCsrfCookie = ResponseCookie.from("XSRF-TOKEN", "")
+            .httpOnly(false)
+            .secure(cookieSecure)
+            .path("/api")
+            .maxAge(0)
+            .sameSite(cookieSameSite)
+            .build();
+
+        response.addHeader("Set-Cookie", legacyCsrfCookie.toString());
     }
 }

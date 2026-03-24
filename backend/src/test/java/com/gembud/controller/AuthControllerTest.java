@@ -1,5 +1,6 @@
 package com.gembud.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,6 +56,14 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.status").value(200))
             .andExpect(jsonPath("$.message").value("Success"))
             .andExpect(jsonPath("$.data.headerName").value("X-XSRF-TOKEN"))
-            .andExpect(jsonPath("$.data.parameterName").value("_csrf"));
+            .andExpect(jsonPath("$.data.parameterName").value("_csrf"))
+            .andExpect(result -> {
+                assertThat(result.getResponse().getHeaders("Set-Cookie"))
+                    .anySatisfy(header -> {
+                        assertThat(header).contains("XSRF-TOKEN=");
+                        assertThat(header).contains("Path=/api");
+                        assertThat(header).contains("Max-Age=0");
+                    });
+            });
     }
 }
