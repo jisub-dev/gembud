@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `5d31eeb` |
+| Base HEAD | `7ba3e02` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + frontend active-room/query/test stabilization |
 | Worktree state | modified files present, not committed |
@@ -28,6 +28,7 @@
   - Added `GET /auth/csrf` as a lightweight CSRF bootstrap endpoint that does not depend on game catalog queries
   - Added SPA-aware CSRF token request handling so raw `XSRF-TOKEN` cookies can be echoed back via `X-XSRF-TOKEN`
   - Permitted `/error` so backend exceptions are not masked as auth failures during dispatch
+  - `GET /auth/csrf` now also clears the legacy `Path=/api` `XSRF-TOKEN` cookie so old browsers stop sending conflicting CSRF cookies
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
@@ -46,6 +47,7 @@
   - RoomListPage join/password/retry orchestration extracted into `useRoomJoinFlow`
   - Recommendation localStorage state and auto-join flow centralized into a shared hook/util layer
   - ROOM_CHAT mapping logic separated into shared selector helper
+  - Auth mutations now force a fresh `/api/auth/csrf` bootstrap before POST so legacy CSRF cookies are cleaned up before login/signup/refresh
   - ChatPage evaluatable query now only runs for `IN_PROGRESS` / `CLOSED` rooms
   - Sidebar waiting-room navigation no longer toggles unnecessary async local state
 - Tests:
@@ -61,6 +63,7 @@
 ### Current Modified Areas
 
 - Backend:
+  - `backend/src/main/java/com/gembud/controller/AuthController.java`
   - `backend/src/main/java/com/gembud/controller/RoomController.java`
   - `backend/src/main/java/com/gembud/repository/RoomRepository.java`
   - `backend/src/main/java/com/gembud/repository/UserRepository.java`
@@ -70,6 +73,7 @@
 - Frontend:
   - `frontend/src/components/layout/Sidebar.tsx`
   - `frontend/src/main.tsx`
+  - `frontend/src/services/api.ts`
   - `frontend/src/hooks/queries/useChatQueries.ts`
   - `frontend/src/hooks/useRoomCreateEntry.ts`
   - `frontend/src/hooks/useRoomInviteEntry.ts`
@@ -94,6 +98,7 @@
 - Backend now serializes `create/join` by user and locks joined rooms; controller coverage improved, but broader integration coverage for the new path is still thin.
 - Worktree is dirty; changes are not yet committed or grouped into a final PR-ready unit.
 - The frontend registers a PWA service worker in production, but localhost development now intentionally disables and clears it to avoid stale cached modules.
+- Browsers that visited older builds may still need one successful `/auth/csrf` bootstrap or a tab reload to clear the old `Path=/api` CSRF cookie.
 
 ### Working Preference
 
@@ -136,6 +141,10 @@
 - Traced the browser-only `403` login regression to stale service worker caching on the frontend dev origin.
 - Updated `frontend/src/main.tsx` so service worker registration only happens in production, while development unregisters existing workers, clears `gembud-` caches, and reloads once.
 - Updated `frontend/public/sw.js` so any already-installed localhost worker self-unregisters and clears cached assets on activation.
+- Reproduced a second browser-only `403` path by sending duplicate `XSRF-TOKEN` cookies for `Path=/api` and `Path=/`.
+- Updated `backend/src/main/java/com/gembud/controller/AuthController.java` so `GET /auth/csrf` expires the legacy `Path=/api` CSRF cookie.
+- Updated `frontend/src/services/api.ts` so auth mutations always re-bootstrap CSRF before POST, guaranteeing legacy cookie cleanup runs before login/signup/refresh.
+- Verified on a temporary `8081` backend that the duplicate-cookie scenario now collapses to a single root cookie and `POST /auth/login` returns `200`.
 
 #### Verification
 
@@ -161,6 +170,28 @@
     - `vite build` succeeded after the development service-worker cleanup changes
   - Notes:
     - confirms the dev-only unregister path in `src/main.tsx` and the localhost self-unregister path in `public/sw.js` compile cleanly.
+- Backend:
+  - Command:
+    - `./gradlew test --tests "com.gembud.controller.AuthControllerTest"`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - `/auth/csrf` bootstrap now also asserts that the legacy `Path=/api` cookie cleanup header is emitted.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run src/test/services/api.test.ts --reporter=verbose`
+  - Result:
+    - `Test Files 1 passed (1), Tests 3 passed (3)`
+  - Notes:
+    - auth POSTs now force `/api/auth/csrf` even when a root CSRF cookie already exists.
+- Backend:
+  - Command:
+    - `curl` duplicate-cookie replay against temporary `http://localhost:8081/api`
+  - Result:
+    - `GET /auth/csrf` cleared `Path=/api` legacy cookie
+    - `POST /auth/login -> 200`
+  - Notes:
+    - this reproduces the browser-only `403` and proves the new cleanup path resolves it.
 
 ### 2026-03-23
 
