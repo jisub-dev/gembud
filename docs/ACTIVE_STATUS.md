@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `c510936` |
+| Base HEAD | `aef2356` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + auth/session hardening |
 | Worktree state | modified files present, not committed |
@@ -34,6 +34,8 @@
   - Refresh tokens are now stored hashed at rest in Redis instead of raw-token form
   - Refresh reuse detection now revokes the active Redis refresh/session pair before forcing re-login
   - Logout can now revoke server-side auth state from the `refreshToken` cookie even when the access-token principal is already gone
+  - SockJS `/ws/info` now allows both `http://localhost:5173` and `http://localhost:3000` by default, matching the HTTP CORS baseline
+  - Room controller now fails unauthenticated room mutations with `AUTH002` instead of falling through to a null-principal `500`
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
@@ -76,6 +78,7 @@
   - backend auth/security regression now covers OAuth2 single-session issuance, refresh cookie reissue, logout cookie clearing, and JWT session match/mismatch
   - backend auth/security regression now also covers hashed refresh-token storage, refresh-cookie logout revoke, and reuse-triggered session revocation
   - frontend `OAuth2CallbackPage` now covers success -> home, success -> onboarding, failure -> login
+  - backend `RoomControllerTest` now covers the unauthenticated create-room path returning `401 AUTH002`
 
 ### Current Modified Areas
 
@@ -87,7 +90,9 @@
   - `backend/src/test/java/com/gembud/security/OAuth2SuccessHandlerTest.java`
   - `backend/src/test/java/com/gembud/service/AuthServiceTest.java`
   - `backend/src/main/java/com/gembud/controller/AuthController.java`
+  - `backend/src/main/java/com/gembud/config/WebSocketConfig.java`
   - `backend/src/main/java/com/gembud/controller/RoomController.java`
+  - `backend/src/main/resources/application.yml`
   - `backend/src/main/java/com/gembud/repository/RoomRepository.java`
   - `backend/src/main/java/com/gembud/repository/UserRepository.java`
   - `backend/src/main/java/com/gembud/service/RoomService.java`
@@ -165,6 +170,9 @@
 - Updated `backend/src/main/java/com/gembud/service/AuthService.java` so refresh reuse invalidates the current Redis session pair immediately, and logout can revoke by raw refresh-token cookie via `invalidateByRefreshToken(...)`.
 - Updated `backend/src/main/java/com/gembud/controller/AuthController.java` so `/auth/logout` prefers revoking by refresh cookie and only falls back to the authenticated principal when needed.
 - Expanded `backend/src/test/java/com/gembud/service/RefreshTokenStoreTest.java`, `backend/src/test/java/com/gembud/service/AuthServiceTest.java`, and `backend/src/test/java/com/gembud/controller/AuthControllerTest.java` to lock the hashed-storage and revoke-on-logout/reuse behavior.
+- Updated `backend/src/main/java/com/gembud/config/WebSocketConfig.java` and `backend/src/main/resources/application.yml` so the SockJS endpoint accepts both local SPA origins (`5173`, `3000`) by default, matching the existing HTTP CORS policy and removing the `/api/ws/info` 403 on the current dev frontend.
+- Updated `backend/src/main/java/com/gembud/controller/RoomController.java` so all room mutation endpoints require a non-blank principal explicitly and return `AUTH002` instead of surfacing a null-principal server error.
+- Expanded `backend/src/test/java/com/gembud/controller/RoomControllerTest.java` with an unauthenticated create-room regression case.
 
 #### Verification
 
@@ -196,6 +204,20 @@
     - `BUILD SUCCESSFUL`
   - Notes:
     - Full backend suite still passes after the refresh-token hashing and revoke hardening changes.
+- Backend:
+  - Command:
+    - `./gradlew test --tests "com.gembud.controller.RoomControllerTest"`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Confirms the room-controller auth guard returns `401 AUTH002` and does not regress the existing room controller contract tests.
+- Backend:
+  - Command:
+    - `./gradlew test --continue`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Full backend suite still passes after aligning the websocket allowed-origin defaults and adding the room-controller principal guard.
 - Frontend:
   - Command:
     - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run src/test/pages/OAuth2CallbackPage.test.tsx --reporter=verbose`
