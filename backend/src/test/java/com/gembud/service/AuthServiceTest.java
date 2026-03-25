@@ -26,7 +26,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -57,13 +56,26 @@ class AuthServiceTest {
     @Mock private SecurityEventService securityEventService;
     @Mock private WebSocketSessionRegistry webSocketSessionRegistry;
 
-    @InjectMocks
     private AuthService authService;
+    private AuthSessionService authSessionService;
 
     private User testUser;
 
     @BeforeEach
     void setUp() {
+        authSessionService = new AuthSessionService(jwtTokenProvider, refreshTokenStore, jwtConfig);
+        authService = new AuthService(
+            userRepository,
+            passwordEncoder,
+            jwtTokenProvider,
+            authenticationManager,
+            refreshTokenStore,
+            authSessionService,
+            rateLimitService,
+            securityEventService,
+            webSocketSessionRegistry
+        );
+
         testUser = User.builder()
             .email("test@example.com")
             .password("encodedPw")

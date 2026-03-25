@@ -1,9 +1,11 @@
 package com.gembud.security;
 
 import com.gembud.config.JwtConfig;
+import com.gembud.dto.response.AuthResponse;
 import com.gembud.entity.User;
 import com.gembud.repository.UserRepository;
-import com.gembud.service.RefreshTokenStore;
+import com.gembud.service.AuthSessionService;
+import com.gembud.websocket.WebSocketSessionRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -31,9 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final UserRepository userRepository;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final AuthSessionService authSessionService;
     private final JwtConfig jwtConfig;
-    private final RefreshTokenStore refreshTokenStore;
+    private final WebSocketSessionRegistry webSocketSessionRegistry;
 
     @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
     private String redirectUri;
@@ -69,18 +71,11 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         String registrationId = extractRegistrationId(request);
         User user = processOAuth2User(registrationId, oAuth2User);
 
-        // Generate JWT tokens with user role (Phase 12: RBAC)
-        String accessToken = jwtTokenProvider.generateAccessToken(
-            user.getEmail(),
-            user.getRole().name()
-        );
-        String refreshToken = jwtTokenProvider.generateRefreshToken(
-            user.getEmail(),
-            user.getRole().name()
-        );
+        AuthResponse authResponse = authSessionService.issueTokens(user);
+        webSocketSessionRegistry.closeUserSessions(user.getEmail());
 
         // Set access token cookie (HTTP-only, Secure, SameSite=Strict)
-        ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
+        ResponseCookie accessCookie = ResponseCookie.from("accessToken", authResponse.getAccessToken())
             .httpOnly(true)
             .secure(cookieSecure)
             .path("/")
@@ -89,7 +84,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             .build();
 
         // Set refresh token cookie (HTTP-only, Secure, SameSite=Strict)
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", authResponse.getRefreshToken())
             .httpOnly(true)
             .secure(cookieSecure)
             .path("/")
@@ -99,9 +94,6 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         response.addHeader("Set-Cookie", accessCookie.toString());
         response.addHeader("Set-Cookie", refreshCookie.toString());
-
-        // Store refresh token in Redis — invalidates any previous session
-        refreshTokenStore.save(user.getEmail(), refreshToken, jwtConfig.getRefreshTokenExpiration());
 
         // Redirect to frontend (URL contains only success flag, no PII/tokens)
         String targetUrl = redirectUri + "?success=true";

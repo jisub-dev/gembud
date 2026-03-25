@@ -1,6 +1,5 @@
 package com.gembud.service;
 
-import com.gembud.config.JwtConfig;
 import com.gembud.dto.request.LoginRequest;
 import com.gembud.dto.request.RefreshTokenRequest;
 import com.gembud.dto.request.SignupRequest;
@@ -12,7 +11,6 @@ import com.gembud.exception.ErrorCode;
 import com.gembud.repository.UserRepository;
 import com.gembud.security.JwtTokenProvider;
 import com.gembud.websocket.WebSocketSessionRegistry;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -38,7 +36,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenStore refreshTokenStore;
-    private final JwtConfig jwtConfig;
+    private final AuthSessionService authSessionService;
     private final RateLimitService rateLimitService;
     private final SecurityEventService securityEventService;
     private final WebSocketSessionRegistry webSocketSessionRegistry;
@@ -74,21 +72,7 @@ public class AuthService {
 
         userRepository.save(user);
 
-        String sessionId = UUID.randomUUID().toString();
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), user.getRole().name(), sessionId);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail(), user.getRole().name());
-
-        // Store refresh token — invalidates any previous session
-        refreshTokenStore.save(user.getEmail(), refreshToken, jwtConfig.getRefreshTokenExpiration());
-        // Store sessionId — validates access token on each request
-        refreshTokenStore.saveSession(user.getEmail(), sessionId, jwtConfig.getAccessTokenExpiration());
-
-        return AuthResponse.builder()
-            .accessToken(accessToken)
-            .refreshToken(refreshToken)
-            .email(user.getEmail())
-            .nickname(user.getNickname())
-            .build();
+        return issueTokens(user);
     }
 
     /**
@@ -123,14 +107,7 @@ public class AuthService {
             // Reset failed attempt counter on success
             rateLimitService.resetLoginCount(request.getEmail());
 
-            String sessionId = UUID.randomUUID().toString();
-            String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), user.getRole().name(), sessionId);
-            String refreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail(), user.getRole().name());
-
-            // Store refresh token — invalidates any previous session (single-session enforcement)
-            refreshTokenStore.save(user.getEmail(), refreshToken, jwtConfig.getRefreshTokenExpiration());
-            // Store sessionId — validates access token on each request
-            refreshTokenStore.saveSession(user.getEmail(), sessionId, jwtConfig.getAccessTokenExpiration());
+            AuthResponse authResponse = issueTokens(user);
 
             // Force-close any existing WebSocket connections for this user
             webSocketSessionRegistry.closeUserSessions(user.getEmail());
@@ -138,12 +115,7 @@ public class AuthService {
             securityEventService.record(EventType.LOGIN_SUCCESS, user.getId(), ip,
                 null, "/auth/login", "SUCCESS", "LOW");
 
-            return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .email(user.getEmail())
-                .nickname(user.getNickname())
-                .build();
+            return authResponse;
 
         } catch (org.springframework.security.core.AuthenticationException e) {
             // Find user for audit (may not exist)
@@ -220,24 +192,12 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        String newSessionId = UUID.randomUUID().toString();
-        String newAccessToken = jwtTokenProvider.generateAccessToken(email, user.getRole().name(), newSessionId);
-        String newRefreshToken = jwtTokenProvider.generateRefreshToken(email, user.getRole().name());
-
-        // Rotate: replace old refresh token with new one
-        refreshTokenStore.save(email, newRefreshToken, jwtConfig.getRefreshTokenExpiration());
-        // Update sessionId to invalidate old access tokens
-        refreshTokenStore.saveSession(email, newSessionId, jwtConfig.getAccessTokenExpiration());
+        AuthResponse authResponse = issueTokens(user);
 
         securityEventService.record(EventType.REFRESH_SUCCESS, user.getId(), ip,
             null, "/auth/refresh", "SUCCESS", "LOW");
 
-        return AuthResponse.builder()
-            .accessToken(newAccessToken)
-            .refreshToken(newRefreshToken)
-            .email(user.getEmail())
-            .nickname(user.getNickname())
-            .build();
+        return authResponse;
     }
 
     /**
@@ -248,6 +208,17 @@ public class AuthService {
     public void invalidateRefreshToken(String email) {
         refreshTokenStore.delete(email);
         refreshTokenStore.deleteSession(email);
+    }
+
+    /**
+     * Issues access/refresh tokens and stores the single-session contract in Redis.
+     * Shared by email login/signup, refresh rotation, and OAuth2 success handling.
+     *
+     * @param user authenticated user
+     * @return auth response containing the newly issued tokens
+     */
+    public AuthResponse issueTokens(User user) {
+        return authSessionService.issueTokens(user);
     }
 
     private String maskEmail(String email) {
