@@ -9,7 +9,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| Base HEAD | `aef2356` |
+| Base HEAD | `43a7779` |
 | Active branch | `main` |
 | Current focus | room/chat lifecycle stabilization + auth/session hardening |
 | Worktree state | modified files present, not committed |
@@ -36,6 +36,7 @@
   - Logout can now revoke server-side auth state from the `refreshToken` cookie even when the access-token principal is already gone
   - SockJS `/ws/info` now allows both `http://localhost:5173` and `http://localhost:3000` by default, matching the HTTP CORS baseline
   - Room controller now fails unauthenticated room mutations with `AUTH002` instead of falling through to a null-principal `500`
+  - `ensureRoomChat()` no longer uses cross-service exception handling as normal control flow, so missing ROOM_CHAT recovery no longer marks the room-create transaction rollback-only
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
@@ -79,6 +80,7 @@
   - backend auth/security regression now also covers hashed refresh-token storage, refresh-cookie logout revoke, and reuse-triggered session revocation
   - frontend `OAuth2CallbackPage` now covers success -> home, success -> onboarding, failure -> login
   - backend `RoomControllerTest` now covers the unauthenticated create-room path returning `401 AUTH002`
+  - backend `RoomServiceCreateRoomIntegrationTest` now covers the missing ROOM_CHAT recovery path end-to-end, including commit
 
 ### Current Modified Areas
 
@@ -97,6 +99,7 @@
   - `backend/src/main/java/com/gembud/repository/UserRepository.java`
   - `backend/src/main/java/com/gembud/service/RoomService.java`
   - `backend/src/test/java/com/gembud/controller/RoomControllerTest.java`
+  - `backend/src/test/java/com/gembud/service/RoomServiceCreateRoomIntegrationTest.java`
   - `backend/src/test/java/com/gembud/service/RoomServiceTest.java`
 - Frontend:
   - `frontend/src/test/pages/OAuth2CallbackPage.test.tsx`
@@ -127,7 +130,7 @@
 
 - `RoomListPage` create/join/invite/recommendation 흐름은 대부분 훅으로 분리됐지만, 화면 레벨 배선과 invalidate 포인트는 여전히 페이지가 최종 조립을 맡는다.
 - `ChatPage` is no longer calling direct room action APIs, but it still derives the visible invite URL locally from the current room snapshot.
-- Backend now serializes `create/join` by user and locks joined rooms; controller coverage improved, but broader integration coverage for the new path is still thin.
+- Backend now serializes `create/join` by user and locks joined rooms; `createRoom` missing-chat recovery is now covered by integration test, but join/leave lifecycle integration coverage is still thinner than the service/controller unit layer.
 - Worktree is dirty; changes are not yet committed or grouped into a final PR-ready unit.
 - The frontend registers a PWA service worker in production, but localhost development now intentionally disables and clears it to avoid stale cached modules.
 - Browsers that visited older builds may still need one successful `/auth/csrf` bootstrap or a tab reload to clear the old `Path=/api` CSRF cookie.
@@ -173,6 +176,9 @@
 - Updated `backend/src/main/java/com/gembud/config/WebSocketConfig.java` and `backend/src/main/resources/application.yml` so the SockJS endpoint accepts both local SPA origins (`5173`, `3000`) by default, matching the existing HTTP CORS policy and removing the `/api/ws/info` 403 on the current dev frontend.
 - Updated `backend/src/main/java/com/gembud/controller/RoomController.java` so all room mutation endpoints require a non-blank principal explicitly and return `AUTH002` instead of surfacing a null-principal server error.
 - Expanded `backend/src/test/java/com/gembud/controller/RoomControllerTest.java` with an unauthenticated create-room regression case.
+- Updated `backend/src/main/java/com/gembud/service/RoomService.java` so `ensureRoomChat()` checks ROOM_CHAT existence without relying on a caught `CHAT_ROOM_NOT_FOUND` exception from another transactional service.
+- Updated `backend/src/test/java/com/gembud/service/RoomServiceTest.java` to follow the new non-exception ROOM_CHAT lookup path.
+- Added `backend/src/test/java/com/gembud/service/RoomServiceCreateRoomIntegrationTest.java` to lock the exact `createRoom -> missing ROOM_CHAT -> recover -> commit` regression that previously surfaced as `UnexpectedRollbackException`.
 
 #### Verification
 
@@ -218,6 +224,20 @@
     - `BUILD SUCCESSFUL`
   - Notes:
     - Full backend suite still passes after aligning the websocket allowed-origin defaults and adding the room-controller principal guard.
+- Backend:
+  - Command:
+    - `./gradlew test --tests "com.gembud.service.RoomServiceTest" --tests "com.gembud.service.RoomServiceCreateRoomIntegrationTest"`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Confirms missing ROOM_CHAT recovery no longer turns `createRoom` into a rollback-only transaction.
+- Backend:
+  - Command:
+    - `./gradlew test --continue`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Full backend suite still passes after removing the rollback-only ROOM_CHAT recovery path and adding the integration regression.
 - Frontend:
   - Command:
     - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run src/test/pages/OAuth2CallbackPage.test.tsx --reporter=verbose`
