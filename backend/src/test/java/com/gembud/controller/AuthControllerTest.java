@@ -127,6 +127,8 @@ class AuthControllerTest {
     @DisplayName("POST /auth/logout - should clear auth cookies and invalidate refresh token")
     @WithMockUser(username = "test@example.com")
     void logout_Success() throws Exception {
+        when(authService.invalidateByRefreshToken(null)).thenReturn(false);
+
         mockMvc.perform(post("/auth/logout"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value(200))
@@ -142,6 +144,28 @@ class AuthControllerTest {
             });
 
         verify(authService).invalidateRefreshToken("test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /auth/logout - should revoke by refresh cookie even without principal")
+    void logout_WithRefreshCookieOnly() throws Exception {
+        when(authService.invalidateByRefreshToken("refresh-cookie")).thenReturn(true);
+
+        mockMvc.perform(post("/auth/logout").cookie(new Cookie("refreshToken", "refresh-cookie")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(200))
+            .andExpect(result -> {
+                Cookie[] cookies = result.getResponse().getCookies();
+                Cookie accessCookie = findCookie(cookies, "accessToken");
+                Cookie refreshCookie = findCookie(cookies, "refreshToken");
+
+                assertThat(accessCookie).isNotNull();
+                assertThat(accessCookie.getMaxAge()).isZero();
+                assertThat(refreshCookie).isNotNull();
+                assertThat(refreshCookie.getMaxAge()).isZero();
+            });
+
+        verify(authService).invalidateByRefreshToken("refresh-cookie");
     }
 
     private Cookie findCookie(Cookie[] cookies, String name) {

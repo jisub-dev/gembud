@@ -179,11 +179,11 @@ public class AuthService {
         String email = jwtTokenProvider.getEmailFromToken(refreshToken);
 
         // Validate against Redis — reject if token was already rotated or user logged out
-        String stored = refreshTokenStore.get(email);
-        if (stored == null || !stored.equals(refreshToken)) {
+        if (!refreshTokenStore.matches(email, refreshToken)) {
             // Token reuse detected (stored is different — another session already rotated it)
             User reuseUser = userRepository.findByEmail(email).orElse(null);
             Long reuseUserId = reuseUser != null ? reuseUser.getId() : null;
+            invalidateRefreshToken(email);
             securityEventService.record(EventType.REFRESH_REUSE_DETECTED, reuseUserId, ip,
                 null, "/auth/refresh", "BLOCKED", "HIGH");
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
@@ -206,8 +206,23 @@ public class AuthService {
      * @param email user email
      */
     public void invalidateRefreshToken(String email) {
-        refreshTokenStore.delete(email);
-        refreshTokenStore.deleteSession(email);
+        refreshTokenStore.deleteAll(email);
+    }
+
+    /**
+     * Invalidate the stored refresh/session pair using a raw refresh token.
+     *
+     * @param refreshToken raw refresh token from cookie
+     * @return true when the token was valid and a matching session was revoked
+     */
+    public boolean invalidateByRefreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank() || !jwtTokenProvider.validateToken(refreshToken)) {
+            return false;
+        }
+
+        String email = jwtTokenProvider.getEmailFromToken(refreshToken);
+        invalidateRefreshToken(email);
+        return true;
     }
 
     /**

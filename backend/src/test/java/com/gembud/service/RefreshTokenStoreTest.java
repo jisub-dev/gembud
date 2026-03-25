@@ -1,9 +1,13 @@
 package com.gembud.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,17 +32,21 @@ class RefreshTokenStoreTest {
     @BeforeEach
     void setUp() {
         refreshTokenStore = new RefreshTokenStore(stringRedisTemplate);
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
-    @DisplayName("save/get/delete refresh token")
+    @DisplayName("save/matches/delete refresh token")
     void refreshTokenCrud() {
-        refreshTokenStore.save("user@example.com", "refresh-token", 60000L);
-        verify(valueOperations).set("refresh:user@example.com", "refresh-token", 60000L, TimeUnit.MILLISECONDS);
+        String hashedToken = sha256("refresh-token");
 
-        when(valueOperations.get("refresh:user@example.com")).thenReturn("refresh-token");
-        assertThat(refreshTokenStore.get("user@example.com")).isEqualTo("refresh-token");
+        refreshTokenStore.save("user@example.com", "refresh-token", 60000L);
+        verify(valueOperations).set("refresh:user@example.com", hashedToken, 60000L, TimeUnit.MILLISECONDS);
+
+        when(valueOperations.get("refresh:user@example.com")).thenReturn(hashedToken);
+        assertThat(refreshTokenStore.get("user@example.com")).isEqualTo(hashedToken);
+        assertThat(refreshTokenStore.matches("user@example.com", "refresh-token")).isTrue();
+        assertThat(refreshTokenStore.matches("user@example.com", "other-refresh-token")).isFalse();
 
         refreshTokenStore.delete("user@example.com");
         verify(stringRedisTemplate).delete("refresh:user@example.com");
@@ -55,5 +63,28 @@ class RefreshTokenStoreTest {
 
         refreshTokenStore.deleteSession("user@example.com");
         verify(stringRedisTemplate).delete("session:user@example.com");
+    }
+
+    @Test
+    @DisplayName("deleteAll refresh token + session")
+    void deleteAll() {
+        refreshTokenStore.deleteAll("user@example.com");
+
+        verify(stringRedisTemplate).delete("refresh:user@example.com");
+        verify(stringRedisTemplate).delete("session:user@example.com");
+    }
+
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

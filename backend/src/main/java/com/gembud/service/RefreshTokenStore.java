@@ -1,5 +1,8 @@
 package com.gembud.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -32,17 +35,36 @@ public class RefreshTokenStore {
      */
     public void save(String email, String token, long ttlMillis) {
         String key = KEY_PREFIX + email;
-        stringRedisTemplate.opsForValue().set(key, token, ttlMillis, TimeUnit.MILLISECONDS);
+        stringRedisTemplate.opsForValue().set(key, hash(token), ttlMillis, TimeUnit.MILLISECONDS);
     }
 
     /**
-     * Retrieve the stored refresh token for a user.
+     * Retrieve the stored hashed refresh token for a user.
      *
      * @param email user email
-     * @return stored token, or null if not present
+     * @return stored hashed token, or null if not present
      */
     public String get(String email) {
         return stringRedisTemplate.opsForValue().get(KEY_PREFIX + email);
+    }
+
+    /**
+     * Compare a raw refresh token against the stored hash.
+     *
+     * @param email user email
+     * @param token raw refresh token
+     * @return true when the stored hash matches the supplied token
+     */
+    public boolean matches(String email, String token) {
+        String storedHash = get(email);
+        if (storedHash == null) {
+            return false;
+        }
+        String candidateHash = hash(token);
+        return MessageDigest.isEqual(
+            storedHash.getBytes(StandardCharsets.UTF_8),
+            candidateHash.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     /**
@@ -82,5 +104,29 @@ public class RefreshTokenStore {
      */
     public void deleteSession(String email) {
         stringRedisTemplate.delete(SESSION_KEY_PREFIX + email);
+    }
+
+    /**
+     * Delete both the stored refresh token and the active session for a user.
+     *
+     * @param email user email
+     */
+    public void deleteAll(String email) {
+        delete(email);
+        deleteSession(email);
+    }
+
+    private String hash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
     }
 }

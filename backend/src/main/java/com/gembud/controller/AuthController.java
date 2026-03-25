@@ -197,9 +197,11 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
         @AuthenticationPrincipal UserDetails userDetails,
+        @CookieValue(name = "refreshToken", required = false) String refreshToken,
         HttpServletResponse response
     ) {
-        if (userDetails != null) {
+        boolean revokedByRefreshCookie = authService.invalidateByRefreshToken(refreshToken);
+        if (!revokedByRefreshCookie && userDetails != null) {
             authService.invalidateRefreshToken(userDetails.getUsername());
         }
         // Clear access token cookie
