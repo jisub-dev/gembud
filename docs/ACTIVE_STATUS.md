@@ -1,6 +1,6 @@
 # Gembud Active Status
 
-> Last updated: 2026-03-24 KST
+> Last updated: 2026-03-25 KST
 > Maintainer: Codex
 
 ---
@@ -11,7 +11,7 @@
 |------|-----|
 | Base HEAD | `c510936` |
 | Active branch | `main` |
-| Current focus | room/chat lifecycle stabilization + room action mutation ownership consolidation |
+| Current focus | room/chat lifecycle stabilization + OAuth2 single-session parity |
 | Worktree state | modified files present, not committed |
 | Verification | backend full suite passed, frontend full suite passed |
 | Default execution mode | main agent orchestrates, sub-agents used aggressively for separable work |
@@ -29,6 +29,8 @@
   - Added SPA-aware CSRF token request handling so raw `XSRF-TOKEN` cookies can be echoed back via `X-XSRF-TOKEN`
   - Permitted `/error` so backend exceptions are not masked as auth failures during dispatch
   - `GET /auth/csrf` now also clears the legacy `Path=/api` `XSRF-TOKEN` cookie so old browsers stop sending conflicting CSRF cookies
+  - OAuth2 success flow now uses the same token/session issuer as email login/signup/refresh
+  - OAuth2 success now persists both `refresh:{email}` and `session:{email}` before redirecting back to the SPA
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
@@ -56,6 +58,7 @@
   - ROOM008 기존 방 이탈 경로도 같은 leave cache reset helper를 사용하도록 정리
   - ChatPage evaluatable query now only runs for `IN_PROGRESS` / `CLOSED` rooms
   - Sidebar waiting-room navigation no longer toggles unnecessary async local state
+  - OAuth2 callback flow now has dedicated regression coverage for home/onboarding/login fallback routing
 - Tests:
   - backend `RoomServiceTest` updated
   - backend `RoomControllerTest` now covers `GET /rooms/my/active` and `POST /rooms/{publicId}/join` `ROOM008`
@@ -67,10 +70,18 @@
   - full frontend vitest suite passes without `act(...)` warning output
   - backend full `./gradlew test --continue` passes with lifecycle service/controller coverage in place
   - live login verification now passes against `http://localhost:8080/api` once Redis is running
+  - backend auth/security regression now covers OAuth2 single-session issuance, refresh cookie reissue, logout cookie clearing, and JWT session match/mismatch
+  - frontend `OAuth2CallbackPage` now covers success -> home, success -> onboarding, failure -> login
 
 ### Current Modified Areas
 
 - Backend:
+  - `backend/src/main/java/com/gembud/security/OAuth2SuccessHandler.java`
+  - `backend/src/main/java/com/gembud/service/AuthService.java`
+  - `backend/src/main/java/com/gembud/service/AuthSessionService.java`
+  - `backend/src/test/java/com/gembud/controller/AuthControllerTest.java`
+  - `backend/src/test/java/com/gembud/security/OAuth2SuccessHandlerTest.java`
+  - `backend/src/test/java/com/gembud/service/AuthServiceTest.java`
   - `backend/src/main/java/com/gembud/controller/AuthController.java`
   - `backend/src/main/java/com/gembud/controller/RoomController.java`
   - `backend/src/main/java/com/gembud/repository/RoomRepository.java`
@@ -79,6 +90,7 @@
   - `backend/src/test/java/com/gembud/controller/RoomControllerTest.java`
   - `backend/src/test/java/com/gembud/service/RoomServiceTest.java`
 - Frontend:
+  - `frontend/src/test/pages/OAuth2CallbackPage.test.tsx`
   - `frontend/src/components/layout/Sidebar.tsx`
   - `frontend/src/main.tsx`
   - `frontend/src/services/api.ts`
@@ -110,6 +122,7 @@
 - Worktree is dirty; changes are not yet committed or grouped into a final PR-ready unit.
 - The frontend registers a PWA service worker in production, but localhost development now intentionally disables and clears it to avoid stale cached modules.
 - Browsers that visited older builds may still need one successful `/auth/csrf` bootstrap or a tab reload to clear the old `Path=/api` CSRF cookie.
+- OAuth2 now shares the same Redis-backed single-session contract as email login, but refresh-token hashing and richer device/session metadata are still future hardening work.
 
 ### Working Preference
 
@@ -128,6 +141,53 @@
 ---
 
 ## Change Log
+
+### 2026-03-25
+
+#### Status
+
+- In progress
+
+#### Performed
+
+- Split JWT/session issuance into `backend/src/main/java/com/gembud/service/AuthSessionService.java` so email login/signup, refresh rotation, and OAuth2 success all use the same Redis-backed session contract.
+- Updated `backend/src/main/java/com/gembud/service/AuthService.java` to delegate token/session issuance to the shared service while keeping login-only WebSocket session eviction behavior unchanged.
+- Updated `backend/src/main/java/com/gembud/security/OAuth2SuccessHandler.java` so OAuth2 success now persists both `refresh:{email}` and `session:{email}` before issuing cookies and redirecting to `/oauth2/callback?success=true`.
+- Added `backend/src/test/java/com/gembud/security/OAuth2SuccessHandlerTest.java` to verify cookie issuance, Redis refresh/session storage, WebSocket session eviction, and redirect shape.
+- Expanded `backend/src/test/java/com/gembud/controller/AuthControllerTest.java` to cover refresh cookie reissue and logout cookie clearing.
+- Added `frontend/src/test/pages/OAuth2CallbackPage.test.tsx` to cover callback success -> home, generated nickname -> onboarding, and restore failure -> login.
+- Removed the Spring bean cycle introduced by wiring OAuth2 success directly to `AuthService`; full backend context tests now start again.
+
+#### Verification
+
+- Backend:
+  - Command:
+    - `./gradlew test --tests "com.gembud.controller.AuthControllerTest" --tests "com.gembud.security.JwtAuthenticationFilterTest" --tests "com.gembud.security.OAuth2SuccessHandlerTest" --tests "com.gembud.service.AuthServiceTest"`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Auth controller, JWT session validation, OAuth2 success flow, and AuthService issuance/rotation checks all passed together.
+- Backend:
+  - Command:
+    - `./gradlew test --continue`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Confirms the new shared issuer no longer creates a Spring Security bean cycle in full application-context tests.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run src/test/pages/OAuth2CallbackPage.test.tsx --reporter=verbose`
+  - Result:
+    - `Test Files 1 passed (1), Tests 3 passed (3)`
+  - Notes:
+    - OAuth2 callback routing and auth-store restoration behavior is fixed in tests.
+- Frontend:
+  - Command:
+    - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run`
+  - Result:
+    - `Test Files 13 passed (13), Tests 70 passed (70)`
+  - Notes:
+    - Full frontend suite still passes after adding the callback regression coverage.
 
 ### 2026-03-24
 
