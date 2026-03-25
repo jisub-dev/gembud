@@ -16,6 +16,7 @@ import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
 import com.gembud.dto.response.ChatMessageResponse;
 import com.gembud.dto.response.RoomResponse;
+import com.gembud.entity.ChatRoom;
 import com.gembud.entity.Game;
 import com.gembud.entity.Notification.NotificationType;
 import com.gembud.entity.Room;
@@ -24,6 +25,7 @@ import com.gembud.entity.RoomParticipant;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
+import com.gembud.repository.ChatRoomRepository;
 import com.gembud.repository.GameRepository;
 import com.gembud.repository.RoomFilterRepository;
 import com.gembud.repository.RoomParticipantRepository;
@@ -58,6 +60,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RoomServiceTest {
+
+    @Mock
+    private ChatRoomRepository chatRoomRepository;
 
     @Mock
     private RoomRepository roomRepository;
@@ -98,7 +103,6 @@ class RoomServiceTest {
     private User user;
     private Game game;
     private Room room;
-
     @BeforeEach
     void setUp() {
         user = User.builder()
@@ -122,6 +126,31 @@ class RoomServiceTest {
             .createdBy(user)
             .build();
         ReflectionTestUtils.setField(room, "id", 1L);
+
+        when(chatRoomRepository.findByTypeAndRelatedRoomId(eq(ChatRoom.ChatRoomType.ROOM_CHAT), anyLong()))
+            .thenAnswer(inv -> {
+                Long roomId = inv.getArgument(1);
+                Room relatedRoom = room;
+                if (!room.getId().equals(roomId)) {
+                    relatedRoom = Room.builder()
+                        .game(game)
+                        .title("Room " + roomId)
+                        .maxParticipants(5)
+                        .currentParticipants(1)
+                        .isPrivate(false)
+                        .createdBy(user)
+                        .build();
+                    ReflectionTestUtils.setField(relatedRoom, "id", roomId);
+                }
+
+                ChatRoom mappedRoomChat = ChatRoom.builder()
+                    .type(ChatRoom.ChatRoomType.ROOM_CHAT)
+                    .relatedRoom(relatedRoom)
+                    .build();
+                ReflectionTestUtils.setField(mappedRoomChat, "id", roomId * 10);
+                ReflectionTestUtils.setField(mappedRoomChat, "publicId", "chat-public-" + (roomId * 10));
+                return Optional.of(mappedRoomChat);
+            });
     }
 
     // ──────────────────────────────────────────────
@@ -149,8 +178,8 @@ class RoomServiceTest {
             return r;
         });
         when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(chatService.getChatRoomIdByGameRoomId(anyLong()))
-            .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        when(chatRoomRepository.findByTypeAndRelatedRoomId(ChatRoom.ChatRoomType.ROOM_CHAT, 1L))
+            .thenReturn(Optional.empty());
         when(chatService.createChatRoomForGameRoom(anyLong())).thenReturn(10L);
         when(chatService.getPublicIdByChatRoomId(10L)).thenReturn("chat-public-10");
         when(participantRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
@@ -404,8 +433,8 @@ class RoomServiceTest {
         when(participantRepository.countByRoomId(1L)).thenReturn(1L);
         when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
         when(roomRepository.save(any(Room.class))).thenReturn(room);
-        when(chatService.getChatRoomIdByGameRoomId(1L))
-            .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        when(chatRoomRepository.findByTypeAndRelatedRoomId(ChatRoom.ChatRoomType.ROOM_CHAT, 1L))
+            .thenReturn(Optional.empty());
         when(chatService.createChatRoomForGameRoom(1L)).thenReturn(77L);
         when(chatService.getPublicIdByChatRoomId(77L)).thenReturn("chat-public-77");
         when(participantRepository.findByRoomId(1L)).thenReturn(List.of(hostParticipant));

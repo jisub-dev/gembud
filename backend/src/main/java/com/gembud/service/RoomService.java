@@ -4,6 +4,7 @@ import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
 import com.gembud.dto.response.ChatMessageResponse;
 import com.gembud.dto.response.RoomResponse;
+import com.gembud.entity.ChatRoom;
 import com.gembud.entity.Game;
 import com.gembud.entity.Notification.NotificationType;
 import com.gembud.entity.Room;
@@ -12,6 +13,7 @@ import com.gembud.entity.RoomParticipant;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
+import com.gembud.repository.ChatRoomRepository;
 import com.gembud.repository.GameRepository;
 import com.gembud.repository.RoomFilterRepository;
 import com.gembud.repository.RoomParticipantRepository;
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RoomService {
 
+    private final ChatRoomRepository chatRoomRepository;
     private final RoomRepository roomRepository;
     private final RoomParticipantRepository participantRepository;
     private final RoomFilterRepository filterRepository;
@@ -587,19 +590,16 @@ public class RoomService {
      * service can treat the mapping as required.</p>
      */
     private ChatRoomMapping ensureRoomChat(Long roomId) {
-        try {
+        if (chatRoomRepository.findByTypeAndRelatedRoomId(ChatRoom.ChatRoomType.ROOM_CHAT, roomId)
+            .isPresent()) {
             return new ChatRoomMapping(
                 chatService.getChatRoomIdByGameRoomId(roomId),
                 chatService.getChatRoomByGameRoomId(roomId)
             );
-        } catch (BusinessException e) {
-            if (e.getErrorCode() != ErrorCode.CHAT_ROOM_NOT_FOUND) {
-                throw e;
-            }
-
-            Long chatRoomId = chatService.createChatRoomForGameRoom(roomId);
-            return new ChatRoomMapping(chatRoomId, chatService.getPublicIdByChatRoomId(chatRoomId));
         }
+
+        Long chatRoomId = chatService.createChatRoomForGameRoom(roomId);
+        return new ChatRoomMapping(chatRoomId, chatService.getPublicIdByChatRoomId(chatRoomId));
     }
 
     private record ChatRoomMapping(Long id, String publicId) {}
