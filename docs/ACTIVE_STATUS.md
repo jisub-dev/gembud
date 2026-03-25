@@ -11,7 +11,7 @@
 |------|-----|
 | Base HEAD | `c510936` |
 | Active branch | `main` |
-| Current focus | room/chat lifecycle stabilization + OAuth2 single-session parity |
+| Current focus | room/chat lifecycle stabilization + auth/session hardening |
 | Worktree state | modified files present, not committed |
 | Verification | backend full suite passed, frontend full suite passed |
 | Default execution mode | main agent orchestrates, sub-agents used aggressively for separable work |
@@ -31,6 +31,9 @@
   - `GET /auth/csrf` now also clears the legacy `Path=/api` `XSRF-TOKEN` cookie so old browsers stop sending conflicting CSRF cookies
   - OAuth2 success flow now uses the same token/session issuer as email login/signup/refresh
   - OAuth2 success now persists both `refresh:{email}` and `session:{email}` before redirecting back to the SPA
+  - Refresh tokens are now stored hashed at rest in Redis instead of raw-token form
+  - Refresh reuse detection now revokes the active Redis refresh/session pair before forcing re-login
+  - Logout can now revoke server-side auth state from the `refreshToken` cookie even when the access-token principal is already gone
 - Frontend:
   - `방 종료` UI/API 제거 반영 유지
   - `ROOM008` 시 기존 활성 대기방 leave 후 재입장 UX 유지
@@ -71,6 +74,7 @@
   - backend full `./gradlew test --continue` passes with lifecycle service/controller coverage in place
   - live login verification now passes against `http://localhost:8080/api` once Redis is running
   - backend auth/security regression now covers OAuth2 single-session issuance, refresh cookie reissue, logout cookie clearing, and JWT session match/mismatch
+  - backend auth/security regression now also covers hashed refresh-token storage, refresh-cookie logout revoke, and reuse-triggered session revocation
   - frontend `OAuth2CallbackPage` now covers success -> home, success -> onboarding, failure -> login
 
 ### Current Modified Areas
@@ -122,7 +126,7 @@
 - Worktree is dirty; changes are not yet committed or grouped into a final PR-ready unit.
 - The frontend registers a PWA service worker in production, but localhost development now intentionally disables and clears it to avoid stale cached modules.
 - Browsers that visited older builds may still need one successful `/auth/csrf` bootstrap or a tab reload to clear the old `Path=/api` CSRF cookie.
-- OAuth2 now shares the same Redis-backed single-session contract as email login, but refresh-token hashing and richer device/session metadata are still future hardening work.
+- OAuth2 now shares the same Redis-backed single-session contract as email login, and refresh tokens are hashed at rest; richer device/session metadata and explicit session-replaced error signaling are still future hardening work.
 
 ### Working Preference
 
@@ -157,6 +161,10 @@
 - Expanded `backend/src/test/java/com/gembud/controller/AuthControllerTest.java` to cover refresh cookie reissue and logout cookie clearing.
 - Added `frontend/src/test/pages/OAuth2CallbackPage.test.tsx` to cover callback success -> home, generated nickname -> onboarding, and restore failure -> login.
 - Removed the Spring bean cycle introduced by wiring OAuth2 success directly to `AuthService`; full backend context tests now start again.
+- Updated `backend/src/main/java/com/gembud/service/RefreshTokenStore.java` so refresh tokens are hashed before writing to Redis, compared through `matches(...)`, and revoked together with session state via `deleteAll(...)`.
+- Updated `backend/src/main/java/com/gembud/service/AuthService.java` so refresh reuse invalidates the current Redis session pair immediately, and logout can revoke by raw refresh-token cookie via `invalidateByRefreshToken(...)`.
+- Updated `backend/src/main/java/com/gembud/controller/AuthController.java` so `/auth/logout` prefers revoking by refresh cookie and only falls back to the authenticated principal when needed.
+- Expanded `backend/src/test/java/com/gembud/service/RefreshTokenStoreTest.java`, `backend/src/test/java/com/gembud/service/AuthServiceTest.java`, and `backend/src/test/java/com/gembud/controller/AuthControllerTest.java` to lock the hashed-storage and revoke-on-logout/reuse behavior.
 
 #### Verification
 
@@ -174,6 +182,20 @@
     - `BUILD SUCCESSFUL`
   - Notes:
     - Confirms the new shared issuer no longer creates a Spring Security bean cycle in full application-context tests.
+- Backend:
+  - Command:
+    - `./gradlew test --tests "com.gembud.controller.AuthControllerTest" --tests "com.gembud.service.AuthServiceTest" --tests "com.gembud.service.RefreshTokenStoreTest"`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Confirms hashed refresh-token storage, refresh-cookie logout revoke, and reuse-triggered invalidation semantics together.
+- Backend:
+  - Command:
+    - `./gradlew test --continue`
+  - Result:
+    - `BUILD SUCCESSFUL`
+  - Notes:
+    - Full backend suite still passes after the refresh-token hashing and revoke hardening changes.
 - Frontend:
   - Command:
     - `PATH=/Users/gimjiseob/.nvm/versions/node/v22.17.1/bin:/usr/bin:/bin npx vitest run src/test/pages/OAuth2CallbackPage.test.tsx --reporter=verbose`
