@@ -39,7 +39,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @Slf4j
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    @Value("${app.websocket.allowed-origins:http://localhost:5173}")
+    @Value("${app.websocket.allowed-origins:http://localhost:5173,http://localhost:3000}")
     private String allowedOrigins;
 
     private final JwtTokenProvider jwtTokenProvider;

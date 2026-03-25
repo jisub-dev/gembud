@@ -108,6 +108,24 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("POST /rooms - should return 401 when principal is missing")
+    void createRoom_MissingPrincipal() throws Exception {
+        CreateRoomRequest request = CreateRoomRequest.builder()
+            .gameId(1L)
+            .title("LOL 랭크 같이 하실 분")
+            .maxParticipants(5)
+            .isPrivate(false)
+            .build();
+
+        mockMvc.perform(post("/rooms")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH002"))
+            .andExpect(jsonPath("$.message").value("Authentication required"));
+    }
+
+    @Test
     @DisplayName("POST /rooms - should return 403 when temperature too low")
     @WithMockUser(username = "test@example.com")
     void createRoom_LowTemperature() throws Exception {

@@ -4,6 +4,8 @@ import com.gembud.dto.ApiResponse;
 import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
 import com.gembud.dto.response.RoomResponse;
+import com.gembud.exception.BusinessException;
+import com.gembud.exception.ErrorCode;
 import com.gembud.service.RoomService;
 import com.gembud.service.RoomService.JoinRoomResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,7 +61,7 @@ public class RoomController {
         @Valid @RequestBody CreateRoomRequest request,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        RoomResponse response = roomService.createRoom(request, userDetails.getUsername());
+        RoomResponse response = roomService.createRoom(request, requireUsername(userDetails));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
 
@@ -78,7 +80,7 @@ public class RoomController {
     public ResponseEntity<ApiResponse<List<RoomResponse>>> getMyRooms(
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.success(roomService.getMyRooms(userDetails.getUsername())));
+        return ResponseEntity.ok(ApiResponse.success(roomService.getMyRooms(requireUsername(userDetails))));
     }
 
     /**
@@ -97,7 +99,7 @@ public class RoomController {
     public ResponseEntity<ApiResponse<RoomResponse>> getMyActiveRoom(
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        return ResponseEntity.ok(ApiResponse.success(roomService.getMyActiveRoom(userDetails.getUsername())));
+        return ResponseEntity.ok(ApiResponse.success(roomService.getMyActiveRoom(requireUsername(userDetails))));
     }
 
     /**
@@ -166,7 +168,7 @@ public class RoomController {
         @RequestBody JoinRoomRequest request,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        RoomResponse response = roomService.joinRoom(roomId, request, userDetails.getUsername());
+        RoomResponse response = roomService.joinRoom(roomId, request, requireUsername(userDetails));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -188,7 +190,7 @@ public class RoomController {
     ) {
         String ip = extractClientIp(httpRequest);
         JoinRoomResult result = roomService.joinRoomByPublicId(
-            publicId, request, userDetails.getUsername(), ip
+            publicId, request, requireUsername(userDetails), ip
         );
         Map<String, Object> body = Map.of(
             "room", result.room(),
@@ -215,7 +217,7 @@ public class RoomController {
         @PathVariable Long roomId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        roomService.leaveRoom(roomId, userDetails.getUsername());
+        roomService.leaveRoom(roomId, requireUsername(userDetails));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
@@ -229,7 +231,7 @@ public class RoomController {
         @PathVariable Long userId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        roomService.kickParticipant(roomId, userId, userDetails.getUsername());
+        roomService.kickParticipant(roomId, userId, requireUsername(userDetails));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
@@ -243,7 +245,7 @@ public class RoomController {
         @PathVariable Long userId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        roomService.transferHost(roomId, userId, userDetails.getUsername());
+        roomService.transferHost(roomId, userId, requireUsername(userDetails));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
@@ -256,7 +258,7 @@ public class RoomController {
         @PathVariable Long roomId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        roomService.startRoom(roomId, userDetails.getUsername());
+        roomService.startRoom(roomId, requireUsername(userDetails));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
@@ -270,7 +272,7 @@ public class RoomController {
         @AuthenticationPrincipal UserDetails userDetails
     ) {
         RoomResponse room = roomService.getRoomByPublicId(publicId);
-        roomService.resetRoom(room.getId(), userDetails.getUsername());
+        roomService.resetRoom(room.getId(), requireUsername(userDetails));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 
@@ -287,8 +289,15 @@ public class RoomController {
         @PathVariable String publicId,
         @AuthenticationPrincipal UserDetails userDetails
     ) {
-        RoomResponse response = roomService.regenerateInviteCode(publicId, userDetails.getUsername());
+        RoomResponse response = roomService.regenerateInviteCode(publicId, requireUsername(userDetails));
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    private String requireUsername(UserDetails userDetails) {
+        if (userDetails == null || userDetails.getUsername() == null || userDetails.getUsername().isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        return userDetails.getUsername();
     }
 
     private String extractClientIp(HttpServletRequest request) {

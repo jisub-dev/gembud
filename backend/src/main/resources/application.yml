@@ -37,7 +37,7 @@ app:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAMESITE:Lax}
   websocket:
-    allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
   security:
     slack-webhook-url: ${SECURITY_ALERT_WEBHOOK_URL:}
     report-duplicate-block-days: ${REPORT_DUPLICATE_BLOCK_DAYS:7}
