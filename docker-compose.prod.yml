@@ -60,8 +60,8 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
-    ports:
-      - "${BACKEND_PORT:-8080}:8080"
+    expose:
+      - "8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,10 +79,32 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         VITE_WS_BASE_URL: ${VITE_WS_BASE_URL}
     container_name: gembud-frontend-prod
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
+    expose:
+      - "80"
     depends_on:
       - backend
+    networks:
+      - gembud-network
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: gembud-caddy-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_healthy
     networks:
       - gembud-network
     restart: unless-stopped
@@ -91,6 +113,10 @@ volumes:
   postgres_data_prod:
     driver: local
   redis_data_prod:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
     driver: local
 
 networks:
