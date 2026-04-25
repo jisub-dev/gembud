@@ -1,5 +1,13 @@
 # Changelog — 2026-04
 
+## 2026-04-26 — Sentry Error Tracking
+
+- Backend: sentry-spring-boot-starter-jakarta + sentry-logback wired into prod profile
+- Frontend: @sentry/react with ErrorBoundary at App root
+- Disabled by default (empty DSN) — set SENTRY_DSN/VITE_SENTRY_DSN env vars to enable
+- 10% trace sampling, send-default-pii=false (GDPR-friendly)
+- Frontend Sentry config requires VITE_* env vars at BUILD time (Dockerfile ARGs)
+
 ## 2026-04-26 — Actuator + Structured JSON Logging
 
 - Added spring-boot-starter-actuator with prometheus registry

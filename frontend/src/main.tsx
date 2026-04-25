@@ -1,8 +1,24 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import * as Sentry from '@sentry/react'
 import App from './App.tsx'
 import './index.css'
+
+// Initialize Sentry only when DSN is configured (disabled by default)
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || 'production',
+    release: import.meta.env.VITE_SENTRY_RELEASE,
+    tracesSampleRate: 0.1,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+    ],
+    // Don't send PII (GDPR-friendly)
+    sendDefaultPii: false,
+  });
+}
 
 const PWA_UPDATE_READY_EVENT = 'pwa:update-ready';
 const PWA_APPLY_UPDATE_EVENT = 'pwa:apply-update';

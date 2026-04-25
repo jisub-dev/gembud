@@ -7,6 +7,9 @@ interface ImportMetaEnv {
   readonly VITE_ADSENSE_SLOT_LEADERBOARD?: string;
   readonly VITE_ADSENSE_SLOT_RECTANGLE?: string;
   readonly VITE_ADSENSE_SLOT_INLINE?: string;
+  readonly VITE_SENTRY_DSN?: string;
+  readonly VITE_SENTRY_ENVIRONMENT?: string;
+  readonly VITE_SENTRY_RELEASE?: string;
 }
 
 interface ImportMeta {
