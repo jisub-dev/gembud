@@ -1,11 +1,10 @@
 package com.gembud;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,18 +16,21 @@ import com.gembud.entity.User;
 import com.gembud.entity.User.UserRole;
 import com.gembud.repository.ReportRepository;
 import com.gembud.repository.UserRepository;
+import com.gembud.security.CustomUserDetails;
 import jakarta.servlet.http.Cookie;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -161,9 +163,11 @@ class ReleaseGateTest {
     /**
      * Test 3: CSRF token validation.
      * POST/PUT/DELETE requests without CSRF token should fail with 403.
+     *
+     * Note: CSRF was re-enabled in Phase 2 hardening (CookieCsrfTokenRepository),
+     * so this gate now verifies real CSRF behavior — the prior @Disabled note is stale.
      */
     @Test
-    @Disabled("CSRF is disabled (JWT + SameSite=Strict); this gate is satisfied by design")
     @DisplayName("Release Gate #3: CSRF 토큰 없으면 403")
     @WithMockUser(username = "test@example.com")
     void test03_CSRF토큰_없으면_403() throws Exception {
@@ -187,11 +191,13 @@ class ReleaseGateTest {
 
     /**
      * Test 3-2: CSRF token validation - success case.
+     *
+     * Uses .with(authentication(...)) to inject a CustomUserDetails principal
+     * referencing the persisted testUser, since @WithMockUser would supply a
+     * generic principal that the controller's @AuthenticationPrincipal cannot bind.
      */
     @Test
-    @Disabled("Requires @WithUserDetails + CustomUserDetailsService setup; covered by service unit tests")
     @DisplayName("Release Gate #3-2: CSRF 토큰 있으면 성공")
-    @WithMockUser(username = "test@example.com")
     void test03_CSRF토큰_있으면_성공() throws Exception {
         // Given
         CreateReportRequest request = new CreateReportRequest(
@@ -204,9 +210,10 @@ class ReleaseGateTest {
 
         // When & Then (with CSRF token)
         mockMvc.perform(post("/reports")
+                .with(authentication(authFor(testUser)))
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(csrf())
             )
             .andExpect(status().isCreated());
     }
@@ -228,12 +235,15 @@ class ReleaseGateTest {
 
     /**
      * Test 5: Report cooldown (7 days).
-     * Reporting the same user within 7 days should be blocked.
+     * Reporting the same user within the configured window should be blocked.
+     *
+     * Uses .with(authentication(...)) so the controller's @AuthenticationPrincipal
+     * binds to a CustomUserDetails referencing the persisted testUser. The current
+     * implementation surfaces this as ErrorCode.DUPLICATE_REPORT (HTTP 409 / REPORT003),
+     * not 400 — the original placeholder assertion was written before that decision.
      */
     @Test
-    @Disabled("Requires @WithUserDetails + CustomUserDetailsService setup; covered by ReportService unit tests")
     @DisplayName("Release Gate #5: 동일 대상 7일 내 재신고 차단")
-    @WithMockUser(username = "test@example.com")
     void test05_신고쿨다운_7일() throws Exception {
         // Given: Create a report 3 days ago
         reportRepository.save(Report.builder()
@@ -256,41 +266,19 @@ class ReleaseGateTest {
         );
 
         mockMvc.perform(post("/reports")
+                .with(authentication(authFor(testUser)))
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(csrf())
             )
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("최근")));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("REPORT003"));
     }
 
-    /**
-     * Test 6: Email exposure prevention in DTOs.
-     * Other users' emails should NOT be visible in API responses.
-     */
-    @Test
-    @Disabled("GET /reports/{id} endpoint not implemented; email exposure verified via DTO @JsonIgnore")
-    @DisplayName("Release Gate #6: 신고 조회 시 타인 이메일 null")
-    @WithMockUser(username = "test@example.com", roles = "ADMIN")
-    void test06_타인이메일_노출없음() throws Exception {
-        // Given: Create a report
-        Report report = reportRepository.save(Report.builder()
-            .reporter(testUser)
-            .reported(reportedUser)
-            .category(ReportCategory.VERBAL_ABUSE)
-            .reason("욕설")
-            .description("욕설을 사용했습니다")
-            .build());
-
-        // When & Then: Retrieve report
-        mockMvc.perform(get("/reports/{reportId}", report.getId())
-                .with(csrf()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.reporter.email").doesNotExist())
-            .andExpect(jsonPath("$.reported.email").doesNotExist())
-            .andExpect(jsonPath("$.reporter.nickname").value("TestUser"))
-            .andExpect(jsonPath("$.reported.nickname").value("ReportedUser"));
-    }
+    // Test 6 (단건 신고 조회 응답에 타인 이메일 노출 없음) was removed because
+    // GET /reports/{reportId} is not implemented and is intentionally out of scope —
+    // see docs/adr/0002-disabled-test-cleanup.md. Email exposure on the existing list
+    // endpoints is enforced by ReportResponse (no email field) and verified there.
 
     // ========================================
     // Functional Tests (2)
@@ -341,5 +329,25 @@ class ReleaseGateTest {
         // Rate limiting is defined in Appendix D but not yet implemented
         // Skipping until Resilience4j is configured
         assertThat(true).isTrue(); // Placeholder
+    }
+
+    /**
+     * Builds an Authentication whose principal is a {@link CustomUserDetails}
+     * matching the given persisted user. Use with {@code .with(authentication(...))}
+     * so that the controller's {@code @AuthenticationPrincipal CustomUserDetails}
+     * binds correctly (which {@code @WithMockUser} cannot do).
+     */
+    private UsernamePasswordAuthenticationToken authFor(User user) {
+        CustomUserDetails principal = new CustomUserDetails(
+            user.getId(),
+            user.getEmail(),
+            user.getPassword() != null ? user.getPassword() : "",
+            user.getRole()
+        );
+        return new UsernamePasswordAuthenticationToken(
+            principal,
+            null,
+            List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+        );
     }
 }

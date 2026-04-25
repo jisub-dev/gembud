@@ -17,6 +17,7 @@ Architecture Decision Record (ADR)는 소프트웨어 아키텍처에서 중요�
 | 번호 | 제목 | 상태 | 날짜 |
 |------|------|------|------|
 | [ADR-0001](0001-project-architecture-overview.md) | 프로젝트 아키텍처 개요 | Accepted | 2026-02-16 |
+| [ADR-0002](0002-disabled-test-cleanup.md) | @Disabled 테스트 정리 (PR 1.5) | Accepted | 2026-04-25 |
 
 ## ADR 작성 가이드
 

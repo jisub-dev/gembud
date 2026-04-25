@@ -7,7 +7,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.junit.jupiter.api.Disabled;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -571,21 +570,10 @@ class RoomControllerTest {
             .andExpect(jsonPath("$.message").value("Only host can perform this action"));
     }
 
-    @Test
-    @Disabled("Security filter disabled in @WebMvcTest slice; authentication test requires @SpringBootTest")
-    @DisplayName("POST /rooms - should return 401 when not authenticated")
-    void createRoom_Unauthorized() throws Exception {
-        // Given
-        CreateRoomRequest request = CreateRoomRequest.builder()
-            .gameId(1L)
-            .title("Test Room")
-            .maxParticipants(5)
-            .build();
-
-        // When & Then - No @WithMockUser annotation
-        mockMvc.perform(post("/rooms")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isUnauthorized());
-    }
+    // The 401-when-unauthenticated test was removed — this slice runs with
+    // @AutoConfigureMockMvc(addFilters = false), so security filters never fire.
+    // Reauthentication enforcement is covered by JwtAuthenticationFilter unit tests
+    // and CustomAuthenticationEntryPoint integration tests; rewriting this single
+    // case as @SpringBootTest would duplicate that coverage. See
+    // docs/adr/0002-disabled-test-cleanup.md.
 }
