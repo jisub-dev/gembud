@@ -57,5 +57,16 @@ logging:
     org.springframework.security: DEBUG
     org.springframework.security.web.csrf: TRACE
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,beans
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+
 ads:
   daily-view-limit: ${ADS_DAILY_VIEW_LIMIT:5}

@@ -64,7 +64,14 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfTokenRepository)
                 .csrfTokenRequestHandler(csrfTokenRequestHandler)
-                .ignoringRequestMatchers("/ws/**", "/api/auth/oauth2/**", "/auth/oauth2/**")
+                .ignoringRequestMatchers(
+                    "/ws/**",
+                    "/api/auth/oauth2/**",
+                    "/auth/oauth2/**",
+                    // Actuator endpoints are stateless probes/scrapes, no CSRF token to send
+                    "/actuator/**",
+                    "/api/actuator/**"
+                )
             )
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .sessionManagement(session ->
@@ -86,6 +93,13 @@ public class SecurityConfig {
                     "/swagger-ui/**",   // Swagger UI resources
                     "/swagger-ui.html"  // Swagger UI page
                 ).permitAll()
+                // Actuator: liveness/readiness/info are public (probes by Caddy/Docker/K8s);
+                // metrics, prometheus, loggers, beans, etc. require ADMIN role.
+                .requestMatchers(
+                    "/actuator/health", "/actuator/health/**", "/actuator/info",
+                    "/api/actuator/health", "/api/actuator/health/**", "/api/actuator/info"
+                ).permitAll()
+                .requestMatchers("/actuator/**", "/api/actuator/**").hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

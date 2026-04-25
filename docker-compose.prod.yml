@@ -70,6 +70,13 @@ services:
     networks:
       - gembud-network
     restart: unless-stopped
+    healthcheck:
+      # Use wget (curl is not in eclipse-temurin:17-jre-alpine; wget is). Probes liveness.
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/actuator/health/liveness"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   frontend:
     build:
