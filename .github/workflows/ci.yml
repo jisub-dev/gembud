@@ -92,7 +92,7 @@ jobs:
         working-directory: frontend
 
       - name: Run frontend tests
-        run: npx vitest run
+        run: npm run test -- --run
         working-directory: frontend
 
       - name: Build frontend

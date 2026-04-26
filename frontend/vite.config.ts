@@ -4,9 +4,6 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  test: {
-    exclude: ['e2e/**', 'node_modules/**'],
-  },
   plugins: [react()],
   define: {
     global: 'globalThis',
