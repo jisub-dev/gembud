@@ -3,6 +3,7 @@ import { X, Gamepad2, Lock } from 'lucide-react';
 import { useCreateRoom } from '@/hooks/queries/useRooms';
 import { useToast } from '@/hooks/useToast';
 import type { CreateRoomRequest } from '@/types/room';
+import { getApiErrorMessage } from '@/lib/errors';
 
 interface CreateRoomModalProps {
   gameId: number;
@@ -48,8 +49,8 @@ export function CreateRoomModal({ gameId, gameName, onClose, onSuccess }: Create
         onSuccess?.();
         onClose();
       },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || '방 생성에 실패했습니다');
+      onError: (error: unknown) => {
+        toast.error(getApiErrorMessage(error, '방 생성에 실패했습니다'));
       },
     });
   };

@@ -6,6 +6,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import reportService from '@/services/reportService';
 import adminService from '@/services/adminService';
+import type { SecuritySummary, SecurityEventListResponse } from '@/services/adminService';
+import type { AdminReportListParams, AdminReportListResponse } from '@/services/reportService';
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
@@ -50,29 +52,29 @@ describe('AdminPage reports flow', () => {
     vi.clearAllMocks();
     vi.mocked(useAuthStore).mockReturnValue({
       user: { id: 1, email: 'admin@test.com', role: 'ADMIN' },
-    } as any);
+    } as unknown as ReturnType<typeof useAuthStore>);
     vi.mocked(useToast).mockReturnValue({
       success: toastSuccess,
       error: toastError,
       info: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof useToast>);
     vi.mocked(adminService.getSecuritySummary).mockResolvedValue({
       loginFailCount: 0,
       loginLockedCount: 0,
       refreshReuseCount: 0,
       rateLimitHitCount: 0,
-    } as any);
+    } as SecuritySummary);
     vi.mocked(adminService.getSecurityEvents).mockResolvedValue({
       content: [],
       page: 0,
       size: 20,
       totalElements: 0,
       totalPages: 0,
-    } as any);
+    } as SecurityEventListResponse);
   });
 
   it('filters by status and nickname search', async () => {
-    vi.mocked(reportService.getAdminReports).mockImplementation(async (params: any) => {
+    vi.mocked(reportService.getAdminReports).mockImplementation(async (params: AdminReportListParams) => {
       if (params?.status === 'PENDING') {
         return {
           content: [
@@ -89,7 +91,7 @@ describe('AdminPage reports flow', () => {
           size: 20,
           totalElements: 1,
           totalPages: 1,
-        } as any;
+        } as AdminReportListResponse;
       }
       if (params?.status === 'RESOLVED' && params?.search === 'zzz') {
         return {
@@ -98,7 +100,7 @@ describe('AdminPage reports flow', () => {
           size: 20,
           totalElements: 0,
           totalPages: 0,
-        } as any;
+        } as AdminReportListResponse;
       }
       return {
         content: [
@@ -115,7 +117,7 @@ describe('AdminPage reports flow', () => {
         size: 20,
         totalElements: 1,
         totalPages: 1,
-      } as any;
+      } as AdminReportListResponse;
     });
 
     const user = userEvent.setup();
@@ -152,7 +154,7 @@ describe('AdminPage reports flow', () => {
       size: 20,
       totalElements: 1,
       totalPages: 1,
-    } as any);
+    } as AdminReportListResponse);
     vi.mocked(reportService.warnReport).mockResolvedValue(undefined);
 
     const user = userEvent.setup();
@@ -180,7 +182,7 @@ describe('AdminPage reports flow', () => {
       loginLockedCount: 1,
       refreshReuseCount: 2,
       rateLimitHitCount: 4,
-    } as any);
+    } as SecuritySummary);
     vi.mocked(adminService.getSecurityEvents).mockResolvedValue({
       content: [
         {
@@ -198,7 +200,7 @@ describe('AdminPage reports flow', () => {
       size: 20,
       totalElements: 1,
       totalPages: 1,
-    } as any);
+    } as SecurityEventListResponse);
 
     const user = userEvent.setup();
     await renderAdminPage();

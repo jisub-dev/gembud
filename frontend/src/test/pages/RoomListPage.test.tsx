@@ -267,23 +267,23 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(useJoinRoom).mockReturnValue({
       isPending: false,
       mutateAsync: joinRoomMutateAsync,
-    } as any);
+    } as unknown as ReturnType<typeof useJoinRoom>);
     vi.mocked(useLeaveRoom).mockReturnValue({
       isPending: false,
       mutateAsync: leaveRoomMutateAsync,
-    } as any);
+    } as unknown as ReturnType<typeof useLeaveRoom>);
     vi.mocked(useRegenerateInviteCode).mockReturnValue({
       isPending: false,
       mutateAsync: regenerateInviteMutateAsync,
-    } as any);
-    joinRoomMutateAsync.mockImplementation(({ inviteCode, password, roomPublicId }) =>
-      roomService.joinRoom(roomPublicId, password, inviteCode) as any,
+    } as unknown as ReturnType<typeof useRegenerateInviteCode>);
+    joinRoomMutateAsync.mockImplementation(({ inviteCode, password, roomPublicId }: { inviteCode?: string; password?: string; roomPublicId: string }) =>
+      roomService.joinRoom(roomPublicId, password, inviteCode),
     );
-    leaveRoomMutateAsync.mockImplementation(({ room }) =>
-      roomService.leaveRoom(room.id) as any,
+    leaveRoomMutateAsync.mockImplementation(({ room }: { room: Room }) =>
+      roomService.leaveRoom(room.id),
     );
-    regenerateInviteMutateAsync.mockImplementation(({ room }) =>
-      roomService.regenerateInviteCode(room.publicId) as any,
+    regenerateInviteMutateAsync.mockImplementation(({ room }: { room: Room }) =>
+      roomService.regenerateInviteCode(room.publicId),
     );
     vi.mocked(roomService.buildInviteLink).mockImplementation(
       (room) => `https://example.com/invite/${room.inviteCode ?? 'missing'}`,
@@ -293,29 +293,29 @@ describe('RoomListPage auto-join UX', () => {
       data: [publicRoom, privateRoom],
       isLoading: false,
       error: null,
-    } as any);
+    } as unknown as ReturnType<typeof useRooms>);
     vi.mocked(useGameOptions).mockReturnValue({
       game: { id: 1, name: 'LOL', description: 'desc' },
       tierOptions: [],
       positionOptions: [],
       isLoading: false,
-    } as any);
+    } as unknown as ReturnType<typeof useGameOptions>);
     vi.mocked(useRecommendedRooms).mockReturnValue({
       data: [
         { room: publicRoom, roomId: publicRoom.id, matchingScore: 95, reason: 'good' },
         { room: privateRoom, roomId: privateRoom.id, matchingScore: 85, reason: 'private' },
       ],
       isLoading: false,
-    } as any);
-    vi.mocked(useAds).mockReturnValue({ data: [] } as any);
-    vi.mocked(useAuthStore).mockReturnValue({ user: null } as any);
-    vi.mocked(useMyRooms).mockReturnValue({ data: [], isLoading: false } as any);
-    vi.mocked(useMyActiveRoom).mockReturnValue({ data: null, isLoading: false } as any);
+    } as unknown as ReturnType<typeof useRecommendedRooms>);
+    vi.mocked(useAds).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useAds>);
+    vi.mocked(useAuthStore).mockReturnValue({ user: null } as unknown as ReturnType<typeof useAuthStore>);
+    vi.mocked(useMyRooms).mockReturnValue({ data: [], isLoading: false } as unknown as ReturnType<typeof useMyRooms>);
+    vi.mocked(useMyActiveRoom).mockReturnValue({ data: null, isLoading: false } as unknown as ReturnType<typeof useMyActiveRoom>);
     vi.mocked(useToast).mockReturnValue({
       error: toastError,
       success: toastSuccess,
       info: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof useToast>);
 
     Object.defineProperty(navigator, 'clipboard', {
       value: {
@@ -330,7 +330,7 @@ describe('RoomListPage auto-join UX', () => {
   });
 
   it('leaves the current room and retries when ROOM008 is returned for another room', async () => {
-    vi.mocked(useAuthStore).mockReturnValue({ user: { id: 1, nickname: 'me' } } as any);
+    vi.mocked(useAuthStore).mockReturnValue({ user: { id: 1, nickname: 'me' } } as unknown as ReturnType<typeof useAuthStore>);
     vi.mocked(useMyRooms).mockReturnValue({
       data: [
       {
@@ -342,14 +342,14 @@ describe('RoomListPage auto-join UX', () => {
       activeRoom,
       ],
       isLoading: false,
-    } as any);
-    vi.mocked(useMyActiveRoom).mockReturnValue({ data: activeRoom, isLoading: false } as any);
+    } as unknown as ReturnType<typeof useMyRooms>);
+    vi.mocked(useMyActiveRoom).mockReturnValue({ data: activeRoom, isLoading: false } as unknown as ReturnType<typeof useMyActiveRoom>);
     vi.mocked(roomService.joinRoom)
       .mockRejectedValueOnce(createApiError('ROOM008'))
       .mockResolvedValueOnce({
         room: publicRoom,
         chatRoomId: 'chat-public-555',
-      } as any);
+      });
     vi.mocked(roomService.leaveRoom).mockResolvedValue(undefined);
 
     const user = userEvent.setup();
@@ -365,10 +365,10 @@ describe('RoomListPage auto-join UX', () => {
   });
 
   it('does not leave or retry when ROOM008 is returned and the move is canceled', async () => {
-    vi.mocked(useAuthStore).mockReturnValue({ user: { id: 1, nickname: 'me' } } as any);
+    vi.mocked(useAuthStore).mockReturnValue({ user: { id: 1, nickname: 'me' } } as unknown as ReturnType<typeof useAuthStore>);
     vi.mocked(window.confirm).mockReturnValue(false);
-    vi.mocked(useMyRooms).mockReturnValue({ data: [activeRoom], isLoading: false } as any);
-    vi.mocked(useMyActiveRoom).mockReturnValue({ data: activeRoom, isLoading: false } as any);
+    vi.mocked(useMyRooms).mockReturnValue({ data: [activeRoom], isLoading: false } as unknown as ReturnType<typeof useMyRooms>);
+    vi.mocked(useMyActiveRoom).mockReturnValue({ data: activeRoom, isLoading: false } as unknown as ReturnType<typeof useMyActiveRoom>);
     vi.mocked(roomService.joinRoom).mockRejectedValueOnce(createApiError('ROOM008'));
 
     const user = userEvent.setup();
@@ -387,7 +387,7 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(roomService.joinRoom).mockResolvedValue({
       room: publicRoom,
       chatRoomId: 'chat-public-555',
-    } as any);
+    });
     const user = userEvent.setup();
 
     await renderRoomListPage();
@@ -453,7 +453,7 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(roomService.joinRoom).mockResolvedValue({
       room: privateRoom,
       chatRoomId: 'chat-private-777',
-    } as any);
+    });
     const user = userEvent.setup();
 
     await renderRoomListPage('/games/1/rooms?room=private-room-2&invite=INVITE123');
@@ -520,11 +520,11 @@ describe('RoomListPage auto-join UX', () => {
   it('regenerates invite code for host private room and copies invite URL', async () => {
     vi.mocked(useAuthStore).mockReturnValue({
       user: { nickname: 'host' },
-    } as any);
+    } as unknown as ReturnType<typeof useAuthStore>);
     vi.mocked(roomService.regenerateInviteCode).mockResolvedValue({
       ...privateRoom,
       inviteCode: 'NEWCODE123',
-    } as any);
+    });
     const user = userEvent.setup();
 
     await renderRoomListPage();
@@ -541,7 +541,7 @@ describe('RoomListPage auto-join UX', () => {
       data: [publicRoom, fullRoom, inProgressRoom],
       isLoading: false,
       error: null,
-    } as any);
+    } as unknown as ReturnType<typeof useRooms>);
 
     await renderRoomListPage();
 
@@ -554,7 +554,7 @@ describe('RoomListPage auto-join UX', () => {
     vi.mocked(roomService.joinRoom).mockResolvedValue({
       room: publicRoom,
       chatRoomId: 'chat-public-999',
-    } as any);
+    });
     const user = userEvent.setup();
 
     await renderRoomListPage();
@@ -579,11 +579,11 @@ describe('RoomListPage auto-join UX', () => {
         { room: anotherRoom, roomId: anotherRoom.id, matchingScore: 80, reason: 'next' },
       ],
       isLoading: false,
-    } as any);
+    } as unknown as ReturnType<typeof useRecommendedRooms>);
     vi.mocked(roomService.joinRoom).mockResolvedValue({
       room: anotherRoom,
       chatRoomId: 'chat-public-next',
-    } as any);
+    });
 
     await renderRoomListPage('/games/1/rooms?recommend=true&exclude=public-room-1');
 

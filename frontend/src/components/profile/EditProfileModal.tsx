@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { userService } from '@/services/userService';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
+import { getApiErrorMessage } from '@/lib/errors';
 
 
 interface EditProfileModalProps {
@@ -35,8 +36,8 @@ export function EditProfileModal({ currentNickname, onClose }: EditProfileModalP
       }));
       toast.success('프로필이 수정되었습니다');
       onClose();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || '프로필 수정에 실패했습니다');
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, '프로필 수정에 실패했습니다'));
     } finally {
       setIsLoading(false);
     }

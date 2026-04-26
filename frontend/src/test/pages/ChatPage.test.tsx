@@ -201,13 +201,13 @@ describe('ChatPage recommendation leave flow', () => {
     currentActiveRoom = relatedRoom;
     roomChatRoomsState = [chatRoomInfo];
     myChatRoomsState = [chatRoomInfo];
-    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
+    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: Parameters<typeof chatService.getMyChatRooms>[0]) => {
       if (type === 'ROOM_CHAT') {
-        return Promise.resolve(roomChatRoomsState as any);
+        return Promise.resolve(roomChatRoomsState);
       }
-      return Promise.resolve(myChatRoomsState as any);
+      return Promise.resolve(myChatRoomsState);
     });
-    vi.mocked(roomService.getMyActiveRoom).mockImplementation(async () => currentActiveRoom as any);
+    vi.mocked(roomService.getMyActiveRoom).mockImplementation(async () => currentActiveRoom);
     vi.mocked(roomService.leaveRoom).mockImplementation(async () => {
       currentActiveRoom = null;
       roomChatRoomsState = [];
@@ -254,19 +254,19 @@ describe('ChatPage recommendation leave flow', () => {
         inviteCode: 'NEWCODE123',
         inviteCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       };
-      return currentActiveRoom as any;
+      return currentActiveRoom!;
     });
-    vi.mocked(roomService.buildInviteLink).mockImplementation((room: any) =>
+    vi.mocked(roomService.buildInviteLink).mockImplementation((room) =>
       `https://example.com/invite/${room.inviteCode ?? 'missing'}`,
     );
     vi.mocked(useAuthStore).mockReturnValue({
       user: { id: 1, nickname: 'me' },
-    } as any);
+    } as unknown as ReturnType<typeof useAuthStore>);
     vi.mocked(useToast).mockReturnValue({
       success: toastSuccess,
       error: toastError,
       info: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof useToast>);
     Object.defineProperty(navigator, 'clipboard', {
       value: {
         writeText: clipboardWriteText.mockResolvedValue(undefined),
@@ -415,11 +415,11 @@ describe('ChatPage recommendation leave flow', () => {
   });
 
   it('uses ROOM_CHAT mapping without per-room lookup when relatedRoomId is missing from the general chat payload', async () => {
-    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
+    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: Parameters<typeof chatService.getMyChatRooms>[0]) => {
       if (type === 'ROOM_CHAT') {
-        return Promise.resolve([chatRoomInfo] as any);
+        return Promise.resolve([chatRoomInfo]);
       }
-      return Promise.resolve([chatRoomInfoWithoutRelatedRoomId] as any);
+      return Promise.resolve([chatRoomInfoWithoutRelatedRoomId]);
     });
     vi.mocked(chatService.getChatRoomByGameRoom).mockResolvedValue('unused');
 

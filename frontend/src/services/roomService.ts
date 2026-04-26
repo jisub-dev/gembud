@@ -1,3 +1,4 @@
+import { AxiosError } from 'axios';
 import api from './api';
 import type { Room, CreateRoomRequest, JoinRoomResult } from '@/types/room';
 import { ApiResponse } from '@/types/api';
@@ -71,8 +72,8 @@ export const roomService = {
     try {
       const response = await api.get<ApiResponse<Room>>('/rooms/my/active');
       return response.data.data;
-    } catch (error: any) {
-      if (error?.response?.status === 404) {
+    } catch (error: unknown) {
+      if (error instanceof AxiosError && error.response?.status === 404) {
         return null;
       }
       throw error;

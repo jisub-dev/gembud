@@ -104,22 +104,22 @@ describe('NotificationsPage filtering', () => {
     vi.mocked(useNotifications).mockReturnValue({
       data: notifications,
       isLoading: false,
-    } as any);
+    } as unknown as ReturnType<typeof useNotifications>);
 
     vi.mocked(useMarkNotificationAsRead).mockReturnValue({
       mutate: markAsReadMutate,
       isPending: false,
-    } as any);
+    } as unknown as ReturnType<typeof useMarkNotificationAsRead>);
 
     vi.mocked(useMarkAllNotificationsAsRead).mockReturnValue({
       mutate: markAllAsReadMutate,
       isPending: false,
-    } as any);
+    } as unknown as ReturnType<typeof useMarkAllNotificationsAsRead>);
 
     vi.mocked(useDeleteNotification).mockReturnValue({
       mutate: deleteMutate,
       isPending: false,
-    } as any);
+    } as unknown as ReturnType<typeof useDeleteNotification>);
   });
 
   it('shows summary counts and room CTA label', async () => {

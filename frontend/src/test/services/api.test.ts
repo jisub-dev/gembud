@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { InternalAxiosRequestConfig } from 'axios';
 
 const { requestUse, responseUse, axiosGet } = vi.hoisted(() => ({
   requestUse: vi.fn(),
@@ -26,7 +27,7 @@ vi.mock('axios', () => {
 // Import after mocking so interceptors are registered on the mocked axios instance.
 import '@/services/api';
 
-const requestInterceptor = requestUse.mock.calls[0][0] as (config: any) => Promise<any>;
+const requestInterceptor = requestUse.mock.calls[0][0] as (config: InternalAxiosRequestConfig) => Promise<InternalAxiosRequestConfig>;
 
 describe('api csrf request interceptor', () => {
   beforeEach(() => {
@@ -43,7 +44,7 @@ describe('api csrf request interceptor', () => {
     const config = await requestInterceptor({
       method: 'post',
       url: '/rooms',
-      headers: {},
+      headers: {} as InternalAxiosRequestConfig['headers'],
     });
 
     expect(axiosGet).toHaveBeenCalledWith('http://localhost:8080/api/auth/csrf', {
@@ -58,7 +59,7 @@ describe('api csrf request interceptor', () => {
     const config = await requestInterceptor({
       method: 'post',
       url: '/rooms/123/join',
-      headers: {},
+      headers: {} as InternalAxiosRequestConfig['headers'],
     });
 
     expect(axiosGet).not.toHaveBeenCalled();
@@ -75,7 +76,7 @@ describe('api csrf request interceptor', () => {
     const config = await requestInterceptor({
       method: 'post',
       url: '/auth/login',
-      headers: {},
+      headers: {} as InternalAxiosRequestConfig['headers'],
     });
 
     expect(axiosGet).toHaveBeenCalledWith('http://localhost:8080/api/auth/csrf', {

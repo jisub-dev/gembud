@@ -11,6 +11,8 @@ import { useGames } from '@/hooks/queries/useGames';
 import { useFriends } from '@/hooks/queries/useFriends';
 import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
 import { useAuthStore } from '@/store/authStore';
+import type { ChatRoomInfo } from '@/types/chat';
+import type { Room } from '@/types/room';
 
 const { mockNavigate } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
@@ -105,8 +107,8 @@ const mockRoom = {
 };
 
 describe('Sidebar', () => {
-  let roomChatsLookup: any[];
-  let generalChats: any[];
+  let roomChatsLookup: ChatRoomInfo[];
+  let generalChats: ChatRoomInfo[];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -119,18 +121,18 @@ describe('Sidebar', () => {
         relatedRoomTitle: '내 대기방 A',
       },
     ];
-    generalChats = [{ id: 201, type: 'DIRECT_CHAT', name: 'DM Visible' }];
+    generalChats = [{ id: 201, publicId: 'dm-public-201', type: 'DIRECT_CHAT', name: 'DM Visible' }];
 
-    vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as any);
-    vi.mocked(useGames).mockReturnValue({ data: [] } as any);
-    vi.mocked(useFriends).mockReturnValue({ data: [] } as any);
-    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 3 } as any);
-    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(mockRoom as any);
-    vi.mocked(chatService.getMyChatRooms).mockImplementation(async (type?: any) => {
+    vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as unknown as ReturnType<typeof useAuthStore>);
+    vi.mocked(useGames).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useGames>);
+    vi.mocked(useFriends).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useFriends>);
+    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 3 } as unknown as ReturnType<typeof useUnreadNotificationCount>);
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(mockRoom as unknown as Room);
+    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: Parameters<typeof chatService.getMyChatRooms>[0]) => {
       if (type === 'ROOM_CHAT') {
-        return roomChatsLookup as any;
+        return Promise.resolve(roomChatsLookup);
       }
-      return generalChats as any;
+      return Promise.resolve(generalChats);
     });
   });
 
@@ -164,7 +166,7 @@ describe('Sidebar', () => {
   });
 
   it('falls back to / when gameId is missing', async () => {
-    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(null as any);
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(null);
 
     await renderSidebar('대기방 없음');
 
@@ -197,9 +199,9 @@ describe('Sidebar', () => {
 
   it('shows only DIRECT_CHAT/GROUP_CHAT in 채팅방 section', async () => {
     generalChats = [
-      { id: 201, type: 'DIRECT_CHAT', name: 'DM Visible' },
-      { id: 301, type: 'GROUP_CHAT', name: 'GROUP Visible' },
-      { id: 401, type: 'ROOM_CHAT', name: 'ROOM SHOULD HIDE', relatedRoomId: 1 },
+      { id: 201, publicId: 'dm-201', type: 'DIRECT_CHAT', name: 'DM Visible' },
+      { id: 301, publicId: 'group-301', type: 'GROUP_CHAT', name: 'GROUP Visible' },
+      { id: 401, publicId: 'room-401', type: 'ROOM_CHAT', name: 'ROOM SHOULD HIDE', relatedRoomId: 1 },
     ];
 
     await renderSidebar();
@@ -226,7 +228,7 @@ describe('Sidebar', () => {
           status: 'ACCEPTED',
         },
       ],
-    } as any);
+    } as unknown as ReturnType<typeof useFriends>);
 
     const user = userEvent.setup();
     await renderSidebar();
@@ -248,7 +250,7 @@ describe('Sidebar', () => {
           status: 'ACCEPTED',
         },
       ],
-    } as any);
+    } as unknown as ReturnType<typeof useFriends>);
 
     const user = userEvent.setup();
     await renderSidebar();
@@ -267,7 +269,7 @@ describe('Sidebar', () => {
     expect(await screen.findByText('알림 센터')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
 
-    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 0 } as any);
+    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 0 } as unknown as ReturnType<typeof useUnreadNotificationCount>);
     await act(async () => {
       rerender(<Sidebar />);
       await Promise.resolve();

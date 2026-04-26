@@ -82,12 +82,12 @@ describe('HomePage navigation', () => {
       ],
       isLoading: false,
       error: null,
-    } as any);
-    vi.mocked(useAds).mockReturnValue({ data: [] } as any);
+    } as unknown as ReturnType<typeof useGames>);
+    vi.mocked(useAds).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useAds>);
     vi.mocked(useAuthStore).mockReturnValue({
       isAuthenticated: true,
       user: { isPremium: false },
-    } as any);
+    } as unknown as ReturnType<typeof useAuthStore>);
   });
 
   it('navigates directly to room list when a game is selected', async () => {

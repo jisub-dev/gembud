@@ -16,6 +16,7 @@ import { ConfirmModal } from '@/components/common/ConfirmModal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import type { Friend, FriendRequest } from '@/types/friend';
 import { userService } from '@/services/userService';
+import { getApiErrorMessage } from '@/lib/errors';
 
 const statusBadgeClass: Record<FriendRequest['status'], string> = {
   PENDING: 'bg-amber-500/20 text-amber-300 border border-amber-400/40',
@@ -73,8 +74,8 @@ export default function FriendListPage() {
         setActiveTab('sent');
         setSearchQuery('');
       },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || '친구 요청 실패');
+      onError: (error: unknown) => {
+        toast.error(getApiErrorMessage(error, '친구 요청 실패'));
       },
       onSettled: () => {
         setSendingUserId(null);
@@ -85,21 +86,21 @@ export default function FriendListPage() {
   const handleAccept = (requestId: number) => {
     acceptMutation.mutate(requestId, {
       onSuccess: () => toast.success('친구 요청을 수락했습니다'),
-      onError: (error: any) => toast.error(error.response?.data?.message || '수락 실패'),
+      onError: (error: unknown) => toast.error(getApiErrorMessage(error, '수락 실패')),
     });
   };
 
   const handleReject = (requestId: number) => {
     rejectMutation.mutate(requestId, {
       onSuccess: () => toast.info('친구 요청을 거절했습니다'),
-      onError: (error: any) => toast.error(error.response?.data?.message || '거절 실패'),
+      onError: (error: unknown) => toast.error(getApiErrorMessage(error, '거절 실패')),
     });
   };
 
   const handleCancelSent = (requestId: number) => {
     cancelSentMutation.mutate(requestId, {
       onSuccess: () => toast.info('보낸 친구 요청을 취소했습니다'),
-      onError: (error: any) => toast.error(error.response?.data?.message || '요청 취소 실패'),
+      onError: (error: unknown) => toast.error(getApiErrorMessage(error, '요청 취소 실패')),
     });
   };
 
@@ -110,8 +111,8 @@ export default function FriendListPage() {
         toast.info('친구를 삭제했습니다');
         setRemovingFriend(null);
       },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || '삭제 실패');
+      onError: (error: unknown) => {
+        toast.error(getApiErrorMessage(error, '삭제 실패'));
         setRemovingFriend(null);
       },
     });
