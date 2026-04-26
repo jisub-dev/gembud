@@ -15,6 +15,7 @@ import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import reportService from '@/services/reportService';
 import type { Evaluation } from '@/types/evaluation';
+import { getApiErrorMessage } from '@/lib/errors';
 
 /**
  * User profile page with real API data.
@@ -96,8 +97,8 @@ export default function ProfilePage() {
       onSuccess: () => {
         toast.success('친구 요청을 보냈습니다');
       },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || '친구 요청 실패');
+      onError: (error: unknown) => {
+        toast.error(getApiErrorMessage(error, '친구 요청 실패'));
       },
     });
   };

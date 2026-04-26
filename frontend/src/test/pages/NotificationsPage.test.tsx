@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -35,6 +35,14 @@ vi.mock('@/hooks/queries/useNotifications', () => ({
 vi.mock('@/components/common/ConfirmModal', () => ({
   ConfirmModal: () => null,
 }));
+
+async function renderNotificationsPage() {
+  await act(async () => {
+    render(<NotificationsPage />, { wrapper: createWrapper() });
+    await Promise.resolve();
+  });
+  await screen.findByText('알림 센터');
+}
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -96,26 +104,26 @@ describe('NotificationsPage filtering', () => {
     vi.mocked(useNotifications).mockReturnValue({
       data: notifications,
       isLoading: false,
-    } as any);
+    } as unknown as ReturnType<typeof useNotifications>);
 
     vi.mocked(useMarkNotificationAsRead).mockReturnValue({
       mutate: markAsReadMutate,
       isPending: false,
-    } as any);
+    } as unknown as ReturnType<typeof useMarkNotificationAsRead>);
 
     vi.mocked(useMarkAllNotificationsAsRead).mockReturnValue({
       mutate: markAllAsReadMutate,
       isPending: false,
-    } as any);
+    } as unknown as ReturnType<typeof useMarkAllNotificationsAsRead>);
 
     vi.mocked(useDeleteNotification).mockReturnValue({
       mutate: deleteMutate,
       isPending: false,
-    } as any);
+    } as unknown as ReturnType<typeof useDeleteNotification>);
   });
 
-  it('shows summary counts and room CTA label', () => {
-    render(<NotificationsPage />, { wrapper: createWrapper() });
+  it('shows summary counts and room CTA label', async () => {
+    await renderNotificationsPage();
 
     expect(screen.getByText('총 알림 수')).toBeInTheDocument();
     expect(screen.getByText('안 읽은 알림')).toBeInTheDocument();
@@ -125,10 +133,12 @@ describe('NotificationsPage filtering', () => {
 
   it('filters by unread tab and friend type', async () => {
     const user = userEvent.setup();
-    render(<NotificationsPage />, { wrapper: createWrapper() });
+    await renderNotificationsPage();
 
-    await user.click(screen.getByRole('button', { name: '안 읽음' }));
-    await user.click(screen.getByRole('button', { name: '친구' }));
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: '안 읽음' }));
+      await user.click(screen.getByRole('button', { name: '친구' }));
+    });
 
     expect(screen.getByText('테스터님이 친구 요청을 보냈습니다')).toBeInTheDocument();
     expect(screen.queryByText('방에 초대되었습니다')).not.toBeInTheDocument();
@@ -137,11 +147,15 @@ describe('NotificationsPage filtering', () => {
 
   it('marks as read and navigates when relatedUrl CTA is clicked', async () => {
     const user = userEvent.setup();
-    render(<NotificationsPage />, { wrapper: createWrapper() });
+    await renderNotificationsPage();
 
-    await user.click(screen.getByRole('button', { name: /방으로 이동/i }));
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /방으로 이동/i }));
+    });
 
-    expect(markAsReadMutate).toHaveBeenCalledWith(2);
-    expect(mockNavigate).toHaveBeenCalledWith('/chat/public-id-1');
+    await waitFor(() => {
+      expect(markAsReadMutate).toHaveBeenCalledWith(2);
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/public-id-1');
+    });
   });
 });

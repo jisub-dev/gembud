@@ -1,14 +1,16 @@
 package com.gembud.repository;
 
 import com.gembud.entity.User;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 /**
  * Repository interface for User entity
@@ -26,6 +28,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return Optional User
      */
     Optional<User> findByEmail(String email);
+
+    /**
+     * Find user by email with pessimistic write lock for room mutations.
+     *
+     * @param email user email
+     * @return locked user
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.email = :email")
+    Optional<User> findByEmailForUpdate(@Param("email") String email);
 
     /**
      * Find user by OAuth provider and OAuth ID

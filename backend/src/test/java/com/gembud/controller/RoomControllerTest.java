@@ -4,9 +4,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.junit.jupiter.api.Disabled;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -107,6 +107,24 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("POST /rooms - should return 401 when principal is missing")
+    void createRoom_MissingPrincipal() throws Exception {
+        CreateRoomRequest request = CreateRoomRequest.builder()
+            .gameId(1L)
+            .title("LOL 랭크 같이 하실 분")
+            .maxParticipants(5)
+            .isPrivate(false)
+            .build();
+
+        mockMvc.perform(post("/rooms")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH002"))
+            .andExpect(jsonPath("$.message").value("Authentication required"));
+    }
+
+    @Test
     @DisplayName("POST /rooms - should return 403 when temperature too low")
     @WithMockUser(username = "test@example.com")
     void createRoom_LowTemperature() throws Exception {
@@ -182,6 +200,49 @@ class RoomControllerTest {
             .andExpect(jsonPath("$.data.length()").value(2))
             .andExpect(jsonPath("$.data[0].id").value(1))
             .andExpect(jsonPath("$.data[1].id").value(2));
+    }
+
+    @Test
+    @DisplayName("GET /rooms/my/active - should return my active room")
+    @WithMockUser(username = "test@example.com")
+    void getMyActiveRoom_Success() throws Exception {
+        RoomResponse response = RoomResponse.builder()
+            .id(1L)
+            .publicId("123e4567-e89b-12d3-a456-426614174000")
+            .gameId(1L)
+            .title("내 활성 방")
+            .createdBy("테스트유저")
+            .currentParticipants(2)
+            .maxParticipants(5)
+            .status("OPEN")
+            .build();
+
+        when(roomService.getMyActiveRoom("test@example.com")).thenReturn(response);
+
+        mockMvc.perform(get("/rooms/my/active"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(200))
+            .andExpect(jsonPath("$.data.id").value(1))
+            .andExpect(jsonPath("$.data.publicId").value("123e4567-e89b-12d3-a456-426614174000"))
+            .andExpect(jsonPath("$.data.title").value("내 활성 방"))
+            .andExpect(jsonPath("$.data.status").value("OPEN"));
+
+        verify(roomService).getMyActiveRoom("test@example.com");
+    }
+
+    @Test
+    @DisplayName("GET /rooms/my/active - should return 404 when there is no active room")
+    @WithMockUser(username = "test@example.com")
+    void getMyActiveRoom_NotFound() throws Exception {
+        when(roomService.getMyActiveRoom("test@example.com"))
+            .thenThrow(new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        mockMvc.perform(get("/rooms/my/active"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ROOM001"))
+            .andExpect(jsonPath("$.message").value("Room not found"));
+
+        verify(roomService).getMyActiveRoom("test@example.com");
     }
 
     @Test
@@ -332,6 +393,28 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("POST /rooms/{publicId}/join - should return 409 when already in another active room")
+    @WithMockUser(username = "test@example.com")
+    void joinRoomByPublicId_AlreadyInOtherRoom() throws Exception {
+        JoinRoomRequest request = new JoinRoomRequest();
+
+        when(roomService.joinRoomByPublicId(
+            eq("123e4567-e89b-12d3-a456-426614174000"),
+            any(JoinRoomRequest.class),
+            eq("test@example.com"),
+            eq("203.0.113.10")
+        )).thenThrow(new BusinessException(ErrorCode.ALREADY_IN_OTHER_ROOM));
+
+        mockMvc.perform(post("/rooms/123e4567-e89b-12d3-a456-426614174000/join")
+                .header("X-Forwarded-For", "203.0.113.10")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("ROOM008"))
+            .andExpect(jsonPath("$.message").value("이미 다른 대기방에 참가 중입니다."));
+    }
+
+    @Test
     @DisplayName("POST /rooms/{roomId}/join - should return 409 when room is full")
     @WithMockUser(username = "test@example.com")
     void joinRoom_RoomFull() throws Exception {
@@ -401,6 +484,77 @@ class RoomControllerTest {
         mockMvc.perform(post("/rooms/1/leave"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).leaveRoom(1L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{roomId}/transfer/{userId} - should transfer host successfully")
+    @WithMockUser(username = "test@example.com")
+    void transferHost_Success() throws Exception {
+        doNothing().when(roomService).transferHost(1L, 2L, "test@example.com");
+
+        mockMvc.perform(post("/rooms/1/transfer/2"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).transferHost(1L, 2L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{roomId}/start - should start room successfully")
+    @WithMockUser(username = "test@example.com")
+    void startRoom_Success() throws Exception {
+        doNothing().when(roomService).startRoom(1L, "test@example.com");
+
+        mockMvc.perform(post("/rooms/1/start"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).startRoom(1L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{publicId}/reset - should reset room successfully")
+    @WithMockUser(username = "test@example.com")
+    void resetRoom_Success() throws Exception {
+        RoomResponse room = RoomResponse.builder()
+            .id(11L)
+            .publicId("public-11")
+            .title("Lifecycle Room")
+            .build();
+
+        doNothing().when(roomService).resetRoom(11L, "test@example.com");
+        when(roomService.getRoomByPublicId("public-11")).thenReturn(room);
+
+        mockMvc.perform(post("/rooms/public-11/reset"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(204));
+
+        verify(roomService).getRoomByPublicId("public-11");
+        verify(roomService).resetRoom(11L, "test@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /rooms/{publicId}/invite/regenerate - should regenerate invite successfully")
+    @WithMockUser(username = "test@example.com")
+    void regenerateInviteCode_Success() throws Exception {
+        RoomResponse response = RoomResponse.builder()
+            .id(1L)
+            .publicId("public-1")
+            .title("Private Room")
+            .inviteCode("new-invite-code")
+            .build();
+
+        when(roomService.regenerateInviteCode("public-1", "test@example.com")).thenReturn(response);
+
+        mockMvc.perform(post("/rooms/public-1/invite/regenerate"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(200))
+            .andExpect(jsonPath("$.data.publicId").value("public-1"))
+            .andExpect(jsonPath("$.data.inviteCode").value("new-invite-code"));
+
+        verify(roomService).regenerateInviteCode("public-1", "test@example.com");
     }
 
     @Test
@@ -416,21 +570,10 @@ class RoomControllerTest {
             .andExpect(jsonPath("$.message").value("Only host can perform this action"));
     }
 
-    @Test
-    @Disabled("Security filter disabled in @WebMvcTest slice; authentication test requires @SpringBootTest")
-    @DisplayName("POST /rooms - should return 401 when not authenticated")
-    void createRoom_Unauthorized() throws Exception {
-        // Given
-        CreateRoomRequest request = CreateRoomRequest.builder()
-            .gameId(1L)
-            .title("Test Room")
-            .maxParticipants(5)
-            .build();
-
-        // When & Then - No @WithMockUser annotation
-        mockMvc.perform(post("/rooms")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isUnauthorized());
-    }
+    // The 401-when-unauthenticated test was removed — this slice runs with
+    // @AutoConfigureMockMvc(addFilters = false), so security filters never fire.
+    // Reauthentication enforcement is covered by JwtAuthenticationFilter unit tests
+    // and CustomAuthenticationEntryPoint integration tests; rewriting this single
+    // case as @SpringBootTest would duplicate that coverage. See
+    // docs/adr/0002-disabled-test-cleanup.md.
 }

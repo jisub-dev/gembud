@@ -11,6 +11,8 @@ import { useGames } from '@/hooks/queries/useGames';
 import { useFriends } from '@/hooks/queries/useFriends';
 import { useUnreadNotificationCount } from '@/hooks/queries/useNotifications';
 import { useAuthStore } from '@/store/authStore';
+import type { ChatRoomInfo } from '@/types/chat';
+import type { Room } from '@/types/room';
 
 const { mockNavigate } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
@@ -26,7 +28,7 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('@/services/roomService', () => ({
   roomService: {
-    getMyRooms: vi.fn(),
+    getMyActiveRoom: vi.fn(),
   },
 }));
 
@@ -70,6 +72,26 @@ function createWrapper() {
     );
 }
 
+async function renderSidebar(waitingRoomLabel?: string) {
+  let utils!: ReturnType<typeof render>;
+  await act(async () => {
+    utils = render(<Sidebar />, { wrapper: createWrapper() });
+    await Promise.resolve();
+  });
+  await screen.findByText('DM Visible');
+  if (waitingRoomLabel) {
+    await screen.findByText(waitingRoomLabel);
+  }
+  return utils;
+}
+
+async function clickAndFlush(user: ReturnType<typeof userEvent.setup>, element: Element) {
+  await act(async () => {
+    await user.click(element);
+    await Promise.resolve();
+  });
+}
+
 const mockRoom = {
   id: 1,
   gameId: 10,
@@ -85,8 +107,8 @@ const mockRoom = {
 };
 
 describe('Sidebar', () => {
-  let roomChatsLookup: any[];
-  let generalChats: any[];
+  let roomChatsLookup: ChatRoomInfo[];
+  let generalChats: ChatRoomInfo[];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -99,26 +121,26 @@ describe('Sidebar', () => {
         relatedRoomTitle: '내 대기방 A',
       },
     ];
-    generalChats = [{ id: 201, type: 'DIRECT_CHAT', name: 'DM Visible' }];
+    generalChats = [{ id: 201, publicId: 'dm-public-201', type: 'DIRECT_CHAT', name: 'DM Visible' }];
 
-    vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as any);
-    vi.mocked(useGames).mockReturnValue({ data: [] } as any);
-    vi.mocked(useFriends).mockReturnValue({ data: [] } as any);
-    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 3 } as any);
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([mockRoom] as any);
-    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: any) => {
+    vi.mocked(useAuthStore).mockReturnValue({ isAuthenticated: true } as unknown as ReturnType<typeof useAuthStore>);
+    vi.mocked(useGames).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useGames>);
+    vi.mocked(useFriends).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useFriends>);
+    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 3 } as unknown as ReturnType<typeof useUnreadNotificationCount>);
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(mockRoom as unknown as Room);
+    vi.mocked(chatService.getMyChatRooms).mockImplementation((type?: Parameters<typeof chatService.getMyChatRooms>[0]) => {
       if (type === 'ROOM_CHAT') {
-        return Promise.resolve(roomChatsLookup as any);
+        return Promise.resolve(roomChatsLookup);
       }
-      return Promise.resolve(generalChats as any);
+      return Promise.resolve(generalChats);
     });
   });
 
   it('opens ROOM_CHAT via /chat/rooms/my?type=ROOM_CHAT and navigates to /chat/{publicId}', async () => {
     const user = userEvent.setup();
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar('내 대기방 A');
 
-    await user.click(await screen.findByText('내 대기방 A'));
+    await clickAndFlush(user, await screen.findByText('내 대기방 A'));
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-public-101');
@@ -126,55 +148,63 @@ describe('Sidebar', () => {
     });
   });
 
-  it('falls back to /games/{gameId}/rooms when ROOM_CHAT lookup result is empty', async () => {
+  it('reuses the currently matched ROOM_CHAT even when the refresh lookup is empty', async () => {
     const user = userEvent.setup();
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar('내 대기방 A');
 
     const roomButton = await screen.findByRole('button', { name: /내 대기방 A/i });
     roomChatsLookup = [];
 
     await act(async () => {
-      await user.click(roomButton);
+      await clickAndFlush(user, roomButton);
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/games/10/rooms');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat/chat-public-101');
     });
     await waitFor(() => expect(roomButton).not.toBeDisabled());
   });
 
   it('falls back to / when gameId is missing', async () => {
-    vi.mocked(roomService.getMyRooms).mockResolvedValue([] as any);
+    vi.mocked(roomService.getMyActiveRoom).mockResolvedValue(null);
 
-    const user = userEvent.setup();
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar('대기방 없음');
 
-    const roomButton = await screen.findByRole('button', { name: /내 대기방 A/i });
-    roomChatsLookup = [];
-    await act(async () => {
-      await user.click(roomButton);
-    });
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
-    });
-    await waitFor(() => expect(roomButton).not.toBeDisabled());
+    expect(await screen.findByText('대기방 없음')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('renders "대기방 없음" when there is no ROOM_CHAT', async () => {
     roomChatsLookup = [];
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar();
     expect(await screen.findByText('대기방 없음')).toBeInTheDocument();
+  });
+
+  it('renders "대기방 없음" when ROOM_CHAT exists but does not match the active room', async () => {
+    roomChatsLookup = [
+      {
+        id: 102,
+        publicId: 'chat-public-stale',
+        type: 'ROOM_CHAT',
+        relatedRoomId: 999,
+        relatedRoomTitle: '오래된 방',
+      },
+    ];
+
+    await renderSidebar();
+
+    expect(await screen.findByText('대기방 없음')).toBeInTheDocument();
+    expect(screen.queryByText('오래된 방')).not.toBeInTheDocument();
   });
 
   it('shows only DIRECT_CHAT/GROUP_CHAT in 채팅방 section', async () => {
     generalChats = [
-      { id: 201, type: 'DIRECT_CHAT', name: 'DM Visible' },
-      { id: 301, type: 'GROUP_CHAT', name: 'GROUP Visible' },
-      { id: 401, type: 'ROOM_CHAT', name: 'ROOM SHOULD HIDE', relatedRoomId: 1 },
+      { id: 201, publicId: 'dm-201', type: 'DIRECT_CHAT', name: 'DM Visible' },
+      { id: 301, publicId: 'group-301', type: 'GROUP_CHAT', name: 'GROUP Visible' },
+      { id: 401, publicId: 'room-401', type: 'ROOM_CHAT', name: 'ROOM SHOULD HIDE', relatedRoomId: 1 },
     ];
 
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar();
 
     expect(await screen.findByText('DM Visible')).toBeInTheDocument();
     expect(screen.getByText('GROUP Visible')).toBeInTheDocument();
@@ -182,7 +212,7 @@ describe('Sidebar', () => {
   });
 
   it('shows "친구 없음" when no friends exist', async () => {
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar();
     expect(await screen.findByText('친구')).toBeInTheDocument();
     expect(screen.getByText('친구 없음')).toBeInTheDocument();
   });
@@ -198,13 +228,13 @@ describe('Sidebar', () => {
           status: 'ACCEPTED',
         },
       ],
-    } as any);
+    } as unknown as ReturnType<typeof useFriends>);
 
     const user = userEvent.setup();
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar();
 
     const friendButton = await screen.findByRole('button', { name: /친구A/i });
-    await user.click(friendButton);
+    await clickAndFlush(user, friendButton);
 
     expect(mockNavigate).toHaveBeenCalledWith('/profile/11');
   });
@@ -220,27 +250,30 @@ describe('Sidebar', () => {
           status: 'ACCEPTED',
         },
       ],
-    } as any);
+    } as unknown as ReturnType<typeof useFriends>);
 
     const user = userEvent.setup();
-    render(<Sidebar />, { wrapper: createWrapper() });
+    await renderSidebar();
 
     expect(await screen.findByText('토글친구')).toBeInTheDocument();
     const friendSectionToggle = screen.getByText('친구').closest('button');
     expect(friendSectionToggle).toBeTruthy();
-    await user.click(friendSectionToggle!);
+    await clickAndFlush(user, friendSectionToggle!);
     expect(screen.queryByText('토글친구')).not.toBeInTheDocument();
-    await user.click(friendSectionToggle!);
+    await clickAndFlush(user, friendSectionToggle!);
     expect(await screen.findByText('토글친구')).toBeInTheDocument();
   });
 
   it('shows unread notification badge in sidebar and hides when zero', async () => {
-    const { rerender } = render(<Sidebar />, { wrapper: createWrapper() });
+    const { rerender } = await renderSidebar();
     expect(await screen.findByText('알림 센터')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
 
-    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 0 } as any);
-    rerender(<Sidebar />);
+    vi.mocked(useUnreadNotificationCount).mockReturnValue({ data: 0 } as unknown as ReturnType<typeof useUnreadNotificationCount>);
+    await act(async () => {
+      rerender(<Sidebar />);
+      await Promise.resolve();
+    });
 
     expect(screen.queryByText('3')).not.toBeInTheDocument();
   });

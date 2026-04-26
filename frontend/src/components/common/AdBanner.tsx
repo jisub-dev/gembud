@@ -46,8 +46,10 @@ export default function AdBanner({ type, adData, className = '' }: AdBannerProps
   useEffect(() => {
     if (!adData && insRef.current) {
       try {
-        ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-      } catch {}
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch {
+        // AdSense script not loaded — slot stays inert
+      }
     }
   }, [adData]);
 

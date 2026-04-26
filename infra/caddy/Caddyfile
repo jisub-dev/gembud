@@ -1,0 +1,50 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+    encode gzip zstd
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        # Remove server header
+        -Server
+    }
+
+    # Request body size limit (10MB for typical API + image upload safety)
+    request_body {
+        max_size 10MB
+    }
+
+    # Backend API
+    handle /api/* {
+        reverse_proxy backend:8080
+    }
+
+    # WebSocket (STOMP over SockJS)
+    handle /ws/* {
+        reverse_proxy backend:8080
+    }
+
+    # Actuator health (only liveness public — others restricted at app level)
+    handle /actuator/* {
+        reverse_proxy backend:8080
+    }
+
+    # OAuth2 endpoints
+    handle /oauth2/* {
+        reverse_proxy backend:8080
+    }
+    handle /login/* {
+        reverse_proxy backend:8080
+    }
+
+    # Frontend (catch-all)
+    handle {
+        reverse_proxy frontend:80
+    }
+}

@@ -5,14 +5,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import com.gembud.dto.request.CreateRoomRequest;
 import com.gembud.dto.request.JoinRoomRequest;
+import com.gembud.dto.response.ChatMessageResponse;
 import com.gembud.dto.response.RoomResponse;
+import com.gembud.entity.ChatRoom;
 import com.gembud.entity.Game;
 import com.gembud.entity.Notification.NotificationType;
 import com.gembud.entity.Room;
@@ -21,12 +25,15 @@ import com.gembud.entity.RoomParticipant;
 import com.gembud.entity.User;
 import com.gembud.exception.BusinessException;
 import com.gembud.exception.ErrorCode;
+import com.gembud.repository.ChatRoomRepository;
 import com.gembud.repository.GameRepository;
 import com.gembud.repository.RoomFilterRepository;
 import com.gembud.repository.RoomParticipantRepository;
 import com.gembud.repository.RoomRepository;
 import com.gembud.repository.UserRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -52,6 +60,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RoomServiceTest {
+
+    @Mock
+    private ChatRoomRepository chatRoomRepository;
 
     @Mock
     private RoomRepository roomRepository;
@@ -92,7 +103,6 @@ class RoomServiceTest {
     private User user;
     private Game game;
     private Room room;
-
     @BeforeEach
     void setUp() {
         user = User.builder()
@@ -116,6 +126,31 @@ class RoomServiceTest {
             .createdBy(user)
             .build();
         ReflectionTestUtils.setField(room, "id", 1L);
+
+        when(chatRoomRepository.findByTypeAndRelatedRoomId(eq(ChatRoom.ChatRoomType.ROOM_CHAT), anyLong()))
+            .thenAnswer(inv -> {
+                Long roomId = inv.getArgument(1);
+                Room relatedRoom = room;
+                if (!room.getId().equals(roomId)) {
+                    relatedRoom = Room.builder()
+                        .game(game)
+                        .title("Room " + roomId)
+                        .maxParticipants(5)
+                        .currentParticipants(1)
+                        .isPrivate(false)
+                        .createdBy(user)
+                        .build();
+                    ReflectionTestUtils.setField(relatedRoom, "id", roomId);
+                }
+
+                ChatRoom mappedRoomChat = ChatRoom.builder()
+                    .type(ChatRoom.ChatRoomType.ROOM_CHAT)
+                    .relatedRoom(relatedRoom)
+                    .build();
+                ReflectionTestUtils.setField(mappedRoomChat, "id", roomId * 10);
+                ReflectionTestUtils.setField(mappedRoomChat, "publicId", "chat-public-" + (roomId * 10));
+                return Optional.of(mappedRoomChat);
+            });
     }
 
     // ──────────────────────────────────────────────
@@ -133,7 +168,7 @@ class RoomServiceTest {
             .isPrivate(false)
             .build();
 
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("user@example.com")).thenReturn(Optional.of(user));
         when(temperatureService.canCreateRoom(1L)).thenReturn(true);
         when(participantRepository.existsActiveParticipationByUserId(1L)).thenReturn(false);
         when(gameRepository.findById(1L)).thenReturn(Optional.of(game));
@@ -143,7 +178,10 @@ class RoomServiceTest {
             return r;
         });
         when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(chatRoomRepository.findByTypeAndRelatedRoomId(ChatRoom.ChatRoomType.ROOM_CHAT, 1L))
+            .thenReturn(Optional.empty());
         when(chatService.createChatRoomForGameRoom(anyLong())).thenReturn(10L);
+        when(chatService.getPublicIdByChatRoomId(10L)).thenReturn("chat-public-10");
         when(participantRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
         when(filterRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
 
@@ -153,8 +191,9 @@ class RoomServiceTest {
         // Then
         assertThat(response).isNotNull();
         assertThat(response.getTitle()).isEqualTo("Test Room");
+        verify(userRepository).findByEmailForUpdate("user@example.com");
         verify(roomRepository).save(any(Room.class));
-        verify(chatService).createChatRoomForGameRoom(anyLong());
+        verify(chatService).addMemberToChatRoomInternal(10L, 1L);
     }
 
     @Test
@@ -185,7 +224,7 @@ class RoomServiceTest {
     @Test
     @DisplayName("createRoom - should throw when user already in active room")
     void createRoom_AlreadyInOtherRoom_ShouldThrow() {
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("user@example.com")).thenReturn(Optional.of(user));
         when(temperatureService.canCreateRoom(1L)).thenReturn(true);
         when(participantRepository.existsActiveParticipationByUserId(1L)).thenReturn(true);
 
@@ -194,6 +233,8 @@ class RoomServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.ALREADY_IN_OTHER_ROOM);
+
+        verify(userRepository).findByEmailForUpdate("user@example.com");
     }
 
     @Test
@@ -232,8 +273,8 @@ class RoomServiceTest {
             .joinOrder(1)
             .build();
 
-        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(userRepository.findByEmailForUpdate("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
         when(participantRepository.findByRoomIdAndUserId(1L, 2L)).thenReturn(Optional.empty());
         when(participantRepository.countByRoomId(1L)).thenReturn(1L);
@@ -249,6 +290,8 @@ class RoomServiceTest {
 
         // Then
         assertThat(response).isNotNull();
+        verify(userRepository).findByEmailForUpdate("joiner@example.com");
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(participantRepository).save(any(RoomParticipant.class));
         verify(chatService).addMemberToChatRoomInternal(10L, 2L);
         verify(notificationService).createNotification(
@@ -270,8 +313,8 @@ class RoomServiceTest {
             .build();
         ReflectionTestUtils.setField(joiner, "id", 2L);
 
-        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(userRepository.findByEmailForUpdate("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(true);
 
         // When / Then
@@ -279,6 +322,9 @@ class RoomServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.ALREADY_IN_OTHER_ROOM);
+
+        verify(userRepository).findByEmailForUpdate("joiner@example.com");
+        verify(roomRepository).findByIdForUpdate(1L);
     }
 
     @Test
@@ -318,13 +364,87 @@ class RoomServiceTest {
             .build();
         ReflectionTestUtils.setField(joiner, "id", 2L);
 
-        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
-        when(roomRepository.findById(2L)).thenReturn(Optional.of(fullRoom));
+        when(userRepository.findByEmailForUpdate("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(fullRoom));
 
         assertThatThrownBy(() -> roomService.joinRoom(2L, new JoinRoomRequest(), "joiner@example.com"))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.ROOM_FULL);
+
+        verify(userRepository).findByEmailForUpdate("joiner@example.com");
+        verify(roomRepository).findByIdForUpdate(2L);
+    }
+
+    @Test
+    @DisplayName("joinRoom - should throw when room is already in progress")
+    void joinRoom_InProgress_ShouldThrow() {
+        Room inProgressRoom = Room.builder()
+            .game(game)
+            .title("Running Room")
+            .maxParticipants(5)
+            .currentParticipants(3)
+            .isPrivate(false)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(inProgressRoom, "id", 15L);
+        inProgressRoom.start();
+
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        when(userRepository.findByEmailForUpdate("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(inProgressRoom));
+
+        assertThatThrownBy(() -> roomService.joinRoom(15L, new JoinRoomRequest(), "joiner@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.ROOM_ALREADY_IN_PROGRESS);
+
+        verify(userRepository).findByEmailForUpdate("joiner@example.com");
+        verify(roomRepository).findByIdForUpdate(15L);
+    }
+
+    @Test
+    @DisplayName("joinRoom - should create missing room chat and continue")
+    void joinRoom_MissingRoomChat_ShouldCreateAndJoin() {
+        User joiner = User.builder()
+            .email("joiner@example.com")
+            .nickname("Joiner")
+            .temperature(new BigDecimal("36.5"))
+            .build();
+        ReflectionTestUtils.setField(joiner, "id", 2L);
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(room)
+            .user(user)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        when(userRepository.findByEmail("joiner@example.com")).thenReturn(Optional.of(joiner));
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(participantRepository.existsActiveParticipationByUserId(2L)).thenReturn(false);
+        when(participantRepository.findByRoomIdAndUserId(1L, 2L)).thenReturn(Optional.empty());
+        when(participantRepository.countByRoomId(1L)).thenReturn(1L);
+        when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.save(any(Room.class))).thenReturn(room);
+        when(chatRoomRepository.findByTypeAndRelatedRoomId(ChatRoom.ChatRoomType.ROOM_CHAT, 1L))
+            .thenReturn(Optional.empty());
+        when(chatService.createChatRoomForGameRoom(1L)).thenReturn(77L);
+        when(chatService.getPublicIdByChatRoomId(77L)).thenReturn("chat-public-77");
+        when(participantRepository.findByRoomId(1L)).thenReturn(List.of(hostParticipant));
+        when(filterRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
+
+        RoomResponse response = roomService.joinRoom(1L, new JoinRoomRequest(), "joiner@example.com");
+
+        assertThat(response).isNotNull();
+        verify(chatService).createChatRoomForGameRoom(1L);
+        verify(chatService).addMemberToChatRoomInternal(77L, 2L);
     }
 
     @Test
@@ -706,13 +826,19 @@ class RoomServiceTest {
 
         RoomParticipant hostParticipant = RoomParticipant.builder()
             .room(singleRoom).user(user).isHost(true).joinOrder(1).build();
+        List<RoomParticipant> activeRooms = new ArrayList<>(List.of(hostParticipant));
 
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(roomRepository.findById(3L)).thenReturn(Optional.of(singleRoom));
         when(participantRepository.findByRoomIdAndUserId(3L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(participantRepository.findActiveRoomsByUserId(1L)).thenAnswer(invocation -> new ArrayList<>(activeRooms));
         when(chatService.getChatRoomIdByGameRoomId(3L)).thenReturn(10L);
         when(chatService.getChatRoomByGameRoomId(3L)).thenReturn("chat-public-10");
         when(roomRepository.save(any(Room.class))).thenReturn(singleRoom);
+        doAnswer(invocation -> {
+            activeRooms.clear();
+            return null;
+        }).when(participantRepository).delete(hostParticipant);
 
         // When
         roomService.leaveRoom(3L, "user@example.com");
@@ -721,6 +847,113 @@ class RoomServiceTest {
         verify(roomRepository).save(singleRoom);
         assertThat(singleRoom.getStatus()).isEqualTo(Room.RoomStatus.CLOSED);
         assertThat(singleRoom.getDeletedAt()).isNotNull();
+        assertThatThrownBy(() -> roomService.getMyActiveRoom("user@example.com"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.ROOM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("leaveRoom - host leaving should transfer host to next participant")
+    void leaveRoom_HostLeaving_ShouldTransferHost() {
+        // Given
+        User member = User.builder()
+            .email("member@example.com")
+            .nickname("Member")
+            .build();
+        ReflectionTestUtils.setField(member, "id", 2L);
+
+        Room transferRoom = Room.builder()
+            .game(game)
+            .title("Transfer Room")
+            .maxParticipants(5)
+            .currentParticipants(2)
+            .isPrivate(false)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(transferRoom, "id", 1L);
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(transferRoom)
+            .user(user)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+        RoomParticipant nextHostCandidate = RoomParticipant.builder()
+            .room(transferRoom)
+            .user(member)
+            .isHost(false)
+            .joinOrder(2)
+            .build();
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(transferRoom));
+        when(participantRepository.findByRoomIdAndUserId(1L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(participantRepository.findNextHostCandidates(1L)).thenReturn(List.of(nextHostCandidate));
+        when(chatService.getChatRoomIdByGameRoomId(1L)).thenReturn(10L);
+        when(chatService.getChatRoomByGameRoomId(1L)).thenReturn("chat-public-10");
+        when(roomRepository.save(any(Room.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(participantRepository.save(any(RoomParticipant.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ArgumentCaptor<RoomParticipant> hostCaptor = ArgumentCaptor.forClass(RoomParticipant.class);
+
+        // When
+        roomService.leaveRoom(1L, "user@example.com");
+
+        // Then
+        verify(participantRepository).delete(hostParticipant);
+        verify(participantRepository).delete(nextHostCandidate);
+        verify(participantRepository).save(hostCaptor.capture());
+        assertThat(hostCaptor.getValue().getIsHost()).isTrue();
+        assertThat(hostCaptor.getValue().getUser().getId()).isEqualTo(2L);
+        assertThat(transferRoom.getCurrentParticipants()).isEqualTo(1);
+        assertThat(transferRoom.getStatus()).isEqualTo(Room.RoomStatus.OPEN);
+        verify(roomRepository, times(1)).save(transferRoom);
+        verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-public-10"), any(ChatMessageResponse.class));
+    }
+
+    @Test
+    @DisplayName("startRoom then resetRoom should round-trip room status")
+    void startAndResetRoom_ShouldRoundTripStatus() {
+        // Given
+        User host = User.builder()
+            .email("host@example.com")
+            .nickname("Host")
+            .build();
+        ReflectionTestUtils.setField(host, "id", 1L);
+
+        Room lifecycleRoom = Room.builder()
+            .game(game)
+            .title("Lifecycle Room")
+            .maxParticipants(5)
+            .currentParticipants(2)
+            .isPrivate(false)
+            .createdBy(host)
+            .build();
+        ReflectionTestUtils.setField(lifecycleRoom, "id", 11L);
+
+        RoomParticipant hostParticipant = RoomParticipant.builder()
+            .room(lifecycleRoom)
+            .user(host)
+            .isHost(true)
+            .joinOrder(1)
+            .build();
+
+        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
+        when(roomRepository.findById(11L)).thenReturn(Optional.of(lifecycleRoom));
+        when(participantRepository.findByRoomIdAndUserId(11L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(chatService.getChatRoomIdByGameRoomId(11L)).thenReturn(88L);
+        when(chatService.getChatRoomByGameRoomId(11L)).thenReturn("chat-public-88");
+        when(roomRepository.save(any(Room.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        roomService.startRoom(11L, "host@example.com");
+        roomService.resetRoom(11L, "host@example.com");
+
+        // Then
+        assertThat(lifecycleRoom.getStatus()).isEqualTo(Room.RoomStatus.OPEN);
+        verify(roomRepository, times(2)).save(lifecycleRoom);
+        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/chat/chat-public-88"), any(ChatMessageResponse.class));
     }
 
     @Test
@@ -848,11 +1081,14 @@ class RoomServiceTest {
         when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
         when(roomRepository.findById(11L)).thenReturn(Optional.of(inProgressRoom));
         when(participantRepository.findByRoomIdAndUserId(11L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(chatService.getChatRoomIdByGameRoomId(11L)).thenReturn(88L);
+        when(chatService.getChatRoomByGameRoomId(11L)).thenReturn("chat-public-88");
 
         roomService.resetRoom(11L, "host@example.com");
 
         assertThat(inProgressRoom.getStatus()).isEqualTo(Room.RoomStatus.OPEN);
         verify(roomRepository).save(inProgressRoom);
+        verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-public-88"), any(ChatMessageResponse.class));
     }
 
     @Test
@@ -892,76 +1128,92 @@ class RoomServiceTest {
     }
 
     @Test
-    @DisplayName("closeRoom - should close room when requester is host")
-    void closeRoom_Host_ShouldClose() {
-        User host = User.builder()
-            .email("host@example.com")
-            .nickname("Host")
-            .build();
-        ReflectionTestUtils.setField(host, "id", 1L);
-
-        Room openRoom = Room.builder()
+    @DisplayName("getMyActiveRoom - should return the most recently joined active room")
+    void getMyActiveRoom_Found_ShouldReturnFirstActiveRoom() {
+        Room recentRoom = Room.builder()
             .game(game)
-            .title("Open Room")
+            .title("Recent Room")
+            .maxParticipants(5)
+            .currentParticipants(2)
+            .isPrivate(false)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(recentRoom, "id", 21L);
+        ReflectionTestUtils.setField(recentRoom, "status", Room.RoomStatus.OPEN);
+
+        Room olderRoom = Room.builder()
+            .game(game)
+            .title("Older Room")
             .maxParticipants(5)
             .currentParticipants(3)
             .isPrivate(false)
-            .createdBy(host)
+            .createdBy(user)
             .build();
-        ReflectionTestUtils.setField(openRoom, "id", 13L);
+        ReflectionTestUtils.setField(olderRoom, "id", 22L);
+        ReflectionTestUtils.setField(olderRoom, "status", Room.RoomStatus.FULL);
 
-        RoomParticipant hostParticipant = RoomParticipant.builder()
-            .room(openRoom)
-            .user(host)
+        RoomParticipant recentParticipant = RoomParticipant.builder()
+            .room(recentRoom)
+            .user(user)
             .isHost(true)
             .joinOrder(1)
             .build();
+        RoomParticipant olderParticipant = RoomParticipant.builder()
+            .room(olderRoom)
+            .user(user)
+            .isHost(false)
+            .joinOrder(2)
+            .build();
 
-        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
-        when(roomRepository.findById(13L)).thenReturn(Optional.of(openRoom));
-        when(participantRepository.findByRoomIdAndUserId(13L, 1L)).thenReturn(Optional.of(hostParticipant));
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(participantRepository.findActiveRoomsByUserId(1L)).thenReturn(List.of(recentParticipant, olderParticipant));
+        when(participantRepository.findByRoomId(21L)).thenReturn(List.of(recentParticipant));
+        when(filterRepository.findByRoomId(21L)).thenReturn(Collections.emptyList());
 
-        roomService.closeRoom(13L, "host@example.com");
+        RoomResponse response = roomService.getMyActiveRoom("user@example.com");
 
-        assertThat(openRoom.getStatus()).isEqualTo(Room.RoomStatus.CLOSED);
-        verify(roomRepository).save(openRoom);
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(21L);
+        assertThat(response.getStatus()).isEqualTo("OPEN");
     }
 
     @Test
-    @DisplayName("closeRoom - should throw when room is already closed")
-    void closeRoom_AlreadyClosed_ShouldThrow() {
-        User host = User.builder()
-            .email("host@example.com")
-            .nickname("Host")
-            .build();
-        ReflectionTestUtils.setField(host, "id", 1L);
+    @DisplayName("getMyActiveRoom - should throw when user has no active rooms")
+    void getMyActiveRoom_NotFound_ShouldThrow() {
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(participantRepository.findActiveRoomsByUserId(1L)).thenReturn(Collections.emptyList());
 
-        Room closedRoom = Room.builder()
-            .game(game)
-            .title("Closed Room")
-            .maxParticipants(5)
-            .currentParticipants(3)
-            .isPrivate(false)
-            .createdBy(host)
-            .build();
-        ReflectionTestUtils.setField(closedRoom, "id", 14L);
-        closedRoom.close();
-
-        RoomParticipant hostParticipant = RoomParticipant.builder()
-            .room(closedRoom)
-            .user(host)
-            .isHost(true)
-            .joinOrder(1)
-            .build();
-
-        when(userRepository.findByEmail("host@example.com")).thenReturn(Optional.of(host));
-        when(roomRepository.findById(14L)).thenReturn(Optional.of(closedRoom));
-        when(participantRepository.findByRoomIdAndUserId(14L, 1L)).thenReturn(Optional.of(hostParticipant));
-
-        assertThatThrownBy(() -> roomService.closeRoom(14L, "host@example.com"))
+        assertThatThrownBy(() -> roomService.getMyActiveRoom("user@example.com"))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
-            .isEqualTo(ErrorCode.ROOM_ALREADY_CLOSED);
+            .isEqualTo(ErrorCode.ROOM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("getRoomsByGame - should request OPEN/FULL/IN_PROGRESS rooms only")
+    void getRoomsByGame_ShouldUseExpectedStatuses() {
+        Room openRoom = createRoomWithStatus(31L, "Open Room", 1, Room.RoomStatus.OPEN);
+        Room fullRoom = createRoomWithStatus(32L, "Full Room", 5, Room.RoomStatus.FULL);
+        Room inProgressRoom = createRoomWithStatus(33L, "In Progress Room", 3, Room.RoomStatus.IN_PROGRESS);
+
+        when(roomRepository.findByGameIdAndStatusInAndDeletedAtIsNull(eq(1L), any())).thenAnswer(invocation -> {
+            Collection<Room.RoomStatus> statuses = invocation.getArgument(1);
+            assertThat(statuses).containsExactlyInAnyOrder(
+                Room.RoomStatus.OPEN,
+                Room.RoomStatus.FULL,
+                Room.RoomStatus.IN_PROGRESS
+            );
+            assertThat(statuses).doesNotContain(Room.RoomStatus.CLOSED);
+            return List.of(openRoom, fullRoom, inProgressRoom);
+        });
+        when(participantRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
+        when(filterRepository.findByRoomId(anyLong())).thenReturn(Collections.emptyList());
+
+        List<RoomResponse> responses = roomService.getRoomsByGame(1L);
+
+        assertThat(responses).hasSize(3);
+        assertThat(responses).extracting(RoomResponse::getStatus)
+            .containsExactly("OPEN", "FULL", "IN_PROGRESS");
     }
 
     // ──────────────────────────────────────────────
@@ -990,5 +1242,19 @@ class RoomServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.ROOM_NOT_FOUND);
+    }
+
+    private Room createRoomWithStatus(Long id, String title, int currentParticipants, Room.RoomStatus status) {
+        Room testRoom = Room.builder()
+            .game(game)
+            .title(title)
+            .maxParticipants(5)
+            .currentParticipants(currentParticipants)
+            .isPrivate(false)
+            .createdBy(user)
+            .build();
+        ReflectionTestUtils.setField(testRoom, "id", id);
+        ReflectionTestUtils.setField(testRoom, "status", status);
+        return testRoom;
     }
 }

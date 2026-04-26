@@ -9,9 +9,9 @@ vi.mock('@/services/subscriptionService');
 
 // Use vi.hoisted to avoid temporal dead zone in vi.mock factory
 const { mockAuthStore } = vi.hoisted(() => {
-  const store = vi.fn(() => ({ isAuthenticated: true, user: null })) as any;
-  store.getState = vi.fn(() => ({ user: null }));
-  store.setState = vi.fn();
+  const store = vi.fn(() => ({ isAuthenticated: true, user: null })) as unknown as typeof import('@/store/authStore').useAuthStore;
+  store.getState = vi.fn(() => ({ user: null })) as unknown as typeof store.getState;
+  store.setState = vi.fn() as unknown as typeof store.setState;
   return { mockAuthStore: store };
 });
 
@@ -48,9 +48,9 @@ const mockPremiumStatus = {
 describe('useSubscriptionStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuthStore.mockReturnValue({ isAuthenticated: true, user: mockUser });
-    mockAuthStore.getState = vi.fn(() => ({ user: mockUser }));
-    mockAuthStore.setState = vi.fn();
+    vi.mocked(mockAuthStore).mockReturnValue({ isAuthenticated: true, user: mockUser } as unknown as ReturnType<typeof mockAuthStore>);
+    mockAuthStore.getState = vi.fn(() => ({ user: mockUser })) as unknown as typeof mockAuthStore.getState;
+    mockAuthStore.setState = vi.fn() as unknown as typeof mockAuthStore.setState;
   });
 
   it('should return non-premium status when not subscribed', async () => {
@@ -77,7 +77,7 @@ describe('useSubscriptionStatus', () => {
   });
 
   it('should not fetch when not authenticated', async () => {
-    mockAuthStore.mockReturnValue({ isAuthenticated: false, user: null });
+    vi.mocked(mockAuthStore).mockReturnValue({ isAuthenticated: false, user: null } as unknown as ReturnType<typeof mockAuthStore>);
 
     const { result } = renderHook(() => useSubscriptionStatus(), {
       wrapper: createWrapper(),
@@ -91,9 +91,9 @@ describe('useSubscriptionStatus', () => {
 describe('useActivatePremium', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuthStore.mockReturnValue({ isAuthenticated: true, user: mockUser });
-    mockAuthStore.getState = vi.fn(() => ({ user: mockUser }));
-    mockAuthStore.setState = vi.fn();
+    vi.mocked(mockAuthStore).mockReturnValue({ isAuthenticated: true, user: mockUser } as unknown as ReturnType<typeof mockAuthStore>);
+    mockAuthStore.getState = vi.fn(() => ({ user: mockUser })) as unknown as typeof mockAuthStore.getState;
+    mockAuthStore.setState = vi.fn() as unknown as typeof mockAuthStore.setState;
   });
 
   it('should call activate service with correct months', async () => {
@@ -114,9 +114,9 @@ describe('useCancelPremium', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const premiumUser = { ...mockUser, isPremium: true };
-    mockAuthStore.mockReturnValue({ isAuthenticated: true, user: premiumUser });
-    mockAuthStore.getState = vi.fn(() => ({ user: premiumUser }));
-    mockAuthStore.setState = vi.fn();
+    vi.mocked(mockAuthStore).mockReturnValue({ isAuthenticated: true, user: premiumUser } as unknown as ReturnType<typeof mockAuthStore>);
+    mockAuthStore.getState = vi.fn(() => ({ user: premiumUser })) as unknown as typeof mockAuthStore.getState;
+    mockAuthStore.setState = vi.fn() as unknown as typeof mockAuthStore.setState;
   });
 
   it('should call cancel service', async () => {

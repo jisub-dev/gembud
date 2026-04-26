@@ -26,7 +26,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -57,13 +56,26 @@ class AuthServiceTest {
     @Mock private SecurityEventService securityEventService;
     @Mock private WebSocketSessionRegistry webSocketSessionRegistry;
 
-    @InjectMocks
     private AuthService authService;
+    private AuthSessionService authSessionService;
 
     private User testUser;
 
     @BeforeEach
     void setUp() {
+        authSessionService = new AuthSessionService(jwtTokenProvider, refreshTokenStore, jwtConfig);
+        authService = new AuthService(
+            userRepository,
+            passwordEncoder,
+            jwtTokenProvider,
+            authenticationManager,
+            refreshTokenStore,
+            authSessionService,
+            rateLimitService,
+            securityEventService,
+            webSocketSessionRegistry
+        );
+
         testUser = User.builder()
             .email("test@example.com")
             .password("encodedPw")
@@ -171,7 +183,7 @@ class AuthServiceTest {
 
         when(jwtTokenProvider.validateToken(oldToken)).thenReturn(true);
         when(jwtTokenProvider.getEmailFromToken(oldToken)).thenReturn("test@example.com");
-        when(refreshTokenStore.get("test@example.com")).thenReturn(oldToken);
+        when(refreshTokenStore.matches("test@example.com", oldToken)).thenReturn(true);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
         AuthResponse result = authService.refreshToken(req, "127.0.0.1");
@@ -202,12 +214,13 @@ class AuthServiceTest {
 
         when(jwtTokenProvider.validateToken(staleToken)).thenReturn(true);
         when(jwtTokenProvider.getEmailFromToken(staleToken)).thenReturn("test@example.com");
-        when(refreshTokenStore.get("test@example.com")).thenReturn("different-token");
+        when(refreshTokenStore.matches("test@example.com", staleToken)).thenReturn(false);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
         assertThatThrownBy(() -> authService.refreshToken(req, "127.0.0.1"))
             .isInstanceOf(BusinessException.class);
 
+        verify(refreshTokenStore).deleteAll("test@example.com");
         verify(securityEventService).record(eq(EventType.REFRESH_REUSE_DETECTED), any(),
             anyString(), any(), anyString(), anyString(), anyString());
     }
@@ -220,7 +233,7 @@ class AuthServiceTest {
 
         when(jwtTokenProvider.validateToken(oldToken)).thenReturn(true);
         when(jwtTokenProvider.getEmailFromToken(oldToken)).thenReturn("test@example.com");
-        when(refreshTokenStore.get("test@example.com")).thenReturn(oldToken);
+        when(refreshTokenStore.matches("test@example.com", oldToken)).thenReturn(true);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(jwtTokenProvider.generateAccessToken(eq("test@example.com"), anyString(), anyString()))
             .thenReturn("rotated-access-token");
@@ -244,7 +257,7 @@ class AuthServiceTest {
         when(jwtTokenProvider.validateToken(oldToken)).thenReturn(true);
         when(jwtTokenProvider.getEmailFromToken(oldToken)).thenReturn("test@example.com");
         // 이미 회전된 뒤 저장소에는 다른 토큰이 남아있는 상황
-        when(refreshTokenStore.get("test@example.com")).thenReturn("rotated-refresh-token");
+        when(refreshTokenStore.matches("test@example.com", oldToken)).thenReturn(false);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
         assertThatThrownBy(() -> authService.refreshToken(req, "127.0.0.1"))
@@ -261,7 +274,7 @@ class AuthServiceTest {
 
         when(jwtTokenProvider.validateToken(token)).thenReturn(true);
         when(jwtTokenProvider.getEmailFromToken(token)).thenReturn("test@example.com");
-        when(refreshTokenStore.get("test@example.com")).thenReturn(null);
+        when(refreshTokenStore.matches("test@example.com", token)).thenReturn(false);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
         assertThatThrownBy(() -> authService.refreshToken(req, "127.0.0.1"))
@@ -299,5 +312,28 @@ class AuthServiceTest {
         verify(webSocketSessionRegistry).closeUserSessions("test@example.com");
         verify(refreshTokenStore).saveSession(eq("test@example.com"), anyString(), anyLong());
         verify(refreshTokenStore, never()).deleteSession(anyString());
+    }
+
+    @Test
+    @DisplayName("invalidateByRefreshToken_ValidToken: refresh 토큰으로 Redis 세션 정리")
+    void invalidateByRefreshToken_ValidToken() {
+        when(jwtTokenProvider.validateToken("valid-refresh-token")).thenReturn(true);
+        when(jwtTokenProvider.getEmailFromToken("valid-refresh-token")).thenReturn("test@example.com");
+
+        boolean invalidated = authService.invalidateByRefreshToken("valid-refresh-token");
+
+        assertThat(invalidated).isTrue();
+        verify(refreshTokenStore).deleteAll("test@example.com");
+    }
+
+    @Test
+    @DisplayName("invalidateByRefreshToken_InvalidToken: 잘못된 refresh 토큰이면 no-op")
+    void invalidateByRefreshToken_InvalidToken() {
+        when(jwtTokenProvider.validateToken("invalid-refresh-token")).thenReturn(false);
+
+        boolean invalidated = authService.invalidateByRefreshToken("invalid-refresh-token");
+
+        assertThat(invalidated).isFalse();
+        verify(refreshTokenStore, never()).deleteAll(anyString());
     }
 }

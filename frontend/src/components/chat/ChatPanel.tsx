@@ -5,6 +5,7 @@ import SockJS from 'sockjs-client';
 import { chatService } from '@/services/chatService';
 import { useAuthStore } from '@/store/authStore';
 import { ReportModal } from '@/components/common/ReportModal';
+import { notifySessionExpired } from '@/lib/sessionExpiryBridge';
 import type { ChatMessage } from '@/types/chat';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
@@ -112,7 +113,7 @@ export function ChatPanel({
 
         client.subscribe('/user/queue/session-expired', () => {
           if (!active) return;
-          useAuthStore.setState({ isSessionExpired: true, isAuthenticated: false, user: null });
+          notifySessionExpired();
           client.deactivate();
         });
 

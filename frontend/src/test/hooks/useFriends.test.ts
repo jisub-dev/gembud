@@ -13,7 +13,7 @@ import {
   useRemoveFriend,
 } from '@/hooks/queries/useFriends';
 import friendService from '@/services/friendService';
-import type { FriendRequest } from '@/types/friend';
+import type { Friend, FriendRequest } from '@/types/friend';
 
 vi.mock('@/services/friendService', () => ({
   default: {
@@ -64,7 +64,7 @@ describe('useFriends queries', () => {
   });
 
   it('returns friends list', async () => {
-    vi.mocked(friendService.getFriends).mockResolvedValue([mockFriend] as any);
+    vi.mocked(friendService.getFriends).mockResolvedValue([mockFriend] as Friend[]);
 
     const { result } = renderHook(() => useFriends(), {
       wrapper: createWrapper(),
@@ -75,7 +75,7 @@ describe('useFriends queries', () => {
   });
 
   it('returns pending friend requests', async () => {
-    vi.mocked(friendService.getPendingRequests).mockResolvedValue([mockPendingRequest] as any);
+    vi.mocked(friendService.getPendingRequests).mockResolvedValue([mockPendingRequest] as FriendRequest[]);
 
     const { result } = renderHook(() => useFriendRequests(), {
       wrapper: createWrapper(),
@@ -87,7 +87,7 @@ describe('useFriends queries', () => {
   });
 
   it('returns sent requests', async () => {
-    vi.mocked(friendService.getSentRequests).mockResolvedValue([mockPendingRequest] as any);
+    vi.mocked(friendService.getSentRequests).mockResolvedValue([mockPendingRequest] as FriendRequest[]);
 
     const { result } = renderHook(() => useSentFriendRequests(), {
       wrapper: createWrapper(),
@@ -104,7 +104,7 @@ describe('useFriends mutations', () => {
   });
 
   it('calls sendFriendRequest with friendId', async () => {
-    vi.mocked(friendService.sendFriendRequest).mockResolvedValue(undefined as any);
+    vi.mocked(friendService.sendFriendRequest).mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useSendFriendRequest(), {
       wrapper: createWrapper(),
@@ -119,7 +119,7 @@ describe('useFriends mutations', () => {
   });
 
   it('calls acceptFriendRequest with requestId', async () => {
-    vi.mocked(friendService.acceptFriendRequest).mockResolvedValue(undefined as any);
+    vi.mocked(friendService.acceptFriendRequest).mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useAcceptFriendRequest(), {
       wrapper: createWrapper(),
@@ -134,7 +134,7 @@ describe('useFriends mutations', () => {
   });
 
   it('calls rejectFriendRequest with requestId', async () => {
-    vi.mocked(friendService.rejectFriendRequest).mockResolvedValue(undefined as any);
+    vi.mocked(friendService.rejectFriendRequest).mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useRejectFriendRequest(), {
       wrapper: createWrapper(),
@@ -149,7 +149,7 @@ describe('useFriends mutations', () => {
   });
 
   it('calls cancelSentFriendRequest with requestId', async () => {
-    vi.mocked(friendService.cancelSentFriendRequest).mockResolvedValue(undefined as any);
+    vi.mocked(friendService.cancelSentFriendRequest).mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useCancelSentFriendRequest(), {
       wrapper: createWrapper(),
@@ -164,7 +164,7 @@ describe('useFriends mutations', () => {
   });
 
   it('calls removeFriend with friendId', async () => {
-    vi.mocked(friendService.removeFriend).mockResolvedValue(undefined as any);
+    vi.mocked(friendService.removeFriend).mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useRemoveFriend(), {
       wrapper: createWrapper(),
@@ -215,11 +215,11 @@ describe('useFriends mutations', () => {
       },
     ];
 
-    const friends: typeof mockFriend[] = [];
+    const friends: Friend[] = [];
 
     vi.mocked(friendService.getPendingRequests).mockImplementation(async () => [...received]);
     vi.mocked(friendService.getSentRequests).mockImplementation(async () => [...sent]);
-    vi.mocked(friendService.getFriends).mockImplementation(async () => [...friends] as any);
+    vi.mocked(friendService.getFriends).mockImplementation(async () => [...friends]);
 
     vi.mocked(friendService.sendFriendRequest).mockImplementation(async (friendId: number) => {
       sent.push({
@@ -228,7 +228,7 @@ describe('useFriends mutations', () => {
         userNickname: 'Me',
         friendId,
         friendNickname: 'Target',
-        status: 'PENDING',
+        status: 'PENDING' as const,
         createdAt: '2026-03-06T11:00:00',
         updatedAt: '2026-03-06T11:00:00',
       });

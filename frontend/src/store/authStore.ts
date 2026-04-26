@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { AxiosError } from 'axios';
 import { authService, type SignupRequest, type LoginRequest } from '../services/authService';
 import type { User } from '../types/user';
 import { featureFlags, isPremiumActive } from '@/config/features';
@@ -42,11 +43,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || 'Signup failed',
-        isLoading: false,
-      });
+    } catch (error: unknown) {
+      const msg = error instanceof AxiosError
+        ? (error.response?.data as { message?: string })?.message ?? 'Signup failed'
+        : 'Signup failed';
+      set({ error: msg, isLoading: false });
       throw error;
     }
   },
@@ -69,11 +70,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.message || 'Login failed',
-        isLoading: false,
-      });
+    } catch (error: unknown) {
+      const msg = error instanceof AxiosError
+        ? (error.response?.data as { message?: string })?.message ?? 'Login failed'
+        : 'Login failed';
+      set({ error: msg, isLoading: false });
       throw error;
     }
   },
@@ -87,7 +88,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isSessionExpired: false,
         error: null,
       });
-    } catch (error: any) {
+    } catch {
       // Logout failed, but clear state anyway
       set({
         user: null,
@@ -117,7 +118,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           },
           isAuthenticated: true,
         });
-      } catch (error: any) {
+      } catch {
         set({ error: 'Failed to get user info after OAuth2 login' });
       }
     } else {

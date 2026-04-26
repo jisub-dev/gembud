@@ -2,6 +2,9 @@ const SW_VERSION = "v2";
 const STATIC_CACHE = `gembud-static-${SW_VERSION}`;
 const RUNTIME_CACHE = `gembud-runtime-${SW_VERSION}`;
 const OFFLINE_URL = "/offline.html";
+const IS_LOCAL_DEVELOPMENT =
+  self.location.hostname === "localhost" ||
+  self.location.hostname === "127.0.0.1";
 
 const PRECACHE_ASSETS = [
   "/",
@@ -11,74 +14,99 @@ const PRECACHE_ASSETS = [
   "/images/pwa-icon.svg",
 ];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_ASSETS))
-  );
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== STATIC_CACHE && key !== RUNTIME_CACHE)
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
-});
-
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
+if (IS_LOCAL_DEVELOPMENT) {
+  self.addEventListener("install", () => {
     self.skipWaiting();
-  }
-});
+  });
 
-self.addEventListener("fetch", (event) => {
-  const request = event.request;
-  if (request.method !== "GET") return;
-
-  const url = new URL(request.url);
-  const isSameOrigin = url.origin === self.location.origin;
-
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const responseClone = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
-          return response;
-        })
-        .catch(async () => {
-          const cachedIndex = await caches.match("/index.html");
-          if (cachedIndex) return cachedIndex;
-          return caches.match(OFFLINE_URL);
-        })
+  self.addEventListener("activate", (event) => {
+    event.waitUntil(
+      (async () => {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys
+            .filter((key) => key.startsWith("gembud-"))
+            .map((key) => caches.delete(key))
+        );
+        await self.registration.unregister();
+        const clients = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+        clients.forEach((client) => client.navigate(client.url));
+      })()
     );
-    return;
-  }
+  });
+} else {
+  self.addEventListener("install", (event) => {
+    event.waitUntil(
+      caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_ASSETS))
+    );
+  });
 
-  const isStaticAsset =
-    isSameOrigin &&
-    ["script", "style", "image", "font"].includes(request.destination);
+  self.addEventListener("activate", (event) => {
+    event.waitUntil(
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== STATIC_CACHE && key !== RUNTIME_CACHE)
+            .map((key) => caches.delete(key))
+        )
+      )
+    );
+    self.clients.claim();
+  });
 
-  if (isStaticAsset) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        const networkFetch = fetch(request)
+  self.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "SKIP_WAITING") {
+      self.skipWaiting();
+    }
+  });
+
+  self.addEventListener("fetch", (event) => {
+    const request = event.request;
+    if (request.method !== "GET") return;
+
+    const url = new URL(request.url);
+    const isSameOrigin = url.origin === self.location.origin;
+
+    if (request.mode === "navigate") {
+      event.respondWith(
+        fetch(request)
           .then((response) => {
-            if (response && response.ok) {
-              const responseClone = response.clone();
-              caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
-            }
+            const responseClone = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
             return response;
           })
-          .catch(() => cached);
+          .catch(async () => {
+            const cachedIndex = await caches.match("/index.html");
+            if (cachedIndex) return cachedIndex;
+            return caches.match(OFFLINE_URL);
+          })
+      );
+      return;
+    }
 
-        return cached || networkFetch;
-      })
-    );
-  }
-});
+    const isStaticAsset =
+      isSameOrigin &&
+      ["script", "style", "image", "font"].includes(request.destination);
+
+    if (isStaticAsset) {
+      event.respondWith(
+        caches.match(request).then((cached) => {
+          const networkFetch = fetch(request)
+            .then((response) => {
+              if (response && response.ok) {
+                const responseClone = response.clone();
+                caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
+              }
+              return response;
+            })
+            .catch(() => cached);
+
+          return cached || networkFetch;
+        })
+      );
+    }
+  });
+}

@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
+import * as Sentry from '@sentry/react';
 import { useAuthStore } from './store/authStore';
 import { ToastContainer } from './components/common/ToastContainer';
-import { SessionExpiredModal } from './components/common/SessionExpiredModal';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import { PwaUpdateBanner } from './components/common/PwaUpdateBanner';
 import { OfflineStatusBanner } from './components/common/OfflineStatusBanner';
@@ -55,12 +55,14 @@ function SessionExpiredHandler() {
   const isSessionExpired = useAuthStore((s) => s.isSessionExpired);
   const navigate = useNavigate();
 
-  const handleConfirm = () => {
+  useEffect(() => {
+    if (!isSessionExpired) return;
+
     useAuthStore.setState({ isSessionExpired: false });
     navigate('/login', { replace: true });
-  };
+  }, [isSessionExpired, navigate]);
 
-  return <SessionExpiredModal isOpen={isSessionExpired} onConfirm={handleConfirm} />;
+  return null;
 }
 
 function LegacyGameDetailRedirect() {
@@ -103,7 +105,14 @@ function App() {
   }, []);
 
   return (
-    <>
+    <Sentry.ErrorBoundary
+      fallback={() => (
+        <div className="p-8 text-center">
+          <h1 className="text-xl font-semibold">예상치 못한 오류가 발생했습니다</h1>
+          <p className="mt-2 text-sm text-gray-600">잠시 후 다시 시도해주세요.</p>
+        </div>
+      )}
+    >
     <ToastContainer />
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <SessionExpiredHandler />
@@ -233,7 +242,7 @@ function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
-    </>
+    </Sentry.ErrorBoundary>
   );
 }
 

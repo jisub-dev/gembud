@@ -1,5 +1,9 @@
 /// <reference types="vite/client" />
 
+interface Window {
+  adsbygoogle?: unknown[];
+}
+
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
   readonly VITE_FEATURE_PREMIUM_ENABLED?: string;
@@ -7,6 +11,9 @@ interface ImportMetaEnv {
   readonly VITE_ADSENSE_SLOT_LEADERBOARD?: string;
   readonly VITE_ADSENSE_SLOT_RECTANGLE?: string;
   readonly VITE_ADSENSE_SLOT_INLINE?: string;
+  readonly VITE_SENTRY_DSN?: string;
+  readonly VITE_SENTRY_ENVIRONMENT?: string;
+  readonly VITE_SENTRY_RELEASE?: string;
 }
 
 interface ImportMeta {
