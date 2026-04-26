@@ -1,10 +1,10 @@
 spring:
   datasource:
-    # Testcontainers JDBC URL — actual host/port managed by @ServiceConnection
-    url: jdbc:tc:postgresql:16:///testdb
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
-    username: test
-    password: test
+    # Testcontainers by default; override via env vars for direct-PostgreSQL CI environments
+    url: ${SPRING_DATASOURCE_URL:jdbc:tc:postgresql:16:///testdb}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.testcontainers.jdbc.ContainerDatabaseDriver}
+    username: ${SPRING_DATASOURCE_USERNAME:test}
+    password: ${SPRING_DATASOURCE_PASSWORD:test}
 
   jpa:
     hibernate:
