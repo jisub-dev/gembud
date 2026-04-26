@@ -47,7 +47,9 @@ export default function AdBanner({ type, adData, className = '' }: AdBannerProps
     if (!adData && insRef.current) {
       try {
         ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-      } catch {}
+      } catch {
+        // AdSense script not loaded — slot stays inert
+      }
     }
   }, [adData]);
 
