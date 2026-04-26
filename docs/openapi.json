@@ -2848,12 +2848,12 @@
             "required": false,
             "schema": {
               "type": "string",
+              "default": "PENDING",
               "enum": [
                 "PENDING",
                 "REVIEWED",
                 "RESOLVED"
-              ],
-              "default": "PENDING"
+              ]
             }
           },
           {
@@ -4533,13 +4533,13 @@
       "CsrfToken": {
         "type": "object",
         "properties": {
-          "headerName": {
-            "type": "string"
-          },
           "parameterName": {
             "type": "string"
           },
           "token": {
+            "type": "string"
+          },
+          "headerName": {
             "type": "string"
           }
         }

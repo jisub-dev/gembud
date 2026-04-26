@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, mockUser, mockGame, mockRoom, setupAuthenticatedSession, seedAuthStore } from './fixtures';
+import { API, mockGame, mockRoom, setupAuthenticatedSession, seedAuthStore } from './fixtures';
 
 async function setupRoomListPage(page: import('@playwright/test').Page) {
   await setupAuthenticatedSession(page);
