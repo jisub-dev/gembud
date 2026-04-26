@@ -51,6 +51,10 @@ jobs:
         run: ./gradlew test --continue
         working-directory: backend
 
+      - name: Check coverage threshold
+        run: ./gradlew jacocoTestReport jacocoTestCoverageVerification
+        working-directory: backend
+
       - name: Upload backend test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4

@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '3.2.2'
     id 'io.spring.dependency-management' version '1.1.4'
     id 'checkstyle'
+    id 'jacoco'
     id 'org.springdoc.openapi-gradle-plugin' version '1.8.0'
 }
 
@@ -92,6 +93,50 @@ checkstyleMain {
 
 checkstyleTest {
     source = 'src/test/java'
+}
+
+// JaCoCo — generate coverage report after tests; enforce minimum thresholds
+jacoco {
+    toolVersion = '0.8.11'
+}
+
+def jacocoExcludes = [
+    '**/entity/**',
+    '**/dto/**',
+    '**/exception/**',
+    '**/config/**',
+    'com/gembud/GembudApplication.class'
+]
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(
+        sourceSets.main.output.asFileTree.matching { exclude(jacocoExcludes) }
+    )
+}
+
+jacocoTestCoverageVerification {
+    dependsOn jacocoTestReport
+    classDirectories.setFrom(
+        sourceSets.main.output.asFileTree.matching { exclude(jacocoExcludes) }
+    )
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.50  // 50% line coverage on service/controller logic
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn jacocoTestCoverageVerification
 }
 
 // OpenAPI spec generation — boots the app with the docs profile (H2, no external deps)
