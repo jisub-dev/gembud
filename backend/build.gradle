@@ -75,6 +75,10 @@ dependencies {
     // Sentry (error tracking)
     implementation 'io.sentry:sentry-spring-boot-starter-jakarta:7.14.0'
     implementation 'io.sentry:sentry-logback:7.14.0'
+
+    // Resilience4j — circuit breaker + retry for outbound HTTP calls
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 }
 
 tasks.named('test') {

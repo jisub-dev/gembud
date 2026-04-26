@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,15 +56,6 @@ class SlackAlertServiceTest {
 
         slackAlertService.sendAlert("LOGIN_FAIL", "HIGH", 1L, "127.0.0.1", "/api/auth/login", "dedupe-key");
 
-        // Only checked dedup — no HTTP call attempted beyond what mocks allow
         verify(valueOps).setIfAbsent(eq("ratelimit:slack:dedupe-key"), eq("1"), eq(10L), eq(TimeUnit.MINUTES));
-    }
-
-    @Test
-    @DisplayName("processRetries - 빈 큐에서는 아무 작업도 하지 않는다")
-    void processRetries_emptyQueue_noOp() {
-        slackAlertService.processRetries();
-        // No exception, no interaction
-        verify(redisTemplate, never()).opsForValue();
     }
 }

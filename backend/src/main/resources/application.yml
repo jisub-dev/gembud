@@ -73,3 +73,26 @@ ads:
 
 sentry:
   enabled: false  # disabled by default in dev/test; prod profile overrides via SENTRY_DSN
+
+# Resilience4j — circuit breaker + retry for outbound HTTP calls (Slack webhook)
+resilience4j:
+  circuitbreaker:
+    instances:
+      slack:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50         # open after 50% failures in the window
+        wait-duration-in-open-state: 60s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - java.lang.Exception
+  retry:
+    instances:
+      slack:
+        max-attempts: 3
+        wait-duration: 2s
+        exponential-backoff-multiplier: 3  # 2s, 6s, 18s
+        retry-exceptions:
+          - java.lang.Exception
