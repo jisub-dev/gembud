@@ -517,3 +517,18 @@ demand; it only performs read-only requests.
 
 This section is a placeholder. Edit it as soon as real contacts are
 known.
+
+---
+
+## Regenerating the OpenAPI Spec
+
+The API spec lives at `docs/openapi.json`. Regenerate it whenever you add, remove, or rename a controller endpoint or change a DTO used in a response.
+
+```bash
+cd backend
+./gradlew generateOpenApiDocs
+```
+
+This boots the app with the `docs` profile (H2 in-memory, no external Postgres/Redis), hits `/api/v3/api-docs`, and writes `docs/openapi.json`. Commit the updated file.
+
+CI runs an `openapi-drift` job that regenerates the spec and fails if the committed file differs from what the app produces.

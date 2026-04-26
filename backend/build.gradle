@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '3.2.2'
     id 'io.spring.dependency-management' version '1.1.4'
     id 'checkstyle'
+    id 'org.springdoc.openapi-gradle-plugin' version '1.8.0'
 }
 
 group = 'com.gembud'
@@ -42,6 +43,7 @@ dependencies {
 
     // Database
     runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'com.h2database:h2'
     implementation 'org.flywaydb:flyway-core'
 
     // Testcontainers for PostgreSQL integration tests
@@ -90,4 +92,16 @@ checkstyleMain {
 
 checkstyleTest {
     source = 'src/test/java'
+}
+
+// OpenAPI spec generation — boots the app with the docs profile (H2, no external deps)
+// and dumps the spec to docs/openapi.yaml via the springdoc plugin.
+openApi {
+    apiDocsUrl.set("http://localhost:8080/api/v3/api-docs")
+    outputDir.set(file("${projectDir}/../docs"))
+    outputFileName.set("openapi.json")
+    waitTimeInSeconds.set(60)
+    customBootRun {
+        args.set(["--spring.profiles.active=docs"])
+    }
 }
