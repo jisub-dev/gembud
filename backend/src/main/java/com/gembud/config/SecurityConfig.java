@@ -57,7 +57,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokenRepository.setCookiePath("/");
-        csrfTokenRepository.setCookieSameSite("None");
         SpaCsrfTokenRequestHandler csrfTokenRequestHandler = new SpaCsrfTokenRequestHandler();
 
         http
@@ -67,6 +66,9 @@ public class SecurityConfig {
                 .csrfTokenRequestHandler(csrfTokenRequestHandler)
                 .ignoringRequestMatchers(
                     "/ws/**",
+                    "/ws/*/xhr",
+                    "/ws/*/xhr_streaming",
+                    "/ws/*/xhr_send",
                     "/api/auth/oauth2/**",
                     "/auth/oauth2/**",
                     // Actuator endpoints are stateless probes/scrapes, no CSRF token to send
