@@ -54,6 +54,7 @@ server:
   servlet:
     context-path: /api
   shutdown: graceful
+  forward-headers-strategy: NATIVE
 
 logging:
   level:
