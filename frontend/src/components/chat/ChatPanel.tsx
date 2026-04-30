@@ -49,6 +49,7 @@ export function ChatPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isAtBottomRef = useRef(true);
   const onRoomUpdateRef = useRef(onRoomUpdate);
+  const failCountRef = useRef(0);
 
   useEffect(() => {
     onRoomUpdateRef.current = onRoomUpdate;
@@ -156,8 +157,12 @@ export function ChatPanel({
       },
       onWebSocketError: () => {
         if (!active) return;
-        setError('WebSocket 연결 실패');
-        setConnecting(false);
+        failCountRef.current += 1;
+        if (failCountRef.current >= 5) {
+          setError('채팅 서버와 연결이 끊겼습니다');
+          setConnecting(false);
+          client.deactivate();
+        }
       },
     });
 
@@ -267,7 +272,16 @@ export function ChatPanel({
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/20 px-3 py-1.5 text-red-400 text-xs text-center flex-shrink-0">{error}</div>
+        <div className="bg-red-500/20 px-3 py-2 text-red-400 text-xs text-center flex-shrink-0 flex items-center justify-center gap-3">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-2 py-0.5 bg-red-500/30 hover:bg-red-500/50 rounded text-red-300 text-xs transition"
+          >
+            새로고침
+          </button>
+        </div>
       )}
 
       {/* Messages */}
