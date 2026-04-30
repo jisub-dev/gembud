@@ -94,32 +94,10 @@ services:
         VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT:-production}
         VITE_SENTRY_RELEASE: ${VITE_SENTRY_RELEASE:-}
     container_name: gembud-frontend-prod
-    expose:
-      - "80"
-    depends_on:
-      - backend
-    networks:
-      - gembud-network
-    restart: unless-stopped
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: gembud-caddy-prod
     ports:
       - "80:80"
-      - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL}
-    volumes:
-      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
     depends_on:
-      backend:
-        condition: service_started
-      frontend:
-        condition: service_healthy
+      - backend
     networks:
       - gembud-network
     restart: unless-stopped
@@ -128,10 +106,6 @@ volumes:
   postgres_data_prod:
     driver: local
   redis_data_prod:
-    driver: local
-  caddy_data:
-    driver: local
-  caddy_config:
     driver: local
 
 networks:
